@@ -19,11 +19,19 @@ export interface MockEphemeralPass {
   readonly patientPseudonym: string;
   readonly domain: DataDomain;
   readonly retention: RetentionPolicy;
-  readonly storageProvider: 'pinata-ipfs' | 'qorechain-da' | 'memory-fallback' | 'gateway-local';
+  readonly storageProvider:
+    | 'pinata-ipfs'
+    | 'qorechain-da'
+    | 'memory-fallback'
+    | 'gateway-local'
+    /** Read from the chain: the real provider/CID is only known after the gateway releases it. */
+    | 'gateway-custody';
   /** Hard-coded example shown for the UI demo: it has no real ciphertext and is NOT on-chain. */
   readonly isSample?: boolean;
   /** true only when grantTimedAccess succeeded on-chain and the envelope is in the gateway. */
   readonly onChain?: boolean;
+  /** Discovered via getGrantsBySpecialist (not created in this tab): fields not on-chain are placeholders. */
+  readonly fromChainScan?: boolean;
   readonly linkedPartName: string;
   readonly linkedPartId: `0x${string}`;
   readonly contentHash: `0x${string}`;
@@ -31,11 +39,12 @@ export interface MockEphemeralPass {
   readonly remainingSeconds: number;
   readonly revoked: boolean;
   readonly gpsSector: string;
+  /** null when unknown (e.g. passes read from the chain, which stores no telemetry). */
   readonly metrics: {
     readonly neuralLatencyMs: number;
     readonly impedanceKOhm: number;
     readonly coherencePct: number;
-  };
+  } | null;
 }
 
 export interface MockBionicPart {
