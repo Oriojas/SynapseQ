@@ -87,19 +87,19 @@ export const SYNAPSE_VAULT_ABI = [
         name: "",
         type: "tuple",
         components: [
-          { name: "partId", type: "bytes32" },
           { name: "bearer", type: "address" },
+          { name: "implantedAt", type: "uint64" },
+          { name: "firmwareVersion", type: "uint32" },
           { name: "manufacturer", type: "address" },
+          { name: "lastUpdatedAt", type: "uint64" },
           { name: "zone", type: "uint8" },
           { name: "status", type: "uint8" },
-          { name: "modelName", type: "string" },
-          { name: "serialNumber", type: "string" },
+          { name: "partId", type: "bytes32" },
           { name: "firmwareHash", type: "bytes32" },
           { name: "calibrationHash", type: "bytes32" },
-          { name: "pqcSignature", type: "bytes" },
-          { name: "implantedAt", type: "uint64" },
-          { name: "lastUpdatedAt", type: "uint64" },
-          { name: "firmwareVersion", type: "uint32" }
+          { name: "modelName", type: "string" },
+          { name: "serialNumber", type: "string" },
+          { name: "pqcSignature", type: "bytes" }
         ]
       }
     ],
