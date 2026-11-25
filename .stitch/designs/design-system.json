@@ -1,0 +1,173 @@
+{
+  "name": "assets/88b32cfef57144919ef1a1d3a599b8fd",
+  "designSystem": {
+    "displayName": "Biotech Post-Quantum HUD",
+    "styleGuidelines": "## Brand & Style\nThis design system defines an authoritative, hyper-specialized user interface bridging synthetic neuro-biology and post-quantum distributed ledger technology. Operating at the confluence of lattice-based cryptography (ML-KEM-1024, SHAKE-256) and autonomous bio-telemetry on the QoreChain Diana Testnet, the aesthetic targets computational biologists, cryptographic engineers, and node operators.\n\nThe visual direction is **Cyber-Biotech Glassmorphism paired with High-Density Terminal Precision**. It prioritizes zero-latency perception, definitive structural boundaries, and tactical illumination. Ambient black voids allow luminous telemetry to function as semantic signaling rather than decoration, evoking the cold clarity of a sterile biosafety level 4 computation pod.\n\n## Layout & Spacing\nThe layout adheres to a 12-column dynamic terminal grid on desktop screens (`1280px` and above), transitioning to an 8-column layout on tablets (`768px - 1279px`) and a 4-column compact flow on mobile devices (`<768px`).\n\n- **Vertical Rhythm**: Built on an absolute 4px/8px micro-grid. Critical diagnostic modules maintain a dense vertical footprint, maximizing information density above the viewport fold.\n- **Terminal Paneling**: Grid sections utilize modular interlocking divisions separated by fixed gutters. Modules do not use fluid white space; empty regions must be backed by sub-layer grid meshes or dark-toned container fills to sustain continuity.\n\n## Elevation & Depth\nElevation is realized through layered luminosity, translucency, and spectral edge lighting rather than diffuse Drop-Shadow physics:\n\n- **Surface Tiers**:\n  - `Level 0 (Canvas)`: `#090D16` base.\n  - `Level 1 (Sub-Panels)`: `#0E1524` with 80% opacity and 12px backdrop-filter blur. Border: 1px solid `#1F2C47`.\n  - `Level 2 (Active Modules & HUD Windows)`: `#141D32` with 90% opacity and 16px backdrop-filter blur. Border: 1px solid `#2E3E63`.\n  - `Level 3 (Modals & Alerts)`: `#1B2640` with 95% opacity, 24px backdrop blur, and an outer ambient aura tinted to the component status:\n    - Primary: `0 0 24px rgba(0, 245, 212, 0.15)`\n    - Kill-Switch / Alert: `0 0 32px rgba(255, 56, 96, 0.25)`\n    - Network / Protocol: `0 0 24px rgba(142, 117, 255, 0.18)`\n- **Low-Contrast Reticles**: Surface elements feature razor-thin 1px borders. Highlighting occurs via border color step-up rather than shadow displacement.\n\n## Components\n\n### Buttons\n- **Quantum Action (Primary)**: Background in `#00F5D4`, text in `#090D16` (`label-md`, font-weight 700). Box glow of `0 0 16px rgba(0, 245, 212, 0.35)` on hover. Chamfered or 4px corner.\n- **Secondary Terminal**: Background in `#141D32`, text in `#00F5D4`, border 1px solid `#1F2C47`. Hover triggers border transition to `#00F5D4` and background to `#1B2640`.\n- **Kill-Switch (Danger)**: Background in transparent `#FF3860` (15% fill), border 1px solid `#FF3860`, text in `#FF5C7C`. Active hover triggers full `#FF3860` fill with white text and `0 0 24px rgba(255, 56, 96, 0.5)` emergency aura.\n\n### Cryptographic Hash Pills\n- Inline pill containers with 2px padding, monospaced text (`code-sm`), background `#0E1524`, border 1px solid `#1F2C47`.\n- Houses shortened SHA-3 / SHAKE-256 addresses (e.g., `0x7a9F...c4E2`) paired with an interactive 12px one-click copy trigger that flashes Quantum Cyan on clipboard write.\n\n### Status Telemetry Meters & Gauge Bars\n- Segmented linear tracks with 2px gaps between computational blocks.\n- Fill state driven by programmatic color: Emerald Cyan for stability (>99% quantum state coherence), Quantum Cyan for nominal network performance, Glowing Crimson for decoherence/drift.\n\n### Form Inputs & Terminal Selectors\n- Background `#0E1524`, border 1px solid `#1F2C47`, text in `#FFFFFF`. Text entry in `JetBrains Mono`.\n- Focus state switches border to `#00F5D4` with an inner glow of `inset 0 0 8px rgba(0, 245, 212, 0.12)`.\n- Prepend indicators include monospace protocol stamps (e.g., `[ML-KEM] >> `).\n\n### Neon Micro-Badges\n- Height 18px, uppercase `label-sm` monospaced lettering, tracking +0.08em.\n- Includes a 4px pulsating LED dot on the leading edge (e.g., green for `CHAIN 9800: SYNCED`, purple for `DIANA TESTNET`, crimson for `REVOCATION LOCK`).\n\n### Glassmorphism HUD Panels\n- Background `#0E1524` with 80% alpha, 1px `#1F2C47` borders, inner linear top highlight (`linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 100%)`).\n- Header bars feature technical metadata tags (`SEC_LVL: 5`, `SYS_STAT: NOMINAL`) anchored to opposite corners.",
+    "theme": {
+      "colorMode": "DARK",
+      "font": "SPACE_GROTESK",
+      "roundness": "ROUND_FOUR",
+      "customColor": "#00f5d4",
+      "headlineFont": "SPACE_GROTESK",
+      "bodyFont": "PLUS_JAKARTA_SANS",
+      "labelFont": "JETBRAINS_MONO",
+      "namedColors": {
+        "surface_variant": "#31353f",
+        "on_surface": "#dfe2ef",
+        "on_secondary": "#31009a",
+        "secondary_fixed": "#e6deff",
+        "tertiary_fixed": "#ffdadb",
+        "surface_container_high": "#262a34",
+        "surface": "#0f131c",
+        "tertiary": "#fff4f3",
+        "surface_tint": "#00dfc1",
+        "surface_container_lowest": "#0a0e17",
+        "primary": "#d7fff3",
+        "on_background": "#dfe2ef",
+        "inverse_primary": "#006b5b",
+        "outline_variant": "#3a4a46",
+        "on_secondary_fixed": "#1c0062",
+        "tertiary_container": "#ffced0",
+        "secondary_fixed_dim": "#cabeff",
+        "on_primary_fixed_variant": "#005144",
+        "inverse_on_surface": "#2c303a",
+        "secondary_container": "#4827b6",
+        "on_primary_fixed": "#00201a",
+        "on_tertiary_fixed": "#40000e",
+        "on_surface_variant": "#b9cac4",
+        "on_error": "#690005",
+        "surface_bright": "#353943",
+        "outline": "#83948f",
+        "background": "#0f131c",
+        "on_primary_container": "#006c5c",
+        "inverse_surface": "#dfe2ef",
+        "on_tertiary": "#67001c",
+        "secondary": "#cabeff",
+        "on_secondary_fixed_variant": "#4827b6",
+        "surface_container": "#1c1f29",
+        "on_primary": "#00382f",
+        "error": "#ffb4ab",
+        "on_tertiary_container": "#bf003c",
+        "on_error_container": "#ffdad6",
+        "surface_dim": "#0f131c",
+        "primary_fixed": "#26fedc",
+        "surface_container_low": "#181b25",
+        "surface_container_highest": "#31353f",
+        "primary_fixed_dim": "#00dfc1",
+        "tertiary_fixed_dim": "#ffb2b7",
+        "on_tertiary_fixed_variant": "#91002b",
+        "error_container": "#93000a",
+        "on_secondary_container": "#b9aaff",
+        "primary_container": "#00f5d4"
+      },
+      "designMd": "---\nname: Biotech Post-Quantum HUD\ncolors:\n  surface: '#0f131c'\n  surface-dim: '#0f131c'\n  surface-bright: '#353943'\n  surface-container-lowest: '#0a0e17'\n  surface-container-low: '#181b25'\n  surface-container: '#1c1f29'\n  surface-container-high: '#262a34'\n  surface-container-highest: '#31353f'\n  on-surface: '#dfe2ef'\n  on-surface-variant: '#b9cac4'\n  inverse-surface: '#dfe2ef'\n  inverse-on-surface: '#2c303a'\n  outline: '#83948f'\n  outline-variant: '#3a4a46'\n  surface-tint: '#00dfc1'\n  primary: '#d7fff3'\n  on-primary: '#00382f'\n  primary-container: '#00f5d4'\n  on-primary-container: '#006c5c'\n  inverse-primary: '#006b5b'\n  secondary: '#cabeff'\n  on-secondary: '#31009a'\n  secondary-container: '#4827b6'\n  on-secondary-container: '#b9aaff'\n  tertiary: '#fff4f3'\n  on-tertiary: '#67001c'\n  tertiary-container: '#ffced0'\n  on-tertiary-container: '#bf003c'\n  error: '#ffb4ab'\n  on-error: '#690005'\n  error-container: '#93000a'\n  on-error-container: '#ffdad6'\n  primary-fixed: '#26fedc'\n  primary-fixed-dim: '#00dfc1'\n  on-primary-fixed: '#00201a'\n  on-primary-fixed-variant: '#005144'\n  secondary-fixed: '#e6deff'\n  secondary-fixed-dim: '#cabeff'\n  on-secondary-fixed: '#1c0062'\n  on-secondary-fixed-variant: '#4827b6'\n  tertiary-fixed: '#ffdadb'\n  tertiary-fixed-dim: '#ffb2b7'\n  on-tertiary-fixed: '#40000e'\n  on-tertiary-fixed-variant: '#91002b'\n  background: '#0f131c'\n  on-background: '#dfe2ef'\n  surface-variant: '#31353f'\ntypography:\n  headline-xl:\n    fontFamily: Space Grotesk\n    fontSize: 48px\n    fontWeight: '700'\n    lineHeight: 56px\n  headline-xl-mobile:\n    fontFamily: Space Grotesk\n    fontSize: 32px\n    fontWeight: '700'\n    lineHeight: 40px\n  headline-lg:\n    fontFamily: Space Grotesk\n    fontSize: 32px\n    fontWeight: '600'\n    lineHeight: 40px\n  headline-lg-mobile:\n    fontFamily: Space Grotesk\n    fontSize: 24px\n    fontWeight: '600'\n    lineHeight: 32px\n  headline-md:\n    fontFamily: Space Grotesk\n    fontSize: 24px\n    fontWeight: '600'\n    lineHeight: 32px\n  headline-sm:\n    fontFamily: Space Grotesk\n    fontSize: 18px\n    fontWeight: '600'\n    lineHeight: 24px\n  body-lg:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 16px\n    fontWeight: '400'\n    lineHeight: 24px\n  body-md:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 14px\n    fontWeight: '400'\n    lineHeight: 20px\n  body-sm:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 12px\n    fontWeight: '400'\n    lineHeight: 16px\n  code-lg:\n    fontFamily: JetBrains Mono\n    fontSize: 14px\n    fontWeight: '500'\n    lineHeight: 20px\n  code-md:\n    fontFamily: JetBrains Mono\n    fontSize: 12px\n    fontWeight: '500'\n    lineHeight: 16px\n  code-sm:\n    fontFamily: JetBrains Mono\n    fontSize: 10px\n    fontWeight: '600'\n    lineHeight: 14px\n  label-md:\n    fontFamily: JetBrains Mono\n    fontSize: 11px\n    fontWeight: '600'\n    lineHeight: 14px\n  label-sm:\n    fontFamily: JetBrains Mono\n    fontSize: 9px\n    fontWeight: '700'\n    lineHeight: 12px\nrounded:\n  sm: 0.125rem\n  DEFAULT: 0.25rem\n  md: 0.375rem\n  lg: 0.5rem\n  xl: 0.75rem\n  full: 9999px\nspacing:\n  gutter: 1rem\n  gutter-desktop: 1.5rem\n  margin: 1rem\n  margin-desktop: 2.5rem\n  space-xs: 0.25rem\n  space-sm: 0.5rem\n  space-md: 1rem\n  space-lg: 1.5rem\n  space-xl: 2.5rem\n---\n\n## Brand & Style\nThis design system defines an authoritative, hyper-specialized user interface bridging synthetic neuro-biology and post-quantum distributed ledger technology. Operating at the confluence of lattice-based cryptography (ML-KEM-1024, SHAKE-256) and autonomous bio-telemetry on the QoreChain Diana Testnet, the aesthetic targets computational biologists, cryptographic engineers, and node operators.\n\nThe visual direction is **Cyber-Biotech Glassmorphism paired with High-Density Terminal Precision**. It prioritizes zero-latency perception, definitive structural boundaries, and tactical illumination. Ambient black voids allow luminous telemetry to function as semantic signaling rather than decoration, evoking the cold clarity of a sterile biosafety level 4 computation pod.\n\n## Colors\nThe palette is built strictly on deep obsidian foundations layered with spectral chromatic accents for cryptographic state signaling:\n\n- **Canvas & Containers**: \n  - Base Obsidian Canvas: `#090D16`\n  - Surface Tier 1 (Base Cards / Panels): `#0E1524`\n  - Surface Tier 2 (Interactive Modules / Inputs): `#141D32`\n  - Surface Tier 3 (Floating HUD / Overlays / Flyouts): `#1B2640`\n  - Structural Reticles & Borders: `#1F2C47` default, `#2E3E63` active/highlight\n- **Cryptographic Primary (`#00F5D4`, base `#00D1B2`)**: Quantum Cyan. Designates post-quantum algorithmic encapsulation, cryptographic handshakes, valid signatures, and primary operational triggers.\n- **Telemetry Secondary (`#8E75FF`, base `#6E56CF`)**: QoreChain Violet. Applied to chain parameters, epoch counters, testnet telemetry (Chain ID 9800), and neural routing protocols.\n- **Alert / Revocation (`#FF3860`, hot `#FF5C7C`)**: Glowing Crimson. Reserved exclusively for quantum decoherence alerts, emergency kill-switches, protocol revocations, and out-of-bound biometrics.\n- **Verified Integrity (`#00E676`)**: Emerald Cyan. Restricted to post-quantum zero-knowledge attestation (SHAKE-256 / ML-KEM verified).\n\n## Typography\nThe system enforces a dual-typeface protocol:\n- **Structural Display (`Space Grotesk`)**: Geometric, sharp, and forward-looking. Applied across section headlines, analytical module names, and major metric units.\n- **Operational Copy (`Plus Jakarta Sans`)**: Neutral, ultra-legible, modern sans-serif designed to balance high-density technical interfaces without causing eye fatigue during continuous monitoring.\n- **Cryptographic & Telemetric Labels (`JetBrains Mono`)**: Monospaced data displays for chain addresses, public key hashes, gas calculations, latency counters, and hex values. Labels are set in uppercase with track spacing (+0.05em to +0.1em) to preserve readability under reduced scales.\n\n## Layout & Spacing\nThe layout adheres to a 12-column dynamic terminal grid on desktop screens (`1280px` and above), transitioning to an 8-column layout on tablets (`768px - 1279px`) and a 4-column compact flow on mobile devices (`<768px`).\n\n- **Vertical Rhythm**: Built on an absolute 4px/8px micro-grid. Critical diagnostic modules maintain a dense vertical footprint, maximizing information density above the viewport fold.\n- **Terminal Paneling**: Grid sections utilize modular interlocking divisions separated by fixed gutters. Modules do not use fluid white space; empty regions must be backed by sub-layer grid meshes or dark-toned container fills to sustain continuity.\n\n## Elevation & Depth\nElevation is realized through layered luminosity, translucency, and spectral edge lighting rather than diffuse Drop-Shadow physics:\n\n- **Surface Tiers**:\n  - `Level 0 (Canvas)`: `#090D16` base.\n  - `Level 1 (Sub-Panels)`: `#0E1524` with 80% opacity and 12px backdrop-filter blur. Border: 1px solid `#1F2C47`.\n  - `Level 2 (Active Modules & HUD Windows)`: `#141D32` with 90% opacity and 16px backdrop-filter blur. Border: 1px solid `#2E3E63`.\n  - `Level 3 (Modals & Alerts)`: `#1B2640` with 95% opacity, 24px backdrop blur, and an outer ambient aura tinted to the component status:\n    - Primary: `0 0 24px rgba(0, 245, 212, 0.15)`\n    - Kill-Switch / Alert: `0 0 32px rgba(255, 56, 96, 0.25)`\n    - Network / Protocol: `0 0 24px rgba(142, 117, 255, 0.18)`\n- **Low-Contrast Reticles**: Surface elements feature razor-thin 1px borders. Highlighting occurs via border color step-up rather than shadow displacement.\n\n## Shapes\nTo preserve an authentic cybernetic and cryptographic instrument feel, roundedness is restrained:\n- Base components (inputs, cards, containers, buttons) feature 4px (`rounded-sm` / `0.25rem`) corners.\n- Micro-elements such as hash pills, network status pills, and cryptographic key wrappers use full pill styling (`9999px`) to distinguish discrete immutable assets from rectangular functional monitors.\n- Technical dialogs, HUD cards, and primary buttons may optionally leverage 45-degree chamfered corners (clip-path: 6px) on top-right edges to accentuate industrial terminal aesthetics.\n\n## Components\n\n### Buttons\n- **Quantum Action (Primary)**: Background in `#00F5D4`, text in `#090D16` (`label-md`, font-weight 700). Box glow of `0 0 16px rgba(0, 245, 212, 0.35)` on hover. Chamfered or 4px corner.\n- **Secondary Terminal**: Background in `#141D32`, text in `#00F5D4`, border 1px solid `#1F2C47`. Hover triggers border transition to `#00F5D4` and background to `#1B2640`.\n- **Kill-Switch (Danger)**: Background in transparent `#FF3860` (15% fill), border 1px solid `#FF3860`, text in `#FF5C7C`. Active hover triggers full `#FF3860` fill with white text and `0 0 24px rgba(255, 56, 96, 0.5)` emergency aura.\n\n### Cryptographic Hash Pills\n- Inline pill containers with 2px padding, monospaced text (`code-sm`), background `#0E1524`, border 1px solid `#1F2C47`.\n- Houses shortened SHA-3 / SHAKE-256 addresses (e.g., `0x7a9F...c4E2`) paired with an interactive 12px one-click copy trigger that flashes Quantum Cyan on clipboard write.\n\n### Status Telemetry Meters & Gauge Bars\n- Segmented linear tracks with 2px gaps between computational blocks.\n- Fill state driven by programmatic color: Emerald Cyan for stability (>99% quantum state coherence), Quantum Cyan for nominal network performance, Glowing Crimson for decoherence/drift.\n\n### Form Inputs & Terminal Selectors\n- Background `#0E1524`, border 1px solid `#1F2C47`, text in `#FFFFFF`. Text entry in `JetBrains Mono`.\n- Focus state switches border to `#00F5D4` with an inner glow of `inset 0 0 8px rgba(0, 245, 212, 0.12)`.\n- Prepend indicators include monospace protocol stamps (e.g., `[ML-KEM] >> `).\n\n### Neon Micro-Badges\n- Height 18px, uppercase `label-sm` monospaced lettering, tracking +0.08em.\n- Includes a 4px pulsating LED dot on the leading edge (e.g., green for `CHAIN 9800: SYNCED`, purple for `DIANA TESTNET`, crimson for `REVOCATION LOCK`).\n\n### Glassmorphism HUD Panels\n- Background `#0E1524` with 80% alpha, 1px `#1F2C47` borders, inner linear top highlight (`linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 100%)`).\n- Header bars feature technical metadata tags (`SEC_LVL: 5`, `SYS_STAT: NOMINAL`) anchored to opposite corners.",
+      "colorVariant": "FIDELITY",
+      "overridePrimaryColor": "#00f5d4",
+      "overrideSecondaryColor": "#8e75ff",
+      "overrideTertiaryColor": "#ff3860",
+      "overrideNeutralColor": "#090d16",
+      "spacingScale": 2,
+      "typography": {
+        "headline-xl-mobile": {
+          "fontFamily": "Space Grotesk",
+          "fontSize": "32px",
+          "fontWeight": "700",
+          "lineHeight": "40px"
+        },
+        "label-md": {
+          "fontFamily": "JetBrains Mono",
+          "fontSize": "11px",
+          "fontWeight": "600",
+          "lineHeight": "14px"
+        },
+        "headline-md": {
+          "fontFamily": "Space Grotesk",
+          "fontSize": "24px",
+          "fontWeight": "600",
+          "lineHeight": "32px"
+        },
+        "code-md": {
+          "fontFamily": "JetBrains Mono",
+          "fontSize": "12px",
+          "fontWeight": "500",
+          "lineHeight": "16px"
+        },
+        "body-md": {
+          "fontFamily": "Plus Jakarta Sans",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "20px"
+        },
+        "code-sm": {
+          "fontFamily": "JetBrains Mono",
+          "fontSize": "10px",
+          "fontWeight": "600",
+          "lineHeight": "14px"
+        },
+        "code-lg": {
+          "fontFamily": "JetBrains Mono",
+          "fontSize": "14px",
+          "fontWeight": "500",
+          "lineHeight": "20px"
+        },
+        "headline-xl": {
+          "fontFamily": "Space Grotesk",
+          "fontSize": "48px",
+          "fontWeight": "700",
+          "lineHeight": "56px"
+        },
+        "body-lg": {
+          "fontFamily": "Plus Jakarta Sans",
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "lineHeight": "24px"
+        },
+        "body-sm": {
+          "fontFamily": "Plus Jakarta Sans",
+          "fontSize": "12px",
+          "fontWeight": "400",
+          "lineHeight": "16px"
+        },
+        "headline-sm": {
+          "fontFamily": "Space Grotesk",
+          "fontSize": "18px",
+          "fontWeight": "600",
+          "lineHeight": "24px"
+        },
+        "headline-lg": {
+          "fontFamily": "Space Grotesk",
+          "fontSize": "32px",
+          "fontWeight": "600",
+          "lineHeight": "40px"
+        },
+        "label-sm": {
+          "fontFamily": "JetBrains Mono",
+          "fontSize": "9px",
+          "fontWeight": "700",
+          "lineHeight": "12px"
+        },
+        "headline-lg-mobile": {
+          "fontFamily": "Space Grotesk",
+          "fontSize": "24px",
+          "fontWeight": "600",
+          "lineHeight": "32px"
+        }
+      },
+      "spacing": {
+        "space-xl": "2.5rem",
+        "space-md": "1rem",
+        "gutter": "1rem",
+        "space-sm": "0.5rem",
+        "margin-desktop": "2.5rem",
+        "gutter-desktop": "1.5rem",
+        "space-xs": "0.25rem",
+        "margin": "1rem",
+        "space-lg": "1.5rem"
+      },
+      "headlineFontFamily": "Space Grotesk",
+      "bodyFontFamily": "Plus Jakarta Sans",
+      "labelFontFamily": "JetBrains Mono"
+    }
+  },
+  "version": "1"
+}
