@@ -5,11 +5,15 @@ pragma solidity ^0.8.24;
  * @title SynapseVaultRegistry
  * @notice Post-Quantum Ephemeral Health Vault & Cyber-Human HBOM Registry.
  * @dev Built for the QoreChain "Build Before Q-Day" Hackathon (Diana Testnet, Chain ID 9800).
- *      Combines:
- *      1) Time-locked ephemeral access passes carrying ML-KEM-1024 (QoreSeal) key envelopes.
- *      2) Human Bill of Materials (HBOM) registry for bionic implants, neural interfaces, and
- *         ML-DSA-87 signed firmware traceability.
- *      3) Emergency Kill-Switch allowing the patient/bearer to extinguish all active passes.
+ *
+ *      Security model (v2):
+ *      - The contract is the on-chain *policy & audit* layer. It NEVER receives the ML-KEM-1024
+ *        envelope or the storage CID: EVM storage and calldata are public, so anything sent here
+ *        is readable forever (`private` does not hide storage, and `msg.sender` in a `view` call
+ *        is spoofable). Only 32-byte commitments are stored.
+ *      - Envelopes are held by the off-chain Key-Release Gateway, which releases them only to a
+ *        wallet that proves key possession (signature) while `isAccessValid(recordId)` is true.
+ *      - Revocation stops *future* releases. It cannot recall a key that was already delivered.
  */
 contract SynapseVaultRegistry {
     // =========================================================================
@@ -18,7 +22,6 @@ contract SynapseVaultRegistry {
 
     error ZeroAddress();
     error InvalidDuration();
-    error EmptyCID();
     error InvalidHash();
     error RecordAlreadyExists();
     error RecordNotFound();
@@ -29,6 +32,7 @@ contract SynapseVaultRegistry {
     error PartNotFound();
     error PartDecommissioned();
     error InvalidKemPublicKey();
+    error EmptySignature();
 
     // =========================================================================
     // Enums & Structs
@@ -55,22 +59,24 @@ contract SynapseVaultRegistry {
     }
 
     struct AccessGrant {
-        // Slot 0 (30/32 bytes): owner + creation timestamp + domain + revocation flag
+        // Slot 0 (30/32 bytes)
         address patient; // 20B - Data owner / cyber-human bearer
-        uint64 createdAt; // 8B  - Creation timestamp
-        RecordDomain domain; // 1B  - CLINICAL or BIONIC_TELEMETRY
-        bool revoked; // 1B  - Manual or Kill-Switch revocation flag
-        // Slot 1 (28/32 bytes): authorized specialist + expiration timestamp
+        uint64 createdAt; // 8B
+        RecordDomain domain; // 1B
+        bool revoked; // 1B - Manual revocation flag
+        // Slot 1 (32/32 bytes)
         address specialist; // 20B - Authorized doctor or bio-engineer
-        uint64 validUntil; // 8B  - Expiration timestamp
-        // Slot 2..5: 32-byte hashes and dynamic payloads
-        bytes32 contentHash; // SHAKE-256 integrity hash (compatible with x/rdk DA commitment)
+        uint64 validUntil; // 8B
+        uint32 epoch; // 4B - Patient kill-switch epoch at grant time
+        // Slot 2..4
+        bytes32 contentHash; // SHAKE-256 of the *ciphertext* (integrity, no plaintext oracle)
+        bytes32 envelopeHash; // keccak256 of the ML-KEM-1024 envelope held by the gateway
         bytes32 linkedPartId; // bytes32(0) for pure clinical records, or HBOM partId
-        string ipfsCID; // IPFS CID of AES-256-GCM encrypted payload
-        bytes encryptedKeyEnvelope; // ML-KEM-1024 (QoreSeal) encapsulated symmetric key
     }
 
     struct GrantMetadata {
+        bytes32 contentHash;
+        bytes32 envelopeHash;
         bytes32 linkedPartId;
         address patient;
         address specialist;
@@ -82,40 +88,40 @@ contract SynapseVaultRegistry {
     }
 
     struct BionicPart {
-        // Slot 0 (32/32 bytes - 100% packed)
+        // Slot 0 (32/32 bytes)
         address bearer; // 20B - Cyber-human owner wallet
-        uint64 implantedAt; // 8B  - Registration timestamp
-        uint32 firmwareVersion; // 4B  - Monotonic firmware counter
+        uint64 implantedAt; // 8B
+        uint32 firmwareVersion; // 4B - Monotonic firmware counter
         // Slot 1 (30/32 bytes)
-        address manufacturer; // 20B - OEM / implant clinic wallet
-        uint64 lastUpdatedAt; // 8B  - Last firmware/status update timestamp
-        AnatomicalZone zone; // 1B  - Anatomical implant zone
-        PartStatus status; // 1B  - Lifecycle status
-        // Slot 2..7: 32-byte hashes and dynamic payloads
-        bytes32 partId; // Unique Cyber-Part ID
+        address manufacturer; // 20B - OEM that registered the part (msg.sender)
+        uint64 lastUpdatedAt; // 8B
+        AnatomicalZone zone; // 1B
+        PartStatus status; // 1B
+        // Slot 2..
+        bytes32 partId; // keccak256(abi.encode(manufacturer, serialNumber))
         bytes32 firmwareHash; // Active firmware SHAKE-256 hash
         bytes32 calibrationHash; // Calibration parameters hash
-        string modelName; // e.g. "NeuroLink-X9 BCI"
-        string serialNumber; // Factory serial number
-        bytes pqcSignature; // ML-DSA-87 attestation signature
+        bytes32 pqcSignatureHash; // keccak256 of the ML-DSA-87 attestation (full bytes in event)
+        string modelName;
+        string serialNumber;
     }
 
     struct FirmwareRecord {
-        // Slot 0 (32/32 bytes - 100% packed)
+        // Slot 0 (32/32 bytes)
         address updatedBy; // 20B
         uint64 timestamp; // 8B
         uint32 version; // 4B
         // Slot 1..3
         bytes32 firmwareHash;
         bytes32 calibrationHash;
-        bytes pqcSignature; // ML-DSA-87 signature of the firmware patch
+        bytes32 pqcSignatureHash;
     }
 
     // =========================================================================
     // Constants
     // =========================================================================
 
-    /// @notice Maximum validity window for a single ephemeral access pass (prevents unbounded grants & uint64 truncation).
+    /// @notice Maximum validity window for a single ephemeral access pass.
     uint256 public constant MAX_ACCESS_DURATION = 365 days;
 
     /// @notice NIST FIPS 203 ML-KEM-1024 public key size in bytes.
@@ -125,17 +131,18 @@ contract SynapseVaultRegistry {
     // Storage
     // =========================================================================
 
-    /// @dev Private so expired/revoked envelopes and CIDs cannot be read bypassing access checks.
     mapping(bytes32 => AccessGrant) private _grants;
     mapping(address => bytes32[]) private _specialistGrants;
     mapping(address => bytes32[]) private _patientGrants;
 
-    /// @dev HBOM registry of cyber-human bionic components.
+    /// @dev Kill-switch epoch per patient. Bumping it invalidates every earlier grant in O(1).
+    mapping(address => uint32) public patientEpoch;
+
     mapping(bytes32 => BionicPart) private _bionicParts;
     mapping(address => bytes32[]) private _bearerParts;
     mapping(bytes32 => FirmwareRecord[]) private _firmwareHistory;
 
-    /// @dev On-chain ML-KEM-1024 public key directory (QoreChain PKI).
+    /// @dev On-chain ML-KEM-1024 public key directory.
     mapping(address => bytes) private _kemPublicKeys;
 
     // =========================================================================
@@ -149,16 +156,15 @@ contract SynapseVaultRegistry {
         bytes32 linkedPartId,
         RecordDomain domain,
         uint64 validUntil,
-        bytes32 contentHash
+        bytes32 contentHash,
+        bytes32 envelopeHash
     );
 
     event AccessExtended(bytes32 indexed recordId, address indexed patient, uint64 newValidUntil);
 
     event AccessRevoked(bytes32 indexed recordId, address indexed patient, uint64 revokedAt);
 
-    event EmergencyKillSwitchActivated(
-        address indexed patient, uint256 revokedCount, uint64 timestamp
-    );
+    event EmergencyKillSwitchActivated(address indexed patient, uint32 newEpoch, uint64 timestamp);
 
     event BionicPartRegistered(
         bytes32 indexed partId,
@@ -167,6 +173,11 @@ contract SynapseVaultRegistry {
         AnatomicalZone zone,
         string modelName,
         bytes32 firmwareHash
+    );
+
+    /// @notice Carries the full ML-DSA-87 signature in cheap log storage for off-chain verification.
+    event FirmwareAttestation(
+        bytes32 indexed partId, uint32 indexed version, bytes32 signatureHash, bytes pqcSignature
     );
 
     event FirmwareUpdated(
@@ -202,89 +213,103 @@ contract SynapseVaultRegistry {
     }
 
     // =========================================================================
+    // Identifier helpers (clients can precompute these offline)
+    // =========================================================================
+
+    /// @notice recordId is namespaced by the patient, so nobody can front-run or squat it.
+    function computeRecordId(address patient, bytes32 salt) public pure returns (bytes32) {
+        return keccak256(abi.encode(patient, salt));
+    }
+
+    /// @notice partId is namespaced by the manufacturer that registers it.
+    function computePartId(address manufacturer, string memory serialNumber)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(manufacturer, serialNumber));
+    }
+
+    // =========================================================================
     // Module 1: Ephemeral Post-Quantum Access (Clinical & Bionic Telemetry)
     // =========================================================================
 
     /**
      * @notice Grants a time-limited ephemeral access pass to a doctor or bio-engineer.
-     * @param recordId Unique identifier for the record/pass (e.g., keccak256 hash).
-     * @param ipfsCID IPFS CID pointing to the AES-256-GCM encrypted payload.
-     * @param contentHash SHAKE-256 hash of the payload (also supports QoreChain x/rdk DA commitment).
-     * @param linkedPartId Optional HBOM partId (pass bytes32(0) for standard clinical records).
+     * @param salt Client-chosen salt; recordId = computeRecordId(msg.sender, salt).
+     * @param contentHash SHAKE-256 hash of the encrypted payload (ciphertext).
+     * @param envelopeHash keccak256 of the ML-KEM-1024 envelope stored in the Key-Release Gateway.
+     * @param linkedPartId Optional HBOM partId (bytes32(0) for clinical records).
      * @param specialist Wallet address of the authorized doctor or bio-engineer.
-     * @param encryptedKeyEnvelope ML-KEM-1024 (QoreSeal) encapsulated symmetric key.
      * @param domain CLINICAL or BIONIC_TELEMETRY.
-     * @param durationInSeconds Validity window in seconds (e.g., 7200 for 2 hours).
+     * @param durationInSeconds Validity window in seconds.
      */
     function grantTimedAccess(
-        bytes32 recordId,
-        string calldata ipfsCID,
+        bytes32 salt,
         bytes32 contentHash,
+        bytes32 envelopeHash,
         bytes32 linkedPartId,
         address specialist,
-        bytes calldata encryptedKeyEnvelope,
         RecordDomain domain,
         uint256 durationInSeconds
-    ) external {
+    ) external returns (bytes32 recordId) {
         if (specialist == address(0)) revert ZeroAddress();
         if (durationInSeconds == 0 || durationInSeconds > MAX_ACCESS_DURATION) {
             revert InvalidDuration();
         }
-        if (bytes(ipfsCID).length == 0 && contentHash == bytes32(0)) revert EmptyCID();
+        if (contentHash == bytes32(0) || envelopeHash == bytes32(0)) revert InvalidHash();
+
+        recordId = computeRecordId(msg.sender, salt);
         if (_grants[recordId].patient != address(0)) revert RecordAlreadyExists();
 
-        // If linked to a bionic part, ensure the part exists and belongs to msg.sender
         if (linkedPartId != bytes32(0)) {
             BionicPart storage part = _bionicParts[linkedPartId];
             if (part.bearer == address(0)) revert PartNotFound();
             if (part.bearer != msg.sender) revert Unauthorized();
         }
 
-        uint256 expiry256 = block.timestamp + durationInSeconds;
-        if (expiry256 > type(uint64).max) revert InvalidDuration();
-
-        // casting to 'uint64' is safe because block.timestamp fits in uint64 for ~584 billion years
+        // casting to 'uint64' is safe: block.timestamp fits in uint64 and duration <= 365 days
         // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
-        // casting to 'uint64' is safe because expiry256 was explicitly bounds-checked against type(uint64).max
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint64 expiry = uint64(expiry256);
+        uint64 expiry = uint64(block.timestamp + durationInSeconds);
 
         _grants[recordId] = AccessGrant({
-            ipfsCID: ipfsCID,
-            contentHash: contentHash,
-            linkedPartId: linkedPartId,
             patient: msg.sender,
-            specialist: specialist,
-            encryptedKeyEnvelope: encryptedKeyEnvelope,
-            domain: domain,
             createdAt: nowTs,
+            domain: domain,
+            revoked: false,
+            specialist: specialist,
             validUntil: expiry,
-            revoked: false
+            epoch: patientEpoch[msg.sender],
+            contentHash: contentHash,
+            envelopeHash: envelopeHash,
+            linkedPartId: linkedPartId
         });
 
         _specialistGrants[specialist].push(recordId);
         _patientGrants[msg.sender].push(recordId);
 
         emit AccessGranted(
-            recordId, msg.sender, specialist, linkedPartId, domain, expiry, contentHash
+            recordId, msg.sender, specialist, linkedPartId, domain, expiry, contentHash, envelopeHash
         );
     }
 
     /**
-     * @notice Extends an active, non-revoked ephemeral pass.
+     * @notice Extends an *active* pass. Expired, revoked or kill-switched passes cannot be revived.
      */
     function extendAccess(bytes32 recordId, uint256 extraSeconds) external onlyPatient(recordId) {
         if (extraSeconds == 0 || extraSeconds > MAX_ACCESS_DURATION) revert InvalidDuration();
         AccessGrant storage grant = _grants[recordId];
-        if (grant.revoked) revert AccessAlreadyRevoked();
+        if (grant.revoked || grant.epoch != patientEpoch[grant.patient]) {
+            revert AccessAlreadyRevoked();
+        }
+        if (block.timestamp > grant.validUntil) revert AccessExpired();
 
-        uint256 baseTime =
-            block.timestamp > grant.validUntil ? block.timestamp : uint256(grant.validUntil);
-        uint256 newExpiry256 = baseTime + extraSeconds;
-        if (newExpiry256 > type(uint64).max) revert InvalidDuration();
+        uint256 newExpiry256 = uint256(grant.validUntil) + extraSeconds;
+        if (newExpiry256 > block.timestamp + MAX_ACCESS_DURATION) revert InvalidDuration();
 
-        // casting to 'uint64' is safe because newExpiry256 was explicitly bounds-checked against type(uint64).max
+        // casting to 'uint64' is safe because newExpiry256 <= block.timestamp + 365 days
         // forge-lint: disable-next-line(unsafe-typecast)
         uint64 newExpiry = uint64(newExpiry256);
         grant.validUntil = newExpiry;
@@ -297,97 +322,56 @@ contract SynapseVaultRegistry {
      */
     function revokeAccess(bytes32 recordId) external onlyPatient(recordId) {
         AccessGrant storage grant = _grants[recordId];
-        if (grant.revoked) revert AccessAlreadyRevoked();
+        if (grant.revoked || grant.epoch != patientEpoch[grant.patient]) {
+            revert AccessAlreadyRevoked();
+        }
 
         grant.revoked = true;
+        // forge-lint: disable-next-line(unsafe-typecast)
         emit AccessRevoked(recordId, msg.sender, uint64(block.timestamp));
     }
 
     /**
-     * @notice Emergency Kill-Switch: revokes all active passes issued by the caller in one tx.
+     * @notice Emergency Kill-Switch: invalidates every pass issued by the caller in O(1) gas,
+     *         no matter how many passes exist (bumps the patient's epoch).
      */
-    function emergencyRevokeAll() external returns (uint256 revokedCount) {
-        bytes32[] storage ids = _patientGrants[msg.sender];
-        uint256 len = ids.length;
-        // casting to 'uint64' is safe because block.timestamp fits in uint64 for ~584 billion years
+    function emergencyRevokeAll() external returns (uint32 newEpoch) {
+        newEpoch = patientEpoch[msg.sender] + 1;
+        patientEpoch[msg.sender] = newEpoch;
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint64 nowTs = uint64(block.timestamp);
+        emit EmergencyKillSwitchActivated(msg.sender, newEpoch, uint64(block.timestamp));
+    }
 
-        for (uint256 i = 0; i < len;) {
-            bytes32 id = ids[i];
-            AccessGrant storage grant = _grants[id];
-            if (!grant.revoked && nowTs <= grant.validUntil) {
-                grant.revoked = true;
-                unchecked {
-                    ++revokedCount;
-                }
-                emit AccessRevoked(id, msg.sender, nowTs);
-            }
-            unchecked {
-                ++i;
-            }
-        }
-
-        emit EmergencyKillSwitchActivated(msg.sender, revokedCount, nowTs);
+    function _isActive(AccessGrant storage grant) private view returns (bool) {
+        return grant.patient != address(0) && !grant.revoked
+            && grant.epoch == patientEpoch[grant.patient] && block.timestamp <= grant.validUntil;
     }
 
     /**
-     * @notice Called by the authorized doctor or bio-engineer to retrieve the encrypted envelope.
-     * @dev Strictly enforces specialist identity, non-revocation, and block.timestamp <= validUntil.
-     */
-    function getRecordForSpecialist(bytes32 recordId)
-        external
-        view
-        returns (
-            string memory ipfsCID,
-            bytes32 contentHash,
-            bytes32 linkedPartId,
-            bytes memory encryptedKeyEnvelope,
-            RecordDomain domain,
-            uint64 validUntil
-        )
-    {
-        AccessGrant storage grant = _grants[recordId];
-        if (grant.patient == address(0)) revert RecordNotFound();
-        if (grant.specialist != msg.sender) revert Unauthorized();
-        if (grant.revoked) revert AccessAlreadyRevoked();
-        if (block.timestamp > grant.validUntil) revert AccessExpired();
-
-        return (
-            grant.ipfsCID,
-            grant.contentHash,
-            grant.linkedPartId,
-            grant.encryptedKeyEnvelope,
-            grant.domain,
-            grant.validUntil
-        );
-    }
-
-    /**
-     * @notice Returns whether an ephemeral pass is currently valid.
+     * @notice Returns whether an ephemeral pass is currently valid (queried by the gateway).
      */
     function isAccessValid(bytes32 recordId) external view returns (bool) {
-        AccessGrant storage grant = _grants[recordId];
-        return
-            (grant.patient != address(0) && !grant.revoked && block.timestamp <= grant.validUntil);
+        return _isActive(_grants[recordId]);
     }
 
     /**
-     * @notice Public non-sensitive metadata for UI dashboards (never leaks CID or ML-KEM envelope).
+     * @notice Public policy metadata. Contains only commitments, never the envelope or CID.
      */
     function getGrantMetadata(bytes32 recordId) external view returns (GrantMetadata memory) {
         AccessGrant storage grant = _grants[recordId];
         if (grant.patient == address(0)) revert RecordNotFound();
 
         return GrantMetadata({
+            contentHash: grant.contentHash,
+            envelopeHash: grant.envelopeHash,
             linkedPartId: grant.linkedPartId,
             patient: grant.patient,
             specialist: grant.specialist,
             domain: grant.domain,
             createdAt: grant.createdAt,
             validUntil: grant.validUntil,
-            revoked: grant.revoked,
-            isActive: (!grant.revoked && block.timestamp <= grant.validUntil)
+            revoked: grant.revoked || grant.epoch != patientEpoch[grant.patient],
+            isActive: _isActive(grant)
         });
     }
 
@@ -404,67 +388,65 @@ contract SynapseVaultRegistry {
     // =========================================================================
 
     /**
-     * @notice Registers a bionic implant, neuro-prosthesis, or synthetic organ in the HBOM.
-     * @param partId Unique Cyber-Part identifier (DID/hash).
-     * @param manufacturer Wallet of the certified OEM or implant clinic.
-     * @param zone Anatomical zone of the implant.
-     * @param modelName Human-readable model designation.
-     * @param serialNumber Factory serial number.
-     * @param firmwareHash SHAKE-256 hash of the initial firmware image.
-     * @param calibrationHash Hash of the surgical/biomechanical calibration profile.
-     * @param pqcSignature ML-DSA-87 post-quantum attestation signature.
+     * @notice Registers a bionic implant. Called by the manufacturer (OEM / implant clinic),
+     *         which becomes `manufacturer`; partId is namespaced by it, preventing squatting.
+     * @return partId keccak256(abi.encode(msg.sender, serialNumber)).
      */
     function registerBionicPart(
-        bytes32 partId,
-        address manufacturer,
+        address bearer,
         AnatomicalZone zone,
         string calldata modelName,
         string calldata serialNumber,
         bytes32 firmwareHash,
         bytes32 calibrationHash,
         bytes calldata pqcSignature
-    ) external {
-        if (manufacturer == address(0)) revert ZeroAddress();
+    ) external returns (bytes32 partId) {
+        if (bearer == address(0)) revert ZeroAddress();
         if (firmwareHash == bytes32(0)) revert InvalidHash();
+        if (pqcSignature.length == 0) revert EmptySignature();
+
+        partId = computePartId(msg.sender, serialNumber);
         if (_bionicParts[partId].bearer != address(0)) revert PartAlreadyRegistered();
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
+        bytes32 sigHash = keccak256(pqcSignature);
 
         _bionicParts[partId] = BionicPart({
-            partId: partId,
-            bearer: msg.sender,
-            manufacturer: manufacturer,
+            bearer: bearer,
+            implantedAt: nowTs,
+            firmwareVersion: 1,
+            manufacturer: msg.sender,
+            lastUpdatedAt: nowTs,
             zone: zone,
             status: PartStatus.ACTIVE,
-            modelName: modelName,
-            serialNumber: serialNumber,
+            partId: partId,
             firmwareHash: firmwareHash,
             calibrationHash: calibrationHash,
-            pqcSignature: pqcSignature,
-            implantedAt: nowTs,
-            lastUpdatedAt: nowTs,
-            firmwareVersion: 1
+            pqcSignatureHash: sigHash,
+            modelName: modelName,
+            serialNumber: serialNumber
         });
 
-        _bearerParts[msg.sender].push(partId);
-
+        _bearerParts[bearer].push(partId);
         _firmwareHistory[partId].push(
             FirmwareRecord({
+                updatedBy: msg.sender,
+                timestamp: nowTs,
                 version: 1,
                 firmwareHash: firmwareHash,
                 calibrationHash: calibrationHash,
-                pqcSignature: pqcSignature,
-                updatedBy: msg.sender,
-                timestamp: nowTs
+                pqcSignatureHash: sigHash
             })
         );
 
-        emit BionicPartRegistered(partId, msg.sender, manufacturer, zone, modelName, firmwareHash);
+        emit BionicPartRegistered(partId, bearer, msg.sender, zone, modelName, firmwareHash);
+        emit FirmwareAttestation(partId, 1, sigHash, pqcSignature);
     }
 
     /**
-     * @notice Logs an ML-DSA-87 signed firmware or calibration update for an active bionic part.
-     * @dev Callable only by the cyber-human bearer or the registered OEM manufacturer.
+     * @notice Logs an ML-DSA-87 signed firmware/calibration update. Only the manufacturer can push
+     *         firmware; the bearer cannot inject unsigned firmware into the history.
      */
     function logFirmwareUpdate(
         bytes32 partId,
@@ -474,35 +456,39 @@ contract SynapseVaultRegistry {
     ) external {
         BionicPart storage part = _bionicParts[partId];
         if (part.bearer == address(0)) revert PartNotFound();
-        if (msg.sender != part.bearer && msg.sender != part.manufacturer) revert Unauthorized();
+        if (msg.sender != part.manufacturer) revert Unauthorized();
         if (part.status == PartStatus.DECOMMISSIONED) revert PartDecommissioned();
         if (newFirmwareHash == bytes32(0)) revert InvalidHash();
+        if (pqcSignature.length == 0) revert EmptySignature();
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
         uint32 nextVersion = part.firmwareVersion + 1;
+        bytes32 sigHash = keccak256(pqcSignature);
 
         part.firmwareHash = newFirmwareHash;
         part.calibrationHash = newCalibrationHash;
-        part.pqcSignature = pqcSignature;
+        part.pqcSignatureHash = sigHash;
         part.lastUpdatedAt = nowTs;
         part.firmwareVersion = nextVersion;
 
         _firmwareHistory[partId].push(
             FirmwareRecord({
+                updatedBy: msg.sender,
+                timestamp: nowTs,
                 version: nextVersion,
                 firmwareHash: newFirmwareHash,
                 calibrationHash: newCalibrationHash,
-                pqcSignature: pqcSignature,
-                updatedBy: msg.sender,
-                timestamp: nowTs
+                pqcSignatureHash: sigHash
             })
         );
 
         emit FirmwareUpdated(partId, nextVersion, newFirmwareHash, msg.sender, nowTs);
+        emit FirmwareAttestation(partId, nextVersion, sigHash, pqcSignature);
     }
 
     /**
-     * @notice Updates the lifecycle status of a registered bionic part (ACTIVE, MAINTENANCE, DECOMMISSIONED).
+     * @notice Updates lifecycle status. DECOMMISSIONED is terminal and cannot be reverted.
      */
     function updatePartStatus(bytes32 partId, PartStatus newStatus)
         external
@@ -510,8 +496,10 @@ contract SynapseVaultRegistry {
     {
         BionicPart storage part = _bionicParts[partId];
         PartStatus oldStatus = part.status;
-        uint64 nowTs = uint64(block.timestamp);
+        if (oldStatus == PartStatus.DECOMMISSIONED) revert PartDecommissioned();
 
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 nowTs = uint64(block.timestamp);
         part.status = newStatus;
         part.lastUpdatedAt = nowTs;
 
@@ -533,29 +521,23 @@ contract SynapseVaultRegistry {
     }
 
     // =========================================================================
-    // Module 3: On-Chain ML-KEM-1024 Public Key Directory (QoreChain PKI)
+    // Module 3: On-Chain ML-KEM-1024 Public Key Directory
     // =========================================================================
 
     /**
-     * @notice Registers or rotates the caller's NIST FIPS 203 ML-KEM-1024 public key (1568 bytes).
-     * @param pubKey 1568-byte ML-KEM-1024 encapsulation public key.
+     * @notice Registers or rotates the caller's ML-KEM-1024 public key (1568 bytes).
      */
     function registerKemPublicKey(bytes calldata pubKey) external {
         if (pubKey.length != ML_KEM_1024_PUBLIC_KEY_BYTES) revert InvalidKemPublicKey();
         _kemPublicKeys[msg.sender] = pubKey;
+        // forge-lint: disable-next-line(unsafe-typecast)
         emit KemPublicKeyRegistered(msg.sender, pubKey.length, uint64(block.timestamp));
     }
 
-    /**
-     * @notice Returns the registered ML-KEM-1024 public key for an account.
-     */
     function getKemPublicKey(address account) external view returns (bytes memory) {
         return _kemPublicKeys[account];
     }
 
-    /**
-     * @notice Returns whether an account has a valid 1568-byte ML-KEM-1024 public key registered.
-     */
     function hasKemPublicKey(address account) external view returns (bool) {
         return _kemPublicKeys[account].length == ML_KEM_1024_PUBLIC_KEY_BYTES;
     }

@@ -117,6 +117,31 @@ export async function fetchEncryptedBlobFromIpfs(
 }
 
 /**
+ * Unpins an encrypted blob from Pinata IPFS (supports Right to Erasure / Ley 1581 / GDPR).
+ * Intended to be called from a trusted backend/gateway holding PINATA_JWT.
+ */
+export async function unpinFromPinata(cid: string, jwt: string): Promise<boolean> {
+  if (!jwt) {
+    throw new Error("Pinata JWT is required to unpin a CID.");
+  }
+  const cleanCid = cid.replace(/^ipfs:\/\//, "");
+  const response = await fetch(`https://api.pinata.cloud/pinning/unpin/${encodeURIComponent(cleanCid)}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+    },
+  });
+  if (response.status === 404) {
+    return false;
+  }
+  if (!response.ok) {
+    throw new Error(`Pinata unpin failed (${response.status}): ${await response.text()}`);
+  }
+  memoryBlobCache.delete(cleanCid);
+  return true;
+}
+
+/**
  * Unified helper that uploads to Pinata IPFS if a JWT is provided/configured,
  * or falls back transparently to browser localStorage / Node .local-ipfs.
  */

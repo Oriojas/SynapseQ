@@ -2,6 +2,7 @@ export interface FrontendEnvConfig {
   readonly qorechainRpcUrl: string;
   readonly qorechainChainId: number;
   readonly synapseVaultAddress: `0x${string}` | undefined;
+  readonly gatewayUrl: string | undefined;
   readonly pinataJwt: string | undefined;
   readonly ipfsGatewayUrl: string | undefined;
 }
@@ -17,6 +18,7 @@ export function getFrontendEnvConfig(): FrontendEnvConfig {
   const rawRpcUrl = import.meta.env.VITE_QORECHAIN_RPC_URL;
   const rawChainId = import.meta.env.VITE_QORECHAIN_CHAIN_ID;
   const rawVaultAddress = import.meta.env.VITE_SYNAPSE_VAULT_ADDRESS;
+  const rawGatewayUrl = import.meta.env.VITE_GATEWAY_URL;
   const rawPinataJwt = import.meta.env.VITE_PINATA_JWT;
   const rawIpfsGatewayUrl = import.meta.env.VITE_IPFS_GATEWAY_URL;
 
@@ -26,6 +28,7 @@ export function getFrontendEnvConfig(): FrontendEnvConfig {
     qorechainRpcUrl: rawRpcUrl?.trim() ?? '',
     qorechainChainId: Number.isFinite(parsedChainId) ? parsedChainId : 0,
     synapseVaultAddress: parseHexAddress(rawVaultAddress),
+    gatewayUrl: rawGatewayUrl?.trim() || undefined,
     pinataJwt: rawPinataJwt?.trim() || undefined,
     ipfsGatewayUrl: rawIpfsGatewayUrl?.trim() || undefined,
   };
