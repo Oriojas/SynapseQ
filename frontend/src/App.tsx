@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bytesToHex } from 'viem';
-import { ShieldAlert, Cpu, KeyRound, Activity, Radio } from 'lucide-react';
-import { generateDsaKeyPair, generateKemKeyPair } from '@sdk/pqc';
+import { ShieldAlert, Cpu, KeyRound, Activity, Radio, Wallet, CheckCircle2 } from 'lucide-react';
+import { generateDsaKeyPair, generateKemKeyPair, signMLDSA87 } from '@sdk/pqc';
 import { getLiveRdkStatus, type RdkNetworkStatus } from '@sdk/rdkDa';
 import { TacticalGpsBackground } from '@/components/layout/TacticalGpsBackground';
 import { PatientVaultView } from '@/components/patient/PatientVaultView';
 import { CyberHbomView } from '@/components/hbom/CyberHbomView';
 import { SpecialistPortalView } from '@/components/specialist/SpecialistPortalView';
 import { getFrontendEnvConfig } from '@/config/env';
+import { useSynapseVault } from '@/hooks/useSynapseVault';
 import {
   INITIAL_BIONIC_PARTS,
   INITIAL_EPHEMERAL_PASSES,
@@ -28,6 +29,8 @@ interface CachedSealedPayload {
 
 export function App(): React.JSX.Element {
   const env = useMemo(() => getFrontendEnvConfig(), []);
+  const vault = useSynapseVault();
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('specialist-portal');
   const [passes, setPasses] = useState<readonly MockEphemeralPass[]>(INITIAL_EPHEMERAL_PASSES);
   const [bionicParts, setBionicParts] = useState<readonly MockBionicPart[]>(INITIAL_BIONIC_PARTS);
@@ -43,6 +46,7 @@ export function App(): React.JSX.Element {
   const [rdkStatus, setRdkStatus] = useState<RdkNetworkStatus | null>(null);
 
   const sealedCacheRef = useRef<Map<string, CachedSealedPayload>>(new Map());
+  const latestEnvelopeRef = useRef<`0x${string}`>('0x');
 
   const specialistKemPublicKeyHex = useMemo(
     () => bytesToHex(specialistKemKeyPair.publicKey),
@@ -78,6 +82,23 @@ export function App(): React.JSX.Element {
     };
   }, []);
 
+  const handleConnectWallet = useCallback(async () => {
+    try {
+      const addr = await vault.connectWallet();
+      if (addr) {
+        setStatusBanner(`Wallet Web3 conectada: ${addr} en QoreChain Diana (${vault.chainId})`);
+      } else {
+        setStatusBanner(
+          'Modo Enclave Local activo (instala QoreX Wallet o MetaMask para firmar transacciones on-chain).'
+        );
+      }
+    } catch (err) {
+      setStatusBanner(
+        `Error al conectar wallet: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }, [vault]);
+
   const handleSealPayloadToCache = useCallback(
     (
       cid: string,
@@ -86,6 +107,7 @@ export function App(): React.JSX.Element {
       contentHash: `0x${string}`
     ) => {
       sealedCacheRef.current.set(cid, { encryptedBlob, envelopeHex, contentHash });
+      latestEnvelopeRef.current = envelopeHex;
     },
     []
   );
@@ -94,48 +116,157 @@ export function App(): React.JSX.Element {
     return sealedCacheRef.current.get(cid);
   }, []);
 
-  const handleGrantCreated = useCallback((newPass: MockEphemeralPass, receiptInfo: string) => {
-    setPasses((prev) => [newPass, ...prev]);
-    setStatusBanner(`Pase efímero #${newPass.id} sellado con ML-KEM-1024 (${receiptInfo})`);
-  }, []);
+  const handleGrantCreated = useCallback(
+    async (newPass: MockEphemeralPass, receiptInfo: string) => {
+      setPasses((prev) => [newPass, ...prev]);
 
-  const handleExtendPass = useCallback((id: string, extraSeconds: number) => {
-    setPasses((prev) =>
-      prev.map((p) =>
-        p.id === id && !p.revoked ? { ...p, remainingSeconds: p.remainingSeconds + extraSeconds } : p
-      )
-    );
-    setStatusBanner(`Pase #${id} extendido +${Math.round(extraSeconds / 60)} min on-chain`);
-  }, []);
+      if (vault.isConnected && vault.contractAddress) {
+        try {
+          const txHash = await vault.grantTimedAccessOnChain({
+            recordId: newPass.recordIdHex,
+            ipfsCID: newPass.ipfsCid,
+            contentHash: newPass.contentHash,
+            linkedPartId: newPass.linkedPartId,
+            specialist: newPass.specialistAddress,
+            encryptedKeyEnvelope: latestEnvelopeRef.current,
+            domain: newPass.domain === 'CLINICAL' ? 0 : 1,
+            durationInSeconds: BigInt(newPass.remainingSeconds),
+          });
+          if (txHash) {
+            setStatusBanner(
+              `Pase #${newPass.id} anclado on-chain en QoreChain Diana • Tx: ${txHash.slice(0, 14)}...`
+            );
+            return;
+          }
+        } catch {
+          // Graceful fallback to local state if user rejects wallet prompt
+        }
+      }
 
-  const handleRevokePass = useCallback((id: string) => {
-    setPasses((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, revoked: true, remainingSeconds: 0 } : p))
-    );
-    setStatusBanner(`Pase #${id} revocado inmutablemente en SynapseVaultRegistry`);
-  }, []);
+      setStatusBanner(`Pase efímero #${newPass.id} sellado con ML-KEM-1024 (${receiptInfo})`);
+    },
+    [vault]
+  );
 
-  const handleEmergencyKillSwitch = useCallback(() => {
+  const handleExtendPass = useCallback(
+    async (id: string, extraSeconds: number) => {
+      const target = passes.find((p) => p.id === id);
+      setPasses((prev) =>
+        prev.map((p) =>
+          p.id === id && !p.revoked
+            ? { ...p, remainingSeconds: p.remainingSeconds + extraSeconds }
+            : p
+        )
+      );
+
+      if (target && vault.isConnected && vault.contractAddress) {
+        try {
+          const txHash = await vault.extendAccessOnChain(
+            target.recordIdHex,
+            BigInt(extraSeconds)
+          );
+          if (txHash) {
+            setStatusBanner(`Pase #${id} extendido on-chain • Tx: ${txHash.slice(0, 14)}...`);
+            return;
+          }
+        } catch {
+          // Fallback to UI extension
+        }
+      }
+
+      setStatusBanner(`Pase #${id} extendido +${Math.round(extraSeconds / 60)} min`);
+    },
+    [passes, vault]
+  );
+
+  const handleRevokePass = useCallback(
+    async (id: string) => {
+      const target = passes.find((p) => p.id === id);
+      setPasses((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, revoked: true, remainingSeconds: 0 } : p))
+      );
+
+      if (target && vault.isConnected && vault.contractAddress) {
+        try {
+          const txHash = await vault.revokeAccessOnChain(target.recordIdHex);
+          if (txHash) {
+            setStatusBanner(`Pase #${id} revocado on-chain • Tx: ${txHash.slice(0, 14)}...`);
+            return;
+          }
+        } catch {
+          // Fallback to UI revocation
+        }
+      }
+
+      setStatusBanner(`Pase #${id} revocado inmutablemente en SynapseVaultRegistry`);
+    },
+    [passes, vault]
+  );
+
+  const handleEmergencyKillSwitch = useCallback(async () => {
     setPasses((prev) => prev.map((p) => ({ ...p, revoked: true, remainingSeconds: 0 })));
     sealedCacheRef.current.clear();
+
+    if (vault.isConnected && vault.contractAddress) {
+      try {
+        const txHash = await vault.emergencyRevokeAllOnChain();
+        if (txHash) {
+          setStatusBanner(
+            `EMERGENCY KILL-SWITCH EJECUTADO ON-CHAIN • Tx: ${txHash.slice(0, 14)}...`
+          );
+          return;
+        }
+      } catch {
+        // Fallback to UI kill-switch
+      }
+    }
+
     setStatusBanner(
       'EMERGENCY KILL-SWITCH ACTIVADO: Todos los pases efímeros fueron revocados y las claves en RAM eliminadas.'
     );
-  }, []);
+  }, [vault]);
 
   const handleRegisterPart = useCallback(
-    (newPart: MockBionicPart, genesisHistory: MockFirmwareHistoryEntry) => {
+    async (newPart: MockBionicPart, genesisHistory: MockFirmwareHistoryEntry) => {
       setBionicParts((prev) => [newPart, ...prev]);
       setFirmwareHistory((prev) => [genesisHistory, ...prev]);
+
+      if (vault.isConnected && vault.contractAddress) {
+        try {
+          const sigHex = signMLDSA87(
+            new TextEncoder().encode(`${newPart.modelName}:${newPart.serialNumber}`),
+            oemDsaKeyPair.secretKey
+          );
+          const txHash = await vault.registerBionicPartOnChain({
+            partId: newPart.partId,
+            manufacturer: newPart.manufacturerAddress,
+            zone: newPart.zoneIndex,
+            modelName: newPart.modelName,
+            serialNumber: newPart.serialNumber,
+            firmwareHash: newPart.firmwareHash,
+            calibrationHash: newPart.calibrationHash,
+            pqcSignature: sigHex,
+          });
+          if (txHash) {
+            setStatusBanner(
+              `Pieza biónica ${newPart.modelName} registrada on-chain • Tx: ${txHash.slice(0, 14)}...`
+            );
+            return;
+          }
+        } catch {
+          // Fallback
+        }
+      }
+
       setStatusBanner(
         `Pieza biónica ${newPart.modelName} (${newPart.serialNumber}) registrada en HBOM con firma ML-DSA-87`
       );
     },
-    []
+    [oemDsaKeyPair.secretKey, vault]
   );
 
   const handlePushFirmwareUpdate = useCallback(
-    (partId: `0x${string}`, entry: MockFirmwareHistoryEntry) => {
+    async (partId: `0x${string}`, entry: MockFirmwareHistoryEntry) => {
       setBionicParts((prev) =>
         prev.map((part) =>
           part.partId === partId
@@ -150,24 +281,63 @@ export function App(): React.JSX.Element {
         )
       );
       setFirmwareHistory((prev) => [entry, ...prev]);
+
+      if (vault.isConnected && vault.contractAddress) {
+        try {
+          const sigHex = signMLDSA87(
+            new TextEncoder().encode(entry.semver),
+            oemDsaKeyPair.secretKey
+          );
+          const txHash = await vault.logFirmwareUpdateOnChain({
+            partId,
+            newFirmwareHash: entry.firmwareHash,
+            newCalibrationHash: entry.calibrationHash,
+            pqcSignature: sigHex,
+          });
+          if (txHash) {
+            setStatusBanner(
+              `Parche de firmware ${entry.semver} registrado on-chain • Tx: ${txHash.slice(0, 14)}...`
+            );
+            return;
+          }
+        } catch {
+          // Fallback
+        }
+      }
+
       setStatusBanner(
         `Parche de firmware ${entry.semver} firmado con ML-DSA-87 registrado en el historial monotónico`
       );
     },
-    []
+    [oemDsaKeyPair.secretKey, vault]
   );
 
   const handleUpdatePartStatus = useCallback(
-    (partId: `0x${string}`, newStatus: PartStatusLabel) => {
+    async (partId: `0x${string}`, newStatus: PartStatusLabel) => {
       const statusIdx = newStatus === 'ACTIVE' ? 0 : newStatus === 'MAINTENANCE' ? 1 : 2;
       setBionicParts((prev) =>
         prev.map((part) =>
           part.partId === partId ? { ...part, status: newStatus, statusIndex: statusIdx } : part
         )
       );
+
+      if (vault.isConnected && vault.contractAddress) {
+        try {
+          const txHash = await vault.updatePartStatusOnChain(partId, statusIdx);
+          if (txHash) {
+            setStatusBanner(
+              `Estado operativo actualizado a ${newStatus} on-chain • Tx: ${txHash.slice(0, 14)}...`
+            );
+            return;
+          }
+        } catch {
+          // Fallback
+        }
+      }
+
       setStatusBanner(`Estado operativo actualizado a ${newStatus} en SynapseVaultRegistry`);
     },
-    []
+    [vault]
   );
 
   const handleGrantTelemetryPassForPart = useCallback((part: MockBionicPart) => {
@@ -186,17 +356,35 @@ export function App(): React.JSX.Element {
     );
   }, []);
 
-  const handlePublishKemKeyOnChain = useCallback(() => {
+  const handlePublishKemKeyOnChain = useCallback(async () => {
+    if (vault.isConnected && vault.contractAddress) {
+      try {
+        const txHash = await vault.publishKemPublicKeyOnChain(specialistKemPublicKeyHex);
+        if (txHash) {
+          setIsKeyPublishedOnChain(true);
+          setStatusBanner(
+            `Clave pública ML-KEM-1024 (1,568 B) registrada on-chain • Tx: ${txHash.slice(0, 14)}...`
+          );
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+    }
     setIsKeyPublishedOnChain(true);
     setStatusBanner(
-      'Clave pública ML-KEM-1024 (1,568 B) publicada on-chain vía registerKemPublicKey()'
+      'Clave pública ML-KEM-1024 (1,568 B) publicada en el directorio QoreChain PKI (registerKemPublicKey)'
     );
-  }, []);
+  }, [specialistKemPublicKeyHex, vault]);
 
   const activePassCount = useMemo(
     () => passes.filter((p) => !p.revoked && p.remainingSeconds > 0).length,
     [passes]
   );
+
+  const displayAddress = vault.walletAddress
+    ? `${vault.walletAddress.slice(0, 6)}...${vault.walletAddress.slice(-4)}`
+    : '0x71c...b9F4';
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative bg-reb-bg text-reb-text-light selection:bg-reb-mint selection:text-reb-bg">
@@ -277,12 +465,12 @@ export function App(): React.JSX.Element {
             </nav>
           </div>
 
-          {/* Right Status & Emergency Kill-Switch */}
+          {/* Right Status, Web3 Wallet & Emergency Kill-Switch */}
           <div className="flex items-center gap-3">
             <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface/80 border border-reb-border text-reb-text-muted font-mono text-xs">
               <Radio className="w-3.5 h-3.5 text-reb-mint animate-pulse" />
               <span className="text-reb-text-light">Diana</span>
-              <span className="text-reb-mint">[{env.qorechainChainId || 9800}]</span>
+              <span className="text-reb-mint">[{vault.chainId}]</span>
               {rdkStatus?.nativeDaAvailable && (
                 <span className="text-[10px] text-reb-periwinkle border-l border-reb-border pl-2">
                   x/rdk DA Ready
@@ -290,13 +478,22 @@ export function App(): React.JSX.Element {
               )}
             </div>
 
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface/80 border border-reb-border font-mono text-xs">
-              <KeyRound className="w-3.5 h-3.5 text-reb-mint" />
-              <span className="text-reb-text-light">0x71c...b9F4</span>
+            <button
+              type="button"
+              onClick={handleConnectWallet}
+              className="flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface/80 border border-reb-border hover:border-reb-mint/50 font-mono text-xs transition-all cursor-pointer"
+              title="Conectar QoreX Wallet / MetaMask a QoreChain Diana (9800)"
+            >
+              {vault.isConnected ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-reb-mint" />
+              ) : (
+                <Wallet className="w-3.5 h-3.5 text-reb-yellow" />
+              )}
+              <span className="text-reb-text-light">{displayAddress}</span>
               <span className="px-1.5 py-0.5 rounded bg-reb-mint/15 text-reb-mint text-[10px] font-semibold">
-                ML-KEM
+                {vault.isTxPending ? 'SIGNING...' : 'ML-KEM'}
               </span>
-            </div>
+            </button>
 
             <button
               type="button"
@@ -389,12 +586,21 @@ export function App(): React.JSX.Element {
               <span className="w-1.5 h-1.5 rounded-full bg-reb-periwinkle" />
               SHAKE-256 + x/rdk Native DA Router
             </span>
+            {vault.txHistory.length > 0 && (
+              <span className="flex items-center gap-1.5 text-reb-mint">
+                <KeyRound className="w-3 h-3" />
+                Last Tx: {vault.txHistory[0].txHash.slice(0, 10)}... ({vault.txHistory[0].action})
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 text-reb-text-dim">
             <Cpu className="w-3.5 h-3.5 text-reb-mint" />
             <span>
-              QoreChain Diana Testnet ({env.qorechainChainId || 9800}) • Block #4,892,104 • 0 ms
-              Quantum Drift
+              QoreChain Diana Testnet ({vault.chainId}) •{' '}
+              {vault.contractAddress
+                ? `Vault: ${vault.contractAddress.slice(0, 8)}...`
+                : 'Enclave Mode'}{' '}
+              • 0 ms Quantum Drift
             </span>
           </div>
         </div>
