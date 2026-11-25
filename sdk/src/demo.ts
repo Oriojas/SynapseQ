@@ -1,6 +1,4 @@
 import { webcrypto } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 if (!globalThis.crypto) {
   (globalThis as unknown as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
@@ -24,6 +22,7 @@ import {
   unsealAndDecryptDocument,
   verifyMLDSA87,
 } from "./pqc.js";
+import { fetchEncryptedBlob, uploadEncryptedBlob } from "./storage.js";
 
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const CONTRACT_ADDRESS = (process.env.SYNAPSE_VAULT_ADDRESS ??
@@ -42,20 +41,6 @@ const qorechainDiana = defineChain({
   nativeCurrency: { name: "QOR", symbol: "QOR", decimals: 18 },
   rpcUrls: { default: { http: [RPC_URL] } },
 });
-
-const LOCAL_IPFS_DIR = join(process.cwd(), ".local-ipfs");
-
-function storeEncryptedBlobLocally(blob: Uint8Array): string {
-  mkdirSync(LOCAL_IPFS_DIR, { recursive: true });
-  const digest = computeShake256(blob).slice(2, 34);
-  const cid = `bafy-synapseq-${digest}`;
-  writeFileSync(join(LOCAL_IPFS_DIR, `${cid}.enc`), blob);
-  return cid;
-}
-
-function fetchEncryptedBlobLocally(cid: string): Uint8Array {
-  return new Uint8Array(readFileSync(join(LOCAL_IPFS_DIR, `${cid}.enc`)));
-}
 
 async function main() {
   const patientAccount = privateKeyToAccount(PATIENT_PK);
@@ -137,7 +122,7 @@ async function main() {
   const plaintextBytes = new TextEncoder().encode(JSON.stringify(sampleDocument, null, 2));
 
   const sealed = await encryptAndSealDocument(plaintextBytes, specialistKem.publicKey);
-  const cid = storeEncryptedBlobLocally(sealed.encryptedBlob);
+  const cid = await uploadEncryptedBlob(sealed.encryptedBlob);
 
   console.log(`  - Plaintext size:        ${plaintextBytes.length} bytes`);
   console.log(`  - Encrypted blob size:   ${sealed.encryptedBlob.length} bytes (stored at .local-ipfs/${cid}.enc)`);
@@ -180,7 +165,7 @@ async function main() {
       account: specialistAccount.address,
     });
 
-  const downloadedBlob = fetchEncryptedBlobLocally(fetchedCid);
+  const downloadedBlob = await fetchEncryptedBlob(fetchedCid);
   const decryptedBytes = await unsealAndDecryptDocument(
     downloadedBlob,
     fetchedEnvelope,

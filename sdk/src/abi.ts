@@ -29,6 +29,16 @@ export const SYNAPSE_VAULT_ABI = [
   },
   {
     type: "function",
+    name: "updatePartStatus",
+    inputs: [
+      { name: "partId", type: "bytes32" },
+      { name: "newStatus", type: "uint8" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
     name: "grantTimedAccess",
     inputs: [
       { name: "recordId", type: "bytes32" },
@@ -39,6 +49,16 @@ export const SYNAPSE_VAULT_ABI = [
       { name: "encryptedKeyEnvelope", type: "bytes" },
       { name: "domain", type: "uint8" },
       { name: "durationInSeconds", type: "uint256" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "extendAccess",
+    inputs: [
+      { name: "recordId", type: "bytes32" },
+      { name: "extraSeconds", type: "uint256" }
     ],
     outputs: [],
     stateMutability: "nonpayable"
@@ -62,6 +82,42 @@ export const SYNAPSE_VAULT_ABI = [
     name: "isAccessValid",
     inputs: [{ name: "recordId", type: "bytes32" }],
     outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getGrantMetadata",
+    inputs: [{ name: "recordId", type: "bytes32" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "linkedPartId", type: "bytes32" },
+          { name: "patient", type: "address" },
+          { name: "specialist", type: "address" },
+          { name: "domain", type: "uint8" },
+          { name: "createdAt", type: "uint64" },
+          { name: "validUntil", type: "uint64" },
+          { name: "revoked", type: "bool" },
+          { name: "isActive", type: "bool" }
+        ]
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getGrantsBySpecialist",
+    inputs: [{ name: "specialist", type: "address" }],
+    outputs: [{ name: "", type: "bytes32[]" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getGrantsByPatient",
+    inputs: [{ name: "patient", type: "address" }],
+    outputs: [{ name: "", type: "bytes32[]" }],
     stateMutability: "view"
   },
   {
@@ -103,6 +159,54 @@ export const SYNAPSE_VAULT_ABI = [
         ]
       }
     ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getPartsByBearer",
+    inputs: [{ name: "bearer", type: "address" }],
+    outputs: [{ name: "", type: "bytes32[]" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "getFirmwareHistory",
+    inputs: [{ name: "partId", type: "bytes32" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "updatedBy", type: "address" },
+          { name: "timestamp", type: "uint64" },
+          { name: "version", type: "uint32" },
+          { name: "firmwareHash", type: "bytes32" },
+          { name: "calibrationHash", type: "bytes32" },
+          { name: "pqcSignature", type: "bytes" }
+        ]
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "registerKemPublicKey",
+    inputs: [{ name: "pubKey", type: "bytes" }],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "getKemPublicKey",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "hasKemPublicKey",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "view"
   }
 ] as const;

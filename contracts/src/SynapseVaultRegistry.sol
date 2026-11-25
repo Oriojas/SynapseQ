@@ -28,6 +28,7 @@ contract SynapseVaultRegistry {
     error PartAlreadyRegistered();
     error PartNotFound();
     error PartDecommissioned();
+    error InvalidKemPublicKey();
 
     // =========================================================================
     // Enums & Structs
@@ -117,6 +118,9 @@ contract SynapseVaultRegistry {
     /// @notice Maximum validity window for a single ephemeral access pass (prevents unbounded grants & uint64 truncation).
     uint256 public constant MAX_ACCESS_DURATION = 365 days;
 
+    /// @notice NIST FIPS 203 ML-KEM-1024 public key size in bytes.
+    uint256 public constant ML_KEM_1024_PUBLIC_KEY_BYTES = 1568;
+
     // =========================================================================
     // Storage
     // =========================================================================
@@ -130,6 +134,9 @@ contract SynapseVaultRegistry {
     mapping(bytes32 => BionicPart) private _bionicParts;
     mapping(address => bytes32[]) private _bearerParts;
     mapping(bytes32 => FirmwareRecord[]) private _firmwareHistory;
+
+    /// @dev On-chain ML-KEM-1024 public key directory (QoreChain PKI).
+    mapping(address => bytes) private _kemPublicKeys;
 
     // =========================================================================
     // Events
@@ -173,6 +180,8 @@ contract SynapseVaultRegistry {
     event PartStatusChanged(
         bytes32 indexed partId, PartStatus oldStatus, PartStatus newStatus, uint64 timestamp
     );
+
+    event KemPublicKeyRegistered(address indexed account, uint256 keyLength, uint64 timestamp);
 
     // =========================================================================
     // Modifiers
@@ -521,5 +530,33 @@ contract SynapseVaultRegistry {
     function getFirmwareHistory(bytes32 partId) external view returns (FirmwareRecord[] memory) {
         if (_bionicParts[partId].bearer == address(0)) revert PartNotFound();
         return _firmwareHistory[partId];
+    }
+
+    // =========================================================================
+    // Module 3: On-Chain ML-KEM-1024 Public Key Directory (QoreChain PKI)
+    // =========================================================================
+
+    /**
+     * @notice Registers or rotates the caller's NIST FIPS 203 ML-KEM-1024 public key (1568 bytes).
+     * @param pubKey 1568-byte ML-KEM-1024 encapsulation public key.
+     */
+    function registerKemPublicKey(bytes calldata pubKey) external {
+        if (pubKey.length != ML_KEM_1024_PUBLIC_KEY_BYTES) revert InvalidKemPublicKey();
+        _kemPublicKeys[msg.sender] = pubKey;
+        emit KemPublicKeyRegistered(msg.sender, pubKey.length, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Returns the registered ML-KEM-1024 public key for an account.
+     */
+    function getKemPublicKey(address account) external view returns (bytes memory) {
+        return _kemPublicKeys[account];
+    }
+
+    /**
+     * @notice Returns whether an account has a valid 1568-byte ML-KEM-1024 public key registered.
+     */
+    function hasKemPublicKey(address account) external view returns (bool) {
+        return _kemPublicKeys[account].length == ML_KEM_1024_PUBLIC_KEY_BYTES;
     }
 }
