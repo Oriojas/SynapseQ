@@ -54,16 +54,19 @@ contract SynapseVaultRegistry {
     }
 
     struct AccessGrant {
+        // Slot 0 (30/32 bytes): owner + creation timestamp + domain + revocation flag
+        address patient; // 20B - Data owner / cyber-human bearer
+        uint64 createdAt; // 8B  - Creation timestamp
+        RecordDomain domain; // 1B  - CLINICAL or BIONIC_TELEMETRY
+        bool revoked; // 1B  - Manual or Kill-Switch revocation flag
+        // Slot 1 (28/32 bytes): authorized specialist + expiration timestamp
+        address specialist; // 20B - Authorized doctor or bio-engineer
+        uint64 validUntil; // 8B  - Expiration timestamp
+        // Slot 2..5: 32-byte hashes and dynamic payloads
+        bytes32 contentHash; // SHAKE-256 integrity hash (compatible with x/rdk DA commitment)
+        bytes32 linkedPartId; // bytes32(0) for pure clinical records, or HBOM partId
         string ipfsCID; // IPFS CID of AES-256-GCM encrypted payload
-        bytes32 contentHash; // SHAKE-256 integrity hash (also compatible with x/rdk DA commitment)
-        bytes32 linkedPartId; // bytes32(0) for pure clinical records, or HBOM partId for bionic passes
-        address patient; // Data owner / cyber-human bearer
-        address specialist; // Authorized doctor or bio-engineer
         bytes encryptedKeyEnvelope; // ML-KEM-1024 (QoreSeal) encapsulated symmetric key
-        RecordDomain domain; // CLINICAL or BIONIC_TELEMETRY
-        uint64 createdAt; // Creation timestamp
-        uint64 validUntil; // Expiration timestamp
-        bool revoked; // Manual or Kill-Switch revocation flag
     }
 
     struct GrantMetadata {
@@ -78,28 +81,33 @@ contract SynapseVaultRegistry {
     }
 
     struct BionicPart {
+        // Slot 0 (32/32 bytes - 100% packed)
+        address bearer; // 20B - Cyber-human owner wallet
+        uint64 implantedAt; // 8B  - Registration timestamp
+        uint32 firmwareVersion; // 4B  - Monotonic firmware counter
+        // Slot 1 (30/32 bytes)
+        address manufacturer; // 20B - OEM / implant clinic wallet
+        uint64 lastUpdatedAt; // 8B  - Last firmware/status update timestamp
+        AnatomicalZone zone; // 1B  - Anatomical implant zone
+        PartStatus status; // 1B  - Lifecycle status
+        // Slot 2..7: 32-byte hashes and dynamic payloads
         bytes32 partId; // Unique Cyber-Part ID
-        address bearer; // Cyber-human owner wallet
-        address manufacturer; // OEM / implant clinic wallet
-        AnatomicalZone zone; // Anatomical implant zone
-        PartStatus status; // Lifecycle status
-        string modelName; // e.g. "NeuroLink-X9 BCI"
-        string serialNumber; // Factory serial number
         bytes32 firmwareHash; // Active firmware SHAKE-256 hash
         bytes32 calibrationHash; // Calibration parameters hash
+        string modelName; // e.g. "NeuroLink-X9 BCI"
+        string serialNumber; // Factory serial number
         bytes pqcSignature; // ML-DSA-87 attestation signature
-        uint64 implantedAt; // Registration timestamp
-        uint64 lastUpdatedAt; // Last firmware/status update timestamp
-        uint32 firmwareVersion; // Monotonic firmware counter
     }
 
     struct FirmwareRecord {
-        uint32 version;
+        // Slot 0 (32/32 bytes - 100% packed)
+        address updatedBy; // 20B
+        uint64 timestamp; // 8B
+        uint32 version; // 4B
+        // Slot 1..3
         bytes32 firmwareHash;
         bytes32 calibrationHash;
         bytes pqcSignature; // ML-DSA-87 signature of the firmware patch
-        address updatedBy;
-        uint64 timestamp;
     }
 
     // =========================================================================
@@ -171,14 +179,16 @@ contract SynapseVaultRegistry {
     // =========================================================================
 
     modifier onlyPatient(bytes32 recordId) {
-        if (_grants[recordId].patient == address(0)) revert RecordNotFound();
-        if (_grants[recordId].patient != msg.sender) revert Unauthorized();
+        address patient = _grants[recordId].patient;
+        if (patient == address(0)) revert RecordNotFound();
+        if (patient != msg.sender) revert Unauthorized();
         _;
     }
 
     modifier onlyPartBearer(bytes32 partId) {
-        if (_bionicParts[partId].bearer == address(0)) revert PartNotFound();
-        if (_bionicParts[partId].bearer != msg.sender) revert Unauthorized();
+        address bearer = _bionicParts[partId].bearer;
+        if (bearer == address(0)) revert PartNotFound();
+        if (bearer != msg.sender) revert Unauthorized();
         _;
     }
 
@@ -289,14 +299,23 @@ contract SynapseVaultRegistry {
      */
     function emergencyRevokeAll() external returns (uint256 revokedCount) {
         bytes32[] storage ids = _patientGrants[msg.sender];
+        uint256 len = ids.length;
+        // casting to 'uint64' is safe because block.timestamp fits in uint64 for ~584 billion years
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
 
-        for (uint256 i = 0; i < ids.length; i++) {
-            AccessGrant storage grant = _grants[ids[i]];
+        for (uint256 i = 0; i < len;) {
+            bytes32 id = ids[i];
+            AccessGrant storage grant = _grants[id];
             if (!grant.revoked && nowTs <= grant.validUntil) {
                 grant.revoked = true;
-                revokedCount++;
-                emit AccessRevoked(ids[i], msg.sender, nowTs);
+                unchecked {
+                    ++revokedCount;
+                }
+                emit AccessRevoked(id, msg.sender, nowTs);
+            }
+            unchecked {
+                ++i;
             }
         }
 
