@@ -13,295 +13,328 @@ contract SynapseVaultRegistryTest is Test {
     address public manufacturer = makeAddr("manufacturer");
     address public attacker = makeAddr("attacker");
 
-    bytes32 public constant RECORD_MRI = keccak256("MRI-CRANIAL-2026-001");
-    bytes32 public constant RECORD_TELEMETRY = keccak256("BCI-TELEMETRY-2026-001");
-    bytes32 public constant PART_BCI = keccak256("NEUROLINK-X9-SN-0042");
-    bytes32 public constant CONTENT_HASH = keccak256("shake256-encrypted-payload-digest");
+    bytes32 public constant SALT_MRI = keccak256("MRI-CRANIAL-2026-001");
+    bytes32 public constant SALT_TELEMETRY = keccak256("BCI-TELEMETRY-2026-001");
+    bytes32 public constant CONTENT_HASH = keccak256("shake256-ciphertext-digest");
+    bytes32 public constant ENVELOPE_HASH = keccak256("mlkem1024-envelope");
     bytes32 public constant FW_V1 = keccak256("firmware-v1.0.0-mldsa87");
     bytes32 public constant FW_V2 = keccak256("firmware-v2.0.0-mldsa87");
     bytes32 public constant CALIBRATION_HASH = keccak256("calibration-profile-v1");
+    string public constant SERIAL = "SN-0042";
 
-    string public constant SAMPLE_CID =
-        "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
-    bytes public constant MLKEM_ENVELOPE = hex"a1b2c3d4e5f60102030405060708090a";
     bytes public constant MLDSA_SIG = hex"deadbeefcafebabe1122334455667788";
 
     function setUp() public {
         vault = new SynapseVaultRegistry();
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    function _grant(bytes32 salt, bytes32 partId, address specialist, uint256 duration)
+        internal
+        returns (bytes32)
+    {
+        SynapseVaultRegistry.RecordDomain domain = partId == bytes32(0)
+            ? SynapseVaultRegistry.RecordDomain.CLINICAL
+            : SynapseVaultRegistry.RecordDomain.BIONIC_TELEMETRY;
+        vm.prank(patient);
+        return vault.grantTimedAccess(
+            salt, CONTENT_HASH, ENVELOPE_HASH, partId, specialist, domain, duration
+        );
+    }
+
+    function _registerPart(address bearer) internal returns (bytes32) {
+        vm.prank(manufacturer);
+        return vault.registerBionicPart(
+            bearer,
+            SynapseVaultRegistry.AnatomicalZone.NEURAL,
+            "NeuroLink-X9 BCI",
+            SERIAL,
+            FW_V1,
+            CALIBRATION_HASH,
+            MLDSA_SIG
+        );
+    }
+
+    /// @dev External on purpose: decoding the full BionicPart struct in its own call frame
+    ///      avoids a via_ir "stack too deep" in the test contract.
+    function partSummary(bytes32 partId)
+        external
+        view
+        returns (address bearer, address manuf, uint32 fwVersion, bytes32 sigHash)
+    {
+        // Read the ABI-encoded struct head directly (word 0 = tuple offset, then fields in order)
+        (bool ok, bytes memory data) =
+            address(vault).staticcall(abi.encodeCall(vault.getBionicPart, (partId)));
+        require(ok, "getBionicPart reverted");
+        assembly {
+            let head := add(add(data, 0x20), mload(add(data, 0x20)))
+            bearer := mload(head)
+            fwVersion := mload(add(head, 0x40))
+            manuf := mload(add(head, 0x60))
+            sigHash := mload(add(head, 0x120))
+        }
+    }
+
     // =========================================================================
-    // Module 1: Clinical & Ephemeral Access Tests
+    // Module 1: Ephemeral Access
     // =========================================================================
 
-    function test_GrantAndRetrieveClinicalAccess() public {
-        vm.prank(patient);
+    function test_GrantStoresOnlyCommitments() public {
+        bytes32 recordId = _grant(SALT_MRI, bytes32(0), doctor, 2 hours);
+        assertEq(recordId, vault.computeRecordId(patient, SALT_MRI));
+        assertTrue(vault.isAccessValid(recordId));
+
+        SynapseVaultRegistry.GrantMetadata memory meta = vault.getGrantMetadata(recordId);
+        assertEq(meta.patient, patient);
+        assertEq(meta.specialist, doctor);
+        assertEq(meta.contentHash, CONTENT_HASH);
+        assertEq(meta.envelopeHash, ENVELOPE_HASH);
+        assertEq(meta.validUntil, uint64(block.timestamp + 2 hours));
+        assertTrue(meta.isActive);
+    }
+
+    function test_RejectsEmptyCommitments() public {
+        vm.startPrank(patient);
+        vm.expectRevert(SynapseVaultRegistry.InvalidHash.selector);
         vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
-            CONTENT_HASH,
+            SALT_MRI,
+            bytes32(0),
+            ENVELOPE_HASH,
             bytes32(0),
             doctor,
-            MLKEM_ENVELOPE,
             SynapseVaultRegistry.RecordDomain.CLINICAL,
-            2 hours
+            1 hours
         );
+        vm.expectRevert(SynapseVaultRegistry.InvalidHash.selector);
+        vault.grantTimedAccess(
+            SALT_MRI,
+            CONTENT_HASH,
+            bytes32(0),
+            bytes32(0),
+            doctor,
+            SynapseVaultRegistry.RecordDomain.CLINICAL,
+            1 hours
+        );
+        vm.stopPrank();
+    }
 
-        assertTrue(vault.isAccessValid(RECORD_MRI));
+    /// Regression (A3): a third party using the same salt gets a different recordId,
+    /// so it can no longer squat/front-run the patient's grant.
+    function test_RecordIdIsNamespacedByPatient() public {
+        vm.prank(attacker);
+        bytes32 attackerId = vault.grantTimedAccess(
+            SALT_MRI,
+            CONTENT_HASH,
+            ENVELOPE_HASH,
+            bytes32(0),
+            attacker,
+            SynapseVaultRegistry.RecordDomain.CLINICAL,
+            1 hours
+        );
+        bytes32 patientId = _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
+        assertTrue(attackerId != patientId);
+        assertEq(vault.getGrantMetadata(patientId).patient, patient);
+    }
 
-        vm.prank(doctor);
-        (
-            string memory cid,
-            bytes32 hash,
-            bytes32 linkedPart,
-            bytes memory envelope,
-            SynapseVaultRegistry.RecordDomain domain,
-            uint64 validUntil
-        ) = vault.getRecordForSpecialist(RECORD_MRI);
-
-        assertEq(cid, SAMPLE_CID);
-        assertEq(hash, CONTENT_HASH);
-        assertEq(linkedPart, bytes32(0));
-        assertEq(envelope, MLKEM_ENVELOPE);
-        assertEq(uint8(domain), uint8(SynapseVaultRegistry.RecordDomain.CLINICAL));
-        assertEq(validUntil, uint64(block.timestamp + 2 hours));
+    function test_SameSaltTwiceReverts() public {
+        _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
+        vm.prank(patient);
+        vm.expectRevert(SynapseVaultRegistry.RecordAlreadyExists.selector);
+        vault.grantTimedAccess(
+            SALT_MRI,
+            CONTENT_HASH,
+            ENVELOPE_HASH,
+            bytes32(0),
+            doctor,
+            SynapseVaultRegistry.RecordDomain.CLINICAL,
+            1 hours
+        );
     }
 
     function test_AccessExpiresExactlyAfterDuration() public {
-        vm.prank(patient);
-        vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            bytes32(0),
-            doctor,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            1 hours
-        );
-
-        // Still valid at the exact boundary second
+        bytes32 recordId = _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
         vm.warp(block.timestamp + 1 hours);
-        assertTrue(vault.isAccessValid(RECORD_MRI));
-
-        // 1 second after expiry -> rejected on-chain
+        assertTrue(vault.isAccessValid(recordId));
         vm.warp(block.timestamp + 1);
-        assertFalse(vault.isAccessValid(RECORD_MRI));
-
-        vm.prank(doctor);
-        vm.expectRevert(SynapseVaultRegistry.AccessExpired.selector);
-        vault.getRecordForSpecialist(RECORD_MRI);
-    }
-
-    function test_UnauthorizedSpecialistCannotReadRecord() public {
-        vm.prank(patient);
-        vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            bytes32(0),
-            doctor,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            1 days
-        );
-
-        vm.prank(attacker);
-        vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
-        vault.getRecordForSpecialist(RECORD_MRI);
+        assertFalse(vault.isAccessValid(recordId));
+        assertFalse(vault.getGrantMetadata(recordId).isActive);
     }
 
     function test_ManualRevocationBlocksAccessImmediately() public {
-        vm.prank(patient);
-        vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            bytes32(0),
-            doctor,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            24 hours
-        );
+        bytes32 recordId = _grant(SALT_MRI, bytes32(0), doctor, 24 hours);
 
-        // Attacker cannot revoke
         vm.prank(attacker);
         vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
-        vault.revokeAccess(RECORD_MRI);
+        vault.revokeAccess(recordId);
 
-        // Patient revokes
         vm.prank(patient);
-        vault.revokeAccess(RECORD_MRI);
+        vault.revokeAccess(recordId);
+        assertFalse(vault.isAccessValid(recordId));
 
-        assertFalse(vault.isAccessValid(RECORD_MRI));
-
-        vm.prank(doctor);
+        vm.prank(patient);
         vm.expectRevert(SynapseVaultRegistry.AccessAlreadyRevoked.selector);
-        vault.getRecordForSpecialist(RECORD_MRI);
+        vault.revokeAccess(recordId);
+    }
+
+    function test_RevokeUnknownRecordReverts() public {
+        vm.prank(patient);
+        vm.expectRevert(SynapseVaultRegistry.RecordNotFound.selector);
+        vault.revokeAccess(keccak256("missing"));
     }
 
     function test_ExtendAccessExtendsExpiry() public {
-        vm.prank(patient);
-        vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            bytes32(0),
-            doctor,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            1 hours
-        );
-
-        uint64 originalExpiry = vault.getGrantMetadata(RECORD_MRI).validUntil;
+        bytes32 recordId = _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
+        uint64 originalExpiry = vault.getGrantMetadata(recordId).validUntil;
 
         vm.prank(patient);
-        vault.extendAccess(RECORD_MRI, 30 minutes);
+        vault.extendAccess(recordId, 30 minutes);
+        assertEq(vault.getGrantMetadata(recordId).validUntil, originalExpiry + 30 minutes);
+    }
 
-        uint64 updatedExpiry = vault.getGrantMetadata(RECORD_MRI).validUntil;
-        assertEq(updatedExpiry, originalExpiry + 30 minutes);
+    function test_CannotReviveExpiredPass() public {
+        bytes32 recordId = _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
+        vm.warp(block.timestamp + 2 hours);
+        vm.prank(patient);
+        vm.expectRevert(SynapseVaultRegistry.AccessExpired.selector);
+        vault.extendAccess(recordId, 1 hours);
     }
 
     function test_EmergencyKillSwitchRevokesAllActivePasses() public {
-        vm.startPrank(patient);
-        vault.registerBionicPart(
-            PART_BCI,
-            manufacturer,
-            SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "NeuroLink-X9 BCI",
-            "SN-0042",
-            FW_V1,
-            CALIBRATION_HASH,
-            MLDSA_SIG
-        );
+        bytes32 partId = _registerPart(patient);
+        bytes32 mri = _grant(SALT_MRI, bytes32(0), doctor, 24 hours);
+        bytes32 tele = _grant(SALT_TELEMETRY, partId, bioEngineer, 2 hours);
 
-        vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            bytes32(0),
-            doctor,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            24 hours
-        );
+        vm.prank(patient);
+        uint32 epoch = vault.emergencyRevokeAll();
 
-        vault.grantTimedAccess(
-            RECORD_TELEMETRY,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            PART_BCI,
-            bioEngineer,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.BIONIC_TELEMETRY,
-            2 hours
-        );
+        assertEq(epoch, 1);
+        assertFalse(vault.isAccessValid(mri));
+        assertFalse(vault.isAccessValid(tele));
+        assertTrue(vault.getGrantMetadata(mri).revoked);
 
-        uint256 revokedCount = vault.emergencyRevokeAll();
-        vm.stopPrank();
+        // Kill-switched passes cannot be extended back to life
+        vm.prank(patient);
+        vm.expectRevert(SynapseVaultRegistry.AccessAlreadyRevoked.selector);
+        vault.extendAccess(mri, 1 hours);
 
-        assertEq(revokedCount, 2);
-        assertFalse(vault.isAccessValid(RECORD_MRI));
-        assertFalse(vault.isAccessValid(RECORD_TELEMETRY));
+        // New grants after the kill-switch work normally
+        bytes32 fresh = _grant(keccak256("after-kill"), bytes32(0), doctor, 1 hours);
+        assertTrue(vault.isAccessValid(fresh));
+    }
+
+    /// Regression: the kill-switch is O(1) and cannot run out of gas with many passes.
+    function test_KillSwitchGasIsConstant() public {
+        for (uint256 i = 0; i < 200; i++) {
+            _grant(bytes32(i + 1), bytes32(0), doctor, 1 hours);
+        }
+        vm.prank(patient);
+        uint256 gasBefore = gasleft();
+        vault.emergencyRevokeAll();
+        assertLt(gasBefore - gasleft(), 50_000);
     }
 
     // =========================================================================
-    // Module 2: Cyber-Human HBOM & Firmware Traceability Tests
+    // Module 2: HBOM
     // =========================================================================
 
     function test_RegisterBionicPartAndUpdateFirmware() public {
-        vm.prank(patient);
-        vault.registerBionicPart(
-            PART_BCI,
-            manufacturer,
-            SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "NeuroLink-X9 BCI",
-            "SN-0042",
-            FW_V1,
-            CALIBRATION_HASH,
-            MLDSA_SIG
-        );
+        bytes32 partId = _registerPart(patient);
+        assertEq(partId, vault.computePartId(manufacturer, SERIAL));
 
-        SynapseVaultRegistry.BionicPart memory part = vault.getBionicPart(PART_BCI);
-        assertEq(part.bearer, patient);
-        assertEq(part.manufacturer, manufacturer);
-        assertEq(part.firmwareVersion, 1);
-        assertEq(part.firmwareHash, FW_V1);
+        (address bearer, address manuf, uint32 fwVersion, bytes32 sigHash) =
+            this.partSummary(partId);
+        assertEq(bearer, patient);
+        assertEq(manuf, manufacturer);
+        assertEq(fwVersion, 1);
+        assertEq(sigHash, keccak256(MLDSA_SIG));
 
-        // Manufacturer pushes ML-DSA-87 signed firmware patch v2
         vm.prank(manufacturer);
-        vault.logFirmwareUpdate(PART_BCI, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
 
-        SynapseVaultRegistry.BionicPart memory updated = vault.getBionicPart(PART_BCI);
-        assertEq(updated.firmwareVersion, 2);
-        assertEq(updated.firmwareHash, FW_V2);
-
-        SynapseVaultRegistry.FirmwareRecord[] memory history = vault.getFirmwareHistory(PART_BCI);
+        SynapseVaultRegistry.FirmwareRecord[] memory history = vault.getFirmwareHistory(partId);
         assertEq(history.length, 2);
         assertEq(history[1].updatedBy, manufacturer);
         assertEq(history[1].firmwareHash, FW_V2);
     }
 
-    function test_UnauthorizedCannotUpdateFirmware() public {
-        vm.prank(patient);
-        vault.registerBionicPart(
-            PART_BCI,
-            manufacturer,
+    /// Regression (A2): an attacker registering the "same serial" lands in its own namespace.
+    function test_PartIdCannotBeSquatted() public {
+        vm.prank(attacker);
+        bytes32 fake = vault.registerBionicPart(
+            attacker,
             SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "NeuroLink-X9 BCI",
-            "SN-0042",
+            "Fake",
+            SERIAL,
             FW_V1,
             CALIBRATION_HASH,
             MLDSA_SIG
         );
+        bytes32 real = _registerPart(patient);
+        assertTrue(fake != real);
+        (, address realManufacturer,,) = this.partSummary(real);
+        assertEq(realManufacturer, manufacturer);
+    }
+
+    function test_RejectsEmptySignature() public {
+        vm.prank(manufacturer);
+        vm.expectRevert(SynapseVaultRegistry.EmptySignature.selector);
+        vault.registerBionicPart(
+            patient,
+            SynapseVaultRegistry.AnatomicalZone.NEURAL,
+            "X",
+            SERIAL,
+            FW_V1,
+            CALIBRATION_HASH,
+            ""
+        );
+    }
+
+    /// Regression (A2): the bearer can no longer push firmware without the manufacturer.
+    function test_OnlyManufacturerCanUpdateFirmware() public {
+        bytes32 partId = _registerPart(patient);
 
         vm.prank(attacker);
         vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
-        vault.logFirmwareUpdate(PART_BCI, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+
+        vm.prank(patient);
+        vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
     }
 
     function test_DecommissionedPartBlocksFirmwareUpdates() public {
-        vm.startPrank(patient);
-        vault.registerBionicPart(
-            PART_BCI,
-            manufacturer,
-            SynapseVaultRegistry.AnatomicalZone.LOCOMOTOR,
-            "Titan-7 Bionic Arm",
-            "ARM-9901",
-            FW_V1,
-            CALIBRATION_HASH,
-            MLDSA_SIG
-        );
-        vault.updatePartStatus(PART_BCI, SynapseVaultRegistry.PartStatus.DECOMMISSIONED);
-        vm.stopPrank();
+        bytes32 partId = _registerPart(patient);
+        vm.prank(patient);
+        vault.updatePartStatus(partId, SynapseVaultRegistry.PartStatus.DECOMMISSIONED);
 
         vm.prank(manufacturer);
         vm.expectRevert(SynapseVaultRegistry.PartDecommissioned.selector);
-        vault.logFirmwareUpdate(PART_BCI, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+    }
+
+    /// Regression (A2): DECOMMISSIONED is terminal.
+    function test_DecommissionedIsTerminal() public {
+        bytes32 partId = _registerPart(patient);
+        vm.startPrank(patient);
+        vault.updatePartStatus(partId, SynapseVaultRegistry.PartStatus.DECOMMISSIONED);
+        vm.expectRevert(SynapseVaultRegistry.PartDecommissioned.selector);
+        vault.updatePartStatus(partId, SynapseVaultRegistry.PartStatus.ACTIVE);
+        vm.stopPrank();
     }
 
     function test_CannotLinkPassToAnotherBearersPart() public {
-        vm.prank(patient);
-        vault.registerBionicPart(
-            PART_BCI,
-            manufacturer,
-            SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "NeuroLink-X9 BCI",
-            "SN-0042",
-            FW_V1,
-            CALIBRATION_HASH,
-            MLDSA_SIG
-        );
-
+        bytes32 partId = _registerPart(patient);
         vm.prank(attacker);
         vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
         vault.grantTimedAccess(
-            RECORD_TELEMETRY,
-            SAMPLE_CID,
+            SALT_TELEMETRY,
             CONTENT_HASH,
-            PART_BCI,
+            ENVELOPE_HASH,
+            partId,
             bioEngineer,
-            MLKEM_ENVELOPE,
             SynapseVaultRegistry.RecordDomain.BIONIC_TELEMETRY,
             1 hours
         );
@@ -312,24 +345,54 @@ contract SynapseVaultRegistryTest is Test {
         vm.prank(patient);
         vm.expectRevert(SynapseVaultRegistry.InvalidDuration.selector);
         vault.grantTimedAccess(
-            RECORD_MRI,
-            SAMPLE_CID,
+            SALT_MRI,
             CONTENT_HASH,
+            ENVELOPE_HASH,
             bytes32(0),
             doctor,
-            MLKEM_ENVELOPE,
             SynapseVaultRegistry.RecordDomain.CLINICAL,
             tooLong
         );
     }
 
     // =========================================================================
-    // Module 3: On-Chain ML-KEM-1024 Public Key Directory (QoreChain PKI) Tests
+    // Gas with realistic post-quantum sizes (A4)
+    // =========================================================================
+
+    /// A real ML-DSA-87 signature is 4627 bytes. Registration must stay far below the
+    /// ~6.9M gas the v1 contract used when it stored the signature twice.
+    function test_RealisticMlDsaSignatureGas() public {
+        bytes memory realSig = new bytes(4627);
+        uint256 gasBefore = gasleft();
+        _registerWithSig(realSig);
+        assertLt(gasBefore - gasleft(), 700_000);
+    }
+
+    function _registerWithSig(bytes memory sig) internal {
+        vm.prank(manufacturer);
+        vault.registerBionicPart(
+            patient,
+            SynapseVaultRegistry.AnatomicalZone.NEURAL,
+            "NeuroLink-X9 BCI",
+            SERIAL,
+            FW_V1,
+            CALIBRATION_HASH,
+            sig
+        );
+    }
+
+    function test_GrantGasIsSmall() public {
+        uint256 gasBefore = gasleft();
+        _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
+        assertLt(gasBefore - gasleft(), 250_000);
+    }
+
+    // =========================================================================
+    // Module 3: ML-KEM-1024 directory
     // =========================================================================
 
     function test_RegisterAndGetKemPublicKey() public {
         assertFalse(vault.hasKemPublicKey(doctor));
-
         bytes memory dummyPubKey = new bytes(1568);
         dummyPubKey[0] = 0x42;
         dummyPubKey[1567] = 0x99;
@@ -346,38 +409,23 @@ contract SynapseVaultRegistryTest is Test {
 
     function test_RejectsInvalidKemPublicKeyLength() public {
         vm.startPrank(doctor);
-
         vm.expectRevert(SynapseVaultRegistry.InvalidKemPublicKey.selector);
         vault.registerKemPublicKey(new bytes(0));
-
         vm.expectRevert(SynapseVaultRegistry.InvalidKemPublicKey.selector);
         vault.registerKemPublicKey(new bytes(32));
-
         vm.stopPrank();
     }
 
     // =========================================================================
-    // Fuzz Tests
+    // Fuzz
     // =========================================================================
 
     function testFuzz_TimedAccessExpiry(uint32 duration, uint32 elapsed) public {
         uint256 boundedDuration = bound(duration, 1, vault.MAX_ACCESS_DURATION());
-        bytes32 recordId = keccak256(abi.encodePacked("FUZZ", boundedDuration, elapsed));
-
-        vm.prank(patient);
-        vault.grantTimedAccess(
-            recordId,
-            SAMPLE_CID,
-            CONTENT_HASH,
-            bytes32(0),
-            doctor,
-            MLKEM_ENVELOPE,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            boundedDuration
-        );
+        bytes32 salt = keccak256(abi.encodePacked("FUZZ", boundedDuration, elapsed));
+        bytes32 recordId = _grant(salt, bytes32(0), doctor, boundedDuration);
 
         vm.warp(block.timestamp + elapsed);
-
         if (elapsed <= boundedDuration) {
             assertTrue(vault.isAccessValid(recordId));
         } else {

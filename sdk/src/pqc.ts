@@ -1,7 +1,7 @@
 import { ml_kem1024 } from "@noble/post-quantum/ml-kem";
 import { ml_dsa87 } from "@noble/post-quantum/ml-dsa";
 import { shake256 } from "@noble/hashes/sha3";
-import { bytesToHex, hexToBytes } from "viem";
+import { bytesToHex, hexToBytes, keccak256 } from "viem";
 
 function getCrypto(): Crypto {
   if (!globalThis.crypto?.subtle) {
@@ -27,8 +27,13 @@ export interface DsaKeyPair {
 export interface SealedDocumentResult {
   /** AES-256-GCM encrypted document bytes (iv || ciphertext+authTag) ready for IPFS */
   encryptedBlob: Uint8Array;
-  /** SHAKE-256 32-byte digest of the original plaintext document */
+  /**
+   * SHAKE-256 32-byte digest of the *encrypted* blob. Hashing the ciphertext (not the plaintext)
+   * avoids a public "guess-and-confirm" oracle for low-entropy medical documents.
+   */
   contentHash: `0x${string}`;
+  /** keccak256 of the envelope: the on-chain commitment the gateway release is checked against */
+  envelopeHash: `0x${string}`;
   /** ML-KEM-1024 sealed envelope (kemCiphertext || wrapIv || wrappedDek+authTag) */
   encryptedKeyEnvelope: `0x${string}`;
 }
@@ -38,6 +43,29 @@ export interface SealedDocumentResult {
  */
 export function generateKemKeyPair(): KemKeyPair {
   return ml_kem1024.keygen();
+}
+
+/**
+ * Deterministically derives an ML-KEM-1024 key pair from a 64-byte seed.
+ * Used to rebuild a specialist's key from a wallet signature (no secret key stored in the browser).
+ */
+export function deriveKemKeyPairFromSeed(seed: Uint8Array): KemKeyPair {
+  const seed64 = seed.length === 64 ? seed : shake256(seed, { dkLen: 64 });
+  return ml_kem1024.keygen(seed64);
+}
+
+/** Fixed message a wallet signs to derive its ML-KEM-1024 key (ECDSA RFC 6979 is deterministic). */
+export const KEM_DERIVATION_MESSAGE =
+  "SynapseQ ML-KEM-1024 key derivation v1\nSigning this does NOT authorize any transaction.";
+
+/** Derives the ML-KEM-1024 key pair from the wallet's signature over KEM_DERIVATION_MESSAGE. */
+export function deriveKemKeyPairFromSignature(signatureHex: `0x${string}`): KemKeyPair {
+  return deriveKemKeyPairFromSeed(shake256(hexToBytes(signatureHex), { dkLen: 64 }));
+}
+
+/** keccak256 commitment of an envelope (matches the contract's `envelopeHash`). */
+export function computeEnvelopeHash(envelopeHex: `0x${string}`): `0x${string}` {
+  return keccak256(envelopeHex);
 }
 
 /**
@@ -119,7 +147,7 @@ async function aesGcmDecrypt(keyBytes: Uint8Array, payload: Uint8Array): Promise
 
 /**
  * Hybrid Post-Quantum Envelope Encryption:
- * 1) Computes SHAKE-256 integrity hash of plaintext.
+ * 1) Computes SHAKE-256 integrity hash of the resulting ciphertext.
  * 2) Encrypts plaintext with a fresh random AES-256-GCM Data Encryption Key (DEK).
  * 3) Encapsulates a shared secret to the recipient's ML-KEM-1024 public key.
  * 4) Wraps the DEK with the ML-KEM shared secret into an on-chain compatible envelope.
@@ -128,8 +156,6 @@ export async function encryptAndSealDocument(
   plaintext: Uint8Array,
   recipientKemPublicKey: Uint8Array
 ): Promise<SealedDocumentResult> {
-  const contentHash = computeShake256(plaintext);
-
   // Step 1: Encrypt the document payload with a fresh random 256-bit DEK
   const dek = getCrypto().getRandomValues(new Uint8Array(AES_KEY_BYTES));
   const encryptedBlob = await aesGcmEncrypt(dek, plaintext);
@@ -147,19 +173,21 @@ export async function encryptAndSealDocument(
   envelopeBytes.set(kemCiphertext, 0);
   envelopeBytes.set(wrappedDek, kemCiphertext.length);
 
+  const encryptedKeyEnvelope = bytesToHex(envelopeBytes);
   return {
     encryptedBlob,
-    contentHash,
-    encryptedKeyEnvelope: bytesToHex(envelopeBytes),
+    contentHash: computeShake256(encryptedBlob),
+    encryptedKeyEnvelope,
+    envelopeHash: computeEnvelopeHash(encryptedKeyEnvelope),
   };
 }
 
 /**
  * Hybrid Post-Quantum Decryption & Integrity Verification:
+ * 0) Verifies SHAKE-256(ciphertext) against the on-chain contentHash BEFORE decrypting.
  * 1) Decapsulates the ML-KEM-1024 shared secret using the recipient's private key.
  * 2) Unwraps the AES-256-GCM DEK.
  * 3) Decrypts the encrypted document blob in memory.
- * 4) Recomputes SHAKE-256 and verifies it strictly matches the on-chain contentHash.
  */
 export async function unsealAndDecryptDocument(
   encryptedBlob: Uint8Array,
@@ -167,6 +195,13 @@ export async function unsealAndDecryptDocument(
   recipientKemSecretKey: Uint8Array,
   expectedContentHash: `0x${string}`
 ): Promise<Uint8Array> {
+  const actualHash = computeShake256(encryptedBlob);
+  if (actualHash.toLowerCase() !== expectedContentHash.toLowerCase()) {
+    throw new Error(
+      `Integrity verification failed: expected ${expectedContentHash}, got ${actualHash}`
+    );
+  }
+
   const envelopeBytes = hexToBytes(encryptedKeyEnvelopeHex);
   const kemCiphertext = envelopeBytes.subarray(0, ML_KEM_1024_CIPHERTEXT_BYTES);
   const wrappedDek = envelopeBytes.subarray(ML_KEM_1024_CIPHERTEXT_BYTES);
@@ -177,16 +212,8 @@ export async function unsealAndDecryptDocument(
   // Step 2: Unwrap DEK
   const dek = await aesGcmDecrypt(sharedSecret, wrappedDek);
 
-  // Step 3: Decrypt document blob in memory
+  // Step 3: Decrypt document blob in memory (AES-GCM tag authenticates the plaintext)
   const plaintext = await aesGcmDecrypt(dek, encryptedBlob);
-
-  // Step 4: Verify SHAKE-256 integrity hash against on-chain commitment
-  const actualHash = computeShake256(plaintext);
-  if (actualHash.toLowerCase() !== expectedContentHash.toLowerCase()) {
-    throw new Error(
-      `Integrity verification failed: expected ${expectedContentHash}, got ${actualHash}`
-    );
-  }
-
+  dek.fill(0);
   return plaintext;
 }

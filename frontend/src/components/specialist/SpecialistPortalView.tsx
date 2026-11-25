@@ -17,13 +17,18 @@ import {
   ShieldAlert,
   Lock,
 } from 'lucide-react';
-import {
-  encryptAndSealDocument,
-  unsealAndDecryptDocument,
-  computeShake256,
-} from '@sdk/pqc';
-import type { StorageProviderId } from '@sdk/storageStrategy';
 import type { MockEphemeralPass } from '@/data/mockData';
+
+/** Where a decrypted payload really came from. */
+export type UnsealProvenance = 'gateway-chain' | 'local-demo';
+
+export interface UnsealResult {
+  readonly plaintext: Uint8Array;
+  readonly verifiedHash: `0x${string}`;
+  readonly envelopeByteSize: number;
+  readonly ciphertextByteSize: number;
+  readonly provenance: UnsealProvenance;
+}
 
 export interface SpecialistPortalViewProps {
   readonly passes: readonly MockEphemeralPass[];
@@ -33,15 +38,12 @@ export interface SpecialistPortalViewProps {
   };
   readonly specialistKemPublicKeyHex: string;
   readonly isKeyPublishedOnChain: boolean;
+  /** 'wallet' = derived from a wallet signature (recoverable); 'ephemeral' = random, lost on reload. */
+  readonly keySource: 'wallet' | 'ephemeral';
   readonly onRegenerateKemKeyPair: () => void;
   readonly onPublishKemKeyOnChain: () => void;
-  readonly getCachedSealedPayload: (cid: string) =>
-    | {
-        readonly encryptedBlob: Uint8Array;
-        readonly envelopeHex: `0x${string}`;
-        readonly contentHash: `0x${string}`;
-      }
-    | undefined;
+  /** Real decryption: gateway release + chain checks, or the local demo cache. Never synthetic. */
+  readonly onUnsealPass: (pass: MockEphemeralPass) => Promise<UnsealResult>;
 }
 
 type GrantFilterTab = 'active' | 'revoked' | 'all';
@@ -50,13 +52,13 @@ interface UnsealedSessionState {
   readonly passId: string;
   readonly passTitle: string;
   readonly ipfsCid: string;
-  readonly storageProvider: StorageProviderId;
+  readonly storageProvider: MockEphemeralPass['storageProvider'];
   readonly decryptedJsonText: string;
   readonly verifiedShake256Hash: `0x${string}`;
   readonly envelopeByteSize: number;
   readonly ciphertextByteSize: number;
   readonly decapsulationTimeMs: number;
-  readonly usedCachedPayload: boolean;
+  readonly provenance: UnsealProvenance;
   readonly timestampIso: string;
 }
 
@@ -68,35 +70,6 @@ function formatRemainingCountdown(seconds: number): string {
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
   return [hrs, mins, secs].map((val) => String(val).padStart(2, '0')).join(':');
-}
-
-function buildSynthesizedTelemetryJsonLd(pass: MockEphemeralPass): string {
-  const payload = {
-    '@context': 'https://synapseq.io/ns/telemetry/v2',
-    passId: pass.id,
-    recordIdHex: pass.recordIdHex,
-    patientPseudonym: pass.patientPseudonym,
-    deviceClass: pass.domain === 'BIONIC_TELEMETRY' ? 'NEURAL_BCI_MK5' : 'CLINICAL_DICOM_VOXEL_V3',
-    linkedBionicPart: pass.linkedPartName,
-    storageLayer: {
-      provider: pass.storageProvider,
-      reference: pass.ipfsCid,
-      retentionPolicy: pass.retention,
-    },
-    gpsCoordinates: {
-      lat: 35.6762,
-      lon: 139.6503,
-      sector: pass.gpsSector,
-    },
-    telemetrySnapshot: {
-      neuralLatencyMs: pass.metrics.neuralLatencyMs,
-      impedanceKOhm: pass.metrics.impedanceKOhm,
-      coherencePct: pass.metrics.coherencePct,
-    },
-    ephemeralDecryptionExpiry: 'Block #4,892,300',
-    zeroizationFlag: 'ON_TERMINATE',
-  };
-  return JSON.stringify(payload, null, 2);
 }
 
 function formatTruncatedKeyPreview(hex: string): string {
@@ -112,12 +85,12 @@ export function SpecialistPortalView(
 ): React.JSX.Element {
   const {
     passes,
-    specialistKemKeyPair,
     specialistKemPublicKeyHex,
     isKeyPublishedOnChain,
+    keySource,
     onRegenerateKemKeyPair,
     onPublishKemKeyOnChain,
-    getCachedSealedPayload,
+    onUnsealPass,
   } = props;
 
   const [filterTab, setFilterTab] = useState<GrantFilterTab>('active');
@@ -163,6 +136,8 @@ export function SpecialistPortalView(
     async (pass: MockEphemeralPass) => {
       setSelectedPassId(pass.id);
       setDecryptionError(null);
+      // Flush the previous plaintext first: never show pass A's data under pass B's header
+      setUnsealedSession(null);
 
       if (pass.revoked || pass.remainingSeconds <= 0) {
         setUnsealedSession(null);
@@ -175,64 +150,11 @@ export function SpecialistPortalView(
 
       try {
         const startPerf = performance.now();
-        const cached = getCachedSealedPayload(pass.ipfsCid);
-        const decoder = new TextDecoder();
-
-        let plaintextBytes: Uint8Array;
-        let verifiedHash: `0x${string}`;
-        let envelopeByteSize = 0;
-        let ciphertextByteSize = 0;
-        let usedCached = false;
-
-        if (cached) {
-          try {
-            plaintextBytes = await unsealAndDecryptDocument(
-              cached.encryptedBlob,
-              cached.envelopeHex,
-              specialistKemKeyPair.secretKey,
-              cached.contentHash
-            );
-            verifiedHash = computeShake256(plaintextBytes);
-            envelopeByteSize = (cached.envelopeHex.length - 2) / 2;
-            ciphertextByteSize = cached.encryptedBlob.byteLength;
-            usedCached = true;
-          } catch {
-            // If specialist keypair was regenerated after sealing, run live round-trip with current keypair
-            const encoder = new TextEncoder();
-            const rawBytes = encoder.encode(buildSynthesizedTelemetryJsonLd(pass));
-            const sealed = await encryptAndSealDocument(rawBytes, specialistKemKeyPair.publicKey);
-            plaintextBytes = await unsealAndDecryptDocument(
-              sealed.encryptedBlob,
-              sealed.encryptedKeyEnvelope,
-              specialistKemKeyPair.secretKey,
-              sealed.contentHash
-            );
-            verifiedHash = computeShake256(plaintextBytes);
-            envelopeByteSize = (sealed.encryptedKeyEnvelope.length - 2) / 2;
-            ciphertextByteSize = sealed.encryptedBlob.byteLength;
-            usedCached = false;
-          }
-        } else {
-          const encoder = new TextEncoder();
-          const rawBytes = encoder.encode(buildSynthesizedTelemetryJsonLd(pass));
-          const sealed = await encryptAndSealDocument(rawBytes, specialistKemKeyPair.publicKey);
-          plaintextBytes = await unsealAndDecryptDocument(
-            sealed.encryptedBlob,
-            sealed.encryptedKeyEnvelope,
-            specialistKemKeyPair.secretKey,
-            sealed.contentHash
-          );
-          verifiedHash = computeShake256(plaintextBytes);
-          envelopeByteSize = (sealed.encryptedKeyEnvelope.length - 2) / 2;
-          ciphertextByteSize = sealed.encryptedBlob.byteLength;
-          usedCached = false;
-        }
-
+        const result = await onUnsealPass(pass);
         const elapsedMs = Number((performance.now() - startPerf).toFixed(2));
-        const decodedText = decoder.decode(plaintextBytes);
-
-        // Zeroize temporary plaintext buffer in RAM after decoding to string
-        plaintextBytes.fill(0);
+        const decodedText = new TextDecoder().decode(result.plaintext);
+        // Zeroize the plaintext buffer once decoded for display
+        result.plaintext.fill(0);
 
         setUnsealedSession({
           passId: pass.id,
@@ -240,11 +162,11 @@ export function SpecialistPortalView(
           ipfsCid: pass.ipfsCid,
           storageProvider: pass.storageProvider,
           decryptedJsonText: decodedText,
-          verifiedShake256Hash: verifiedHash,
-          envelopeByteSize,
-          ciphertextByteSize,
+          verifiedShake256Hash: result.verifiedHash,
+          envelopeByteSize: result.envelopeByteSize,
+          ciphertextByteSize: result.ciphertextByteSize,
           decapsulationTimeMs: elapsedMs,
-          usedCachedPayload: usedCached,
+          provenance: result.provenance,
           timestampIso: new Date().toISOString(),
         });
       } catch (err) {
@@ -257,17 +179,8 @@ export function SpecialistPortalView(
         setIsUnsealing(false);
       }
     },
-    [getCachedSealedPayload, specialistKemKeyPair]
+    [onUnsealPass]
   );
-
-  // Auto-unseal the initial active pass on mount so the right stream viewer shows live PQC metrics immediately
-  useEffect(() => {
-    const initialActive = passes.find((p) => !p.revoked && p.remainingSeconds > 0);
-    if (initialActive && !unsealedSession && !revokedNoticePass) {
-      void handleUnsealPass(initialActive);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Watch for on-chain Kill-Switch revocation while a pass is open in the viewer
   useEffect(() => {
@@ -317,6 +230,10 @@ export function SpecialistPortalView(
     const attestationReport = {
       protocol: 'SynapseQ Post-Quantum Enclave Attestation',
       chain: 'QoreChain Diana Testnet (Chain ID 9800)',
+      provenance:
+        unsealedSession.provenance === 'gateway-chain'
+          ? 'Key-Release Gateway + on-chain isAccessValid/envelopeHash/contentHash'
+          : 'LOCAL DEMO CACHE (not verified on-chain)',
       standards: ['NIST FIPS 203 (ML-KEM-1024)', 'AES-256-GCM', 'SHAKE-256 (32-Byte XOF)'],
       passId: unsealedSession.passId,
       recordIdHex: selectedPass.recordIdHex,
@@ -361,6 +278,9 @@ export function SpecialistPortalView(
                 ML-KEM-1024 Public Key (1,568 B • NIST PQC CAT 5)
               </span>
 
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-border text-reb-text-muted font-mono text-[11px]">
+                {keySource === 'wallet' ? 'DERIVADA DE LA WALLET' : 'EFÍMERA (se pierde al recargar)'}
+              </span>
               {isKeyPublishedOnChain ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-mint/60 text-reb-mint font-mono text-[11px] font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse" />
@@ -412,7 +332,7 @@ export function SpecialistPortalView(
             className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-reb-surface-card/70 hover:bg-reb-surface-card border border-reb-border hover:border-reb-mint/50 text-reb-text-light font-mono text-xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 text-reb-mint" />
-            Regenerate Keypair
+            {keySource === 'wallet' ? 'Re-derivar desde wallet' : 'Derivar / generar clave'}
           </button>
 
           <button
@@ -711,17 +631,24 @@ export function SpecialistPortalView(
                   </span>
                   <span className="font-mono text-xs text-reb-mint">
                     Decapsulated &amp; Verified in {unsealedSession.decapsulationTimeMs} ms •{' '}
-                    {unsealedSession.usedCachedPayload
-                      ? 'Patient Vault Sealed Blob'
-                      : 'Live FIPS 203 Lattice Round-Trip'}
+                    {unsealedSession.provenance === 'gateway-chain'
+                      ? 'Gateway release + verificación on-chain'
+                      : 'Caché local de demo (sin verificación on-chain)'}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>1. QoreChain ✓</span>
-                  </div>
+                  {unsealedSession.provenance === 'gateway-chain' ? (
+                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>1. QoreChain ✓</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-yellow/40 text-reb-yellow font-mono text-xs font-semibold">
+                      <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>1. QoreChain — demo</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
                     <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
                     <span>2. ML-KEM-1024 ✓</span>
@@ -834,7 +761,10 @@ export function SpecialistPortalView(
               <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-reb-border/70">
                 <div className="flex items-center gap-2 text-reb-text-muted font-mono text-xs">
                   <ShieldCheck className="w-4 h-4 text-reb-mint" />
-                  <span>Zero-disk write guarantee strictly enforced by Diana Enclave.</span>
+                  <span>
+                    Descifrado en memoria del navegador. Revocar impide nuevas entregas, pero no
+                    recupera lo que ya se vio.
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
