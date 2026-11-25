@@ -27,6 +27,7 @@ import { fetchEncryptedBlob, uploadEncryptedBlob } from "./storage.js";
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const CONTRACT_ADDRESS = (process.env.SYNAPSE_VAULT_ADDRESS ??
   "0x0B306BF915C4d645ff596e518fAf3F9669b97016") as `0x${string}`;
+const PINATA_JWT = process.env.PINATA_JWT;
 
 // Default Anvil pre-funded accounts (local fork only)
 const PATIENT_PK =
@@ -122,10 +123,15 @@ async function main() {
   const plaintextBytes = new TextEncoder().encode(JSON.stringify(sampleDocument, null, 2));
 
   const sealed = await encryptAndSealDocument(plaintextBytes, specialistKem.publicKey);
-  const cid = await uploadEncryptedBlob(sealed.encryptedBlob);
+  const cid = await uploadEncryptedBlob(sealed.encryptedBlob, {
+    fileName: `synapseq-${runSalt}.enc`,
+    metadata: { app: "SynapseQ", encryption: "AES-256-GCM+ML-KEM-1024" },
+  });
 
   console.log(`  - Plaintext size:        ${plaintextBytes.length} bytes`);
-  console.log(`  - Encrypted blob size:   ${sealed.encryptedBlob.length} bytes (stored at .local-ipfs/${cid}.enc)`);
+  console.log(
+    `  - Encrypted blob size:   ${sealed.encryptedBlob.length} bytes (${PINATA_JWT ? `Pinata IPFS CID: ${cid}` : `local fallback: .local-ipfs/${cid}.enc`})`
+  );
   console.log(`  - SHAKE-256 contentHash: ${sealed.contentHash}`);
   console.log(`  - ML-KEM-1024 envelope:  ${(sealed.encryptedKeyEnvelope.length - 2) / 2} bytes`);
 
