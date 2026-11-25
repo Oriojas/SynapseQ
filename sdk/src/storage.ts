@@ -143,19 +143,13 @@ export async function uploadEncryptedBlob(
 
   if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
     window.localStorage.setItem(`synapseq_ipfs_${cid}`, bytesToHex(blob));
-  } else if (typeof window === "undefined") {
-    const { mkdirSync, writeFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const localIpfsDir = join(process.cwd(), ".local-ipfs");
-    mkdirSync(localIpfsDir, { recursive: true });
-    writeFileSync(join(localIpfsDir, `${cid}.enc`), blob);
   }
 
   return cid;
 }
 
 /**
- * Unified helper that retrieves an encrypted blob from cache, local fallback, or IPFS gateway.
+ * Unified helper that retrieves an encrypted blob from cache, browser localStorage, or IPFS gateway.
  */
 export async function fetchEncryptedBlob(
   cid: string,
@@ -177,14 +171,7 @@ export async function fetchEncryptedBlob(
       return bytes;
     }
 
-    if (typeof window === "undefined") {
-      const { readFileSync } = await import("node:fs");
-      const { join } = await import("node:path");
-      const filePath = join(process.cwd(), ".local-ipfs", `${cid}.enc`);
-      const bytes = new Uint8Array(readFileSync(filePath));
-      memoryBlobCache.set(cid, bytes);
-      return bytes;
-    }
+    throw new Error(`Encrypted blob not found in memory cache for CID: ${cid}`);
   }
 
   const gatewayUrl =
