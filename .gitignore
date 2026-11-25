@@ -155,3 +155,24 @@ vite.config.ts.timestamp-*
 .nx/cache
 .nx/workspace-data
 .nx/migrate-runs
+
+# Foundry / Smart Contracts
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+**/lcov.info
+
+# SynapseQ Local Storage & Sensitive Keys
+.local-ipfs/
+*.enc
+*.pem
+*.key
+cbom-report.json
+
+# OS & Local Tooling
+.DS_Store
+.claude/
+.idea/
+.vscode/
+!.vscode/extensions.json

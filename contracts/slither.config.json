@@ -1,0 +1,6 @@
+{
+  "filter_paths": "test|script|lib",
+  "exclude_dependencies": true,
+  "exclude_informational": false,
+  "exclude_low": false
+}
