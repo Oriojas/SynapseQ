@@ -17,11 +17,11 @@ export PATH := $(FOUNDRY_PATH):$(PATH)
 # Dirección del último despliegue local (leída del broadcast de Foundry)
 VAULT_ADDR_CMD = grep -m1 -o '"contractAddress": *"0x[0-9a-fA-F]*"' contracts/broadcast/DeploySynapseVault.s.sol/$${QORECHAIN_CHAIN_ID:-9800}/run-latest.json | grep -o '0x[0-9a-fA-F]*'
 
-# Carga segura y desacoplada de .env desde la raíz del proyecto
-ENV_EXPORTS = set -a && [ -f .env ] && source .env && set +a && \
-              export ANVIL_PORT="$${ANVIL_PORT:-8545}" && \
-              export FRONTEND_PORT="$${FRONTEND_PORT:-5173}" && \
-              export GATEWAY_PORT="$${GATEWAY_PORT:-4000}" && \
+# Carga segura y desacoplada de .env desde la raíz del proyecto (funciona con o sin archivo .env)
+ENV_EXPORTS = set -a; [ -f .env ] && source .env; set +a; \
+              export ANVIL_PORT="$${ANVIL_PORT:-8545}"; \
+              export FRONTEND_PORT="$${FRONTEND_PORT:-5173}"; \
+              export GATEWAY_PORT="$${GATEWAY_PORT:-4000}"; \
               export LOCAL_RPC_URL="$${LOCAL_RPC_URL:-http://127.0.0.1:$${ANVIL_PORT:-8545}}"
 
 # ── Ayuda ──────────────────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ deploy-local: ## 📦 Desplegar SynapseVaultRegistry.sol en el nodo Anvil local 
 	@$(ENV_EXPORTS) && \
 	  anvil_key="$${DEPLOYER_PRIVATE_KEY}"; \
 	  if [ -z "$$anvil_key" ] || echo "$$anvil_key" | grep -q '<'; then \
-	    anvil_key=$$(grep -m 1 -A 2 "Private Keys" $(ANVIL_LOG) 2>/dev/null | tail -n 1 | awk '{print $$2}'); \
+	    anvil_key=$$(grep -A 5 "Private Keys" $(ANVIL_LOG) 2>/dev/null | grep -m 1 "(0)" | awk '{print $$2}'); \
 	  fi; \
 	  if [ -z "$$anvil_key" ]; then \
 	    echo "❌ No se detectó DEPLOYER_PRIVATE_KEY en .env ni un nodo Anvil activo en $(ANVIL_LOG)."; exit 1; \
