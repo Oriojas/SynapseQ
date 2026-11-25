@@ -86,23 +86,35 @@ SynapseQ combina cifrado post-cuántico en cliente (100% compatible con navegado
 
 ```text
 SynapseQ/
+├── Makefile                           # Automatización integral (build, init, down, test, lint, audit, deploy)
+├── .env.example                       # Plantilla única de variables de entorno (sin secretos ni datos reales)
 ├── contracts/                         # Smart Contracts (Foundry / Solidity 0.8.24)
 │   ├── foundry.toml                   # Configuración EVM ("paris") y RPC Diana Testnet (9800)
-│   ├── .env.example                   # Plantilla de RPC y clave privada de despliegue
 │   ├── src/
-│   │   └── SynapseVaultRegistry.sol   # Contrato unificado: Acceso Efímero + Kill-Switch + HBOM
+│   │   └── SynapseVaultRegistry.sol   # Contrato unificado: Acceso Efímero + Kill-Switch + HBOM + PKI ML-KEM-1024
 │   ├── test/
-│   │   └── SynapseVaultRegistry.t.sol # 11 tests unitarios, timelocks (vm.warp) y fuzz testing
+│   │   └── SynapseVaultRegistry.t.sol # 14 tests unitarios, timelocks (vm.warp), PKI y fuzz testing
 │   └── script/
 │       └── DeploySynapseVault.s.sol   # Script de despliegue para fork local o Diana Testnet
-├── sdk/                               # SDK Post-Cuántico Browser-Safe (TypeScript + Viem)
+├── sdk/                               # SDK Post-Cuántico Browser-Safe (TypeScript + Viem + @qorechain/rdk)
 │   ├── package.json
 │   └── src/
 │       ├── pqc.ts                     # ML-KEM-1024, ML-DSA-87, SHAKE-256 y AES-256-GCM
-│       ├── abi.ts                     # ABI tipado de SynapseVaultRegistry para viem/wagmi
-│       └── demo.ts                    # Demo end-to-end contra fork local de QoreChain (9800)
-└── docs/
-    └── synapseq-plan-hackathon-v2.md  # Planificación inicial del sprint
+│       ├── storage.ts                 # Clientes cifrados Pinata IPFS y fallback local/enclave
+│       ├── storageStrategy.ts         # SynapseStorageRouter (QoreChain DA vs Pinata IPFS vs Memory Fallback)
+│       ├── rdkDa.ts                   # Integración nativa con @qorechain/rdk (Sovereign Rollup & Native DA)
+│       ├── abi.ts                     # ABI tipado completo de SynapseVaultRegistry
+│       └── demo.ts                    # Demo end-to-end contra QoreChain (9800)
+├── frontend/                          # Frontend Post-Quantum Bio-HUD (Vite + React 19 + Tailwind CSS v4)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── layout/                # Mapa vectorial táctico GPS (TacticalGpsBackground)
+│   │   │   ├── patient/               # Vista 1: Portal Paciente & Bóveda Efímera
+│   │   │   ├── hbom/                  # Vista 2: Catálogo Ciber-Humano HBOM & Firmware ML-DSA-87
+│   │   │   └── specialist/            # Vista 3: Portal Especialista Minimalista (Rebecca Glass Edition)
+│   │   └── hooks/
+│   │       └── useSynapseVault.ts     # Hook Web3 de interacción con SynapseVaultRegistry.sol
+└── .stitch/designs/                   # Diseños UI/UX exportados desde Stitch MCP
 ```
 
 ---
@@ -143,9 +155,61 @@ SynapseQ/
 * `updatePartStatus(partId, newStatus)`: Cambia el estado operativo (`ACTIVE`, `MAINTENANCE`, `DECOMMISSIONED`).
 * `getBionicPart(partId)` / `getPartsByBearer(bearer)` / `getFirmwareHistory(partId)`: Consultas completas del inventario corporal y su auditoría histórica.
 
+### Módulo 3: Directorio On-Chain de Claves Públicas `ML-KEM-1024` (QoreChain PKI)
+* `registerKemPublicKey(bytes calldata pubKey)`: Publica on-chain la clave pública `ML-KEM-1024` (`1,568 bytes` NIST FIPS 203) del médico o bio-ingeniero para que el paciente pueda encapsular sin depender de servidores centralizados.
+* `getKemPublicKey(address account)` / `hasKemPublicKey(address account)`: Resuelve directamente desde QoreChain la llave pública post-cuántica de cualquier especialista.
+
 ---
 
-## 🚀 Instalación, Fork Local y Pruebas
+## ⚡ Automatización con `Makefile` (Instalación, Inicio, Detenido y Pruebas)
+
+El proyecto cuenta con un [Makefile](Makefile) unificado que automatiza todo el ciclo de vida del stack (contratos Foundry, nodo local Anvil, SDK Post-Cuántico y Frontend React + Tailwind v4).
+
+### Tabla de Comandos `make`
+Ejecuta `make` o `make help` en la raíz del repositorio para listar todos los comandos disponibles:
+
+| Comando | Descripción |
+| :--- | :--- |
+| `make build` | ⚙️ **Primera vez:** instala `forge-std`, compila los contratos Solidity en Foundry, instala dependencias en `sdk/` y `frontend/`, y verifica el build de producción. |
+| `make init` | 🚀 **Levantar el stack local:** inicia en background el nodo EVM **Anvil (`Chain ID 9800`)** en `:8545`, despliega automáticamente `SynapseVaultRegistry.sol`, levanta el **Frontend Bio-HUD** en `:5173` y verifica con healthcheck HTTP que ambos respondan. |
+| `make down` | 🛑 **Detener el stack local:** finaliza los procesos en background (`Anvil` y `Vite`) y libera los puertos `:8545` y `:5173`. |
+| `make test` | 🧪 **Suite completa acumulada:** ejecuta en orden `make lint` + `make test-contracts` + `make test-sdk` + `make test-front`. |
+| `make test-contracts` | ⛓️ Ejecuta los 14 tests unitarios, *timelocks* (`vm.warp`), *Kill-Switch*, HBOM, PKI y *fuzzing* en Foundry (`forge test -vvv`). |
+| `make test-sdk` | 🔐 Valida el tipado estricto (`tsc --noEmit`) y linting (`eslint`) sobre `ML-KEM-1024`, `ML-DSA-87`, `SHAKE-256`, `rdkDa` y `SynapseStorageRouter`. |
+| `make test-front` | ⚛️ Valida el tipado estricto y la compilación de producción (`vite build`) del Frontend. |
+| `make lint` | 🔍 Verificación de formato y tipos en todo el monorepo (`forge fmt --check` + `eslint` + `tsc`). |
+| `make audit` | 🛡️ Auditoría de seguridad de dependencias (`npm audit`) en `sdk/` y `frontend/`. |
+| `make demo` | 🎯 Ejecuta la demo end-to-end post-cuántica (`sdk/src/demo.ts`) contra el nodo local activo. |
+| `make deploy-local` | 📦 Despliega `SynapseVaultRegistry.sol` en el nodo Anvil local (`:8545`). |
+| `make deploy-diana` | 🌐 Despliega `SynapseVaultRegistry.sol` en **QoreChain Diana Testnet real (`Chain ID 9800`)** usando las variables de `.env`. |
+| `make clean` | 🗑️ Detiene el stack activo y limpia artefactos de compilación, cachés, PIDs y logs temporales (`/tmp/synapseq-*`). |
+
+### Flujo Rápido Recomendado con `make`
+```bash
+# 1. Clonar el repositorio y crear el archivo .env desde la plantilla
+git clone https://github.com/Oriojas/SynapseQ.git
+cd SynapseQ
+cp .env.example .env
+
+# 2. Instalar dependencias y compilar todo el proyecto (primera vez)
+make build
+
+# 3. Levantar todo el entorno local (Anvil 9800 + Deploy Contrato + Frontend en http://localhost:5173)
+make init
+
+# 4. Ejecutar la suite completa de calidad y tests
+make test
+
+# 5. Ejecutar la demo criptográfica de 6 pasos contra el nodo local
+make demo
+
+# 6. Detener todos los servicios y liberar puertos
+make down
+```
+
+---
+
+## 🔧 Ejecución Manual Paso a Paso (Alternativa sin `make`)
 
 ### 1. Clonar e instalar dependencias de Smart Contracts (Foundry)
 ```bash
