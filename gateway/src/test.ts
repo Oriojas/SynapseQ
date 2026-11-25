@@ -4,12 +4,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
 import { keccak256, toBytes } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import {
   buildGatewayAuthMessage,
   combineShares,
   decodeRecoveryShare,
+  downloadBlobViaGateway,
   encodeRecoveryShare,
   encryptAndSealDocument,
   generateKemKeyPair,
@@ -20,242 +22,264 @@ import {
   splitSecret,
   storeProtectedEnvelope,
   unsealAndDecryptDocument,
+  type GatewayAuthAction,
 } from "../../sdk/src/index.js";
-import type { ChainPolicyVerifier, OnChainGrantPolicy } from "./chain.js";
-import { createGatewayServer } from "./server.js";
+import { ChainUnavailableError, type ChainPolicyVerifier, type OnChainGrantPolicy } from "./chain.js";
+import { createGatewayServer, type GatewayServerOptions } from "./server.js";
 import { EnvelopeVaultStore } from "./store.js";
 
 if (!globalThis.crypto) {
   (globalThis as unknown as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
 }
 
-const PATIENT = privateKeyToAccount(
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-);
-const SPECIALIST = privateKeyToAccount(
-  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-);
-const ATTACKER = privateKeyToAccount(
-  "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
-);
+const CHAIN_ID = 9800;
+const PATIENT = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+const SPECIALIST = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+const ATTACKER = privateKeyToAccount("0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a");
+
+async function auth(
+  gatewayUrl: string,
+  account: PrivateKeyAccount,
+  action: GatewayAuthAction,
+  recordId?: `0x${string}`
+): Promise<{ nonce: string; signature: `0x${string}` }> {
+  const { nonce, chainId } = await requestGatewayNonce(gatewayUrl, account.address);
+  assert.equal(chainId, CHAIN_ID);
+  const signature = await account.signMessage({
+    message: buildGatewayAuthMessage({ action, address: account.address, nonce, chainId, recordId }),
+  });
+  return { nonce, signature };
+}
+
+async function startServer(
+  overrides: Partial<GatewayServerOptions> & { verifier: ChainPolicyVerifier }
+): Promise<{ url: string; server: Server; dir: string }> {
+  const dir = mkdtempSync(join(tmpdir(), "synapseq-gw-test-"));
+  const server = createGatewayServer({ store: new EnvelopeVaultStore(dir), ...overrides });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  return { url: `http://127.0.0.1:${port}`, server, dir };
+}
 
 async function testShamirRecovery(): Promise<void> {
   console.log("[Test 1] Shamir Secret Sharing 2-of-3 Recovery...");
   const originalSeed = globalThis.crypto.getRandomValues(new Uint8Array(32));
-  const shares = splitSecret(originalSeed, 3, 2);
-  assert.equal(shares.length, 3);
-
-  // Encode & decode QR/paper share strings
-  const decoded = shares.map((s) => decodeRecoveryShare(encodeRecoveryShare(s)));
-
-  // Every 2-of-3 pair must reconstruct the exact original 32-byte seed
-  const pairs = [
-    [decoded[0], decoded[1]],
-    [decoded[0], decoded[2]],
-    [decoded[1], decoded[2]],
-  ];
-  for (const pair of pairs) {
-    const recovered = combineShares(pair);
-    assert.deepEqual(recovered, originalSeed);
+  const decoded = splitSecret(originalSeed, 3, 2).map((s) => decodeRecoveryShare(encodeRecoveryShare(s)));
+  for (const pair of [[decoded[0], decoded[1]], [decoded[0], decoded[2]], [decoded[1], decoded[2]]]) {
+    assert.deepEqual(combineShares(pair), originalSeed);
   }
-
-  // Fewer than 2 shares must throw
   assert.throws(() => combineShares([decoded[0]]), /At least 2 shares/);
-  console.log("  PASS: All 2-of-3 pairs reconstructed the exact 32-byte ML-KEM master seed.");
+  console.log("  PASS");
 }
 
 async function testKeyReleaseGateway(): Promise<void> {
-  console.log("[Test 2] Zero-Trust Key-Release Gateway + SIWE + Kill-Switch + Crypto-Shredding...");
+  console.log("[Test 2] Key-Release Gateway: commitments, release, blob token, kill-switch, shredding...");
 
+  const specialistKem = generateKemKeyPair();
+  const plaintext = new TextEncoder().encode(JSON.stringify({ exam: "Cranial MRI", secret: "zero-leak" }));
+  const sealed = await encryptAndSealDocument(plaintext, specialistKem.publicKey);
   const recordId = keccak256(toBytes("SYNAPSEQ-ZERO-LEAK-TEST-001"));
-  let currentPolicy: OnChainGrantPolicy = {
+
+  let policy: OnChainGrantPolicy = {
     patient: PATIENT.address,
     specialist: SPECIALIST.address,
     validUntil: BigInt(Math.floor(Date.now() / 1000) + 3600),
     revoked: false,
     isActive: true,
+    contentHash: sealed.contentHash,
+    envelopeHash: sealed.envelopeHash,
   };
-
-  const mockVerifier: ChainPolicyVerifier = {
+  const verifier: ChainPolicyVerifier = {
+    chainId: CHAIN_ID,
     async getGrantPolicy(id) {
-      if (id.toLowerCase() !== recordId.toLowerCase()) return null;
-      return currentPolicy;
+      return id.toLowerCase() === recordId.toLowerCase() ? policy : null;
     },
   };
-
-  const tempDir = mkdtempSync(join(tmpdir(), "synapseq-gw-test-"));
-  const store = new EnvelopeVaultStore(tempDir);
-  const server = createGatewayServer({ verifier: mockVerifier, store });
-
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
-  const gatewayUrl = `http://127.0.0.1:${port}`;
+  const { url, server, dir } = await startServer({ verifier });
 
   try {
-    // 1. Encrypt document client-side with AES-256-GCM + ML-KEM-1024
-    const specialistKem = generateKemKeyPair();
-    const plaintext = new TextEncoder().encode(
-      JSON.stringify({ exam: "Cranial MRI", implant: "NeuroLink-X9", secret: "zero-leak" })
-    );
-    const sealed = await encryptAndSealDocument(plaintext, specialistKem.publicKey);
-
-    // 2. Patient pins encrypted blob via Gateway (no PINATA_JWT in client)
-    const { nonce: pinNonce } = await requestGatewayNonce(gatewayUrl, PATIENT.address);
-    const pinSig = await PATIENT.signMessage({
-      message: buildGatewayAuthMessage({
-        action: "PIN_BLOB",
-        address: PATIENT.address,
-        nonce: pinNonce,
-      }),
-    });
-    const pinned = await pinEncryptedBlobViaGateway(gatewayUrl, {
+    // Pin via gateway
+    const pinned = await pinEncryptedBlobViaGateway(url, {
       encryptedBlob: sealed.encryptedBlob,
       address: PATIENT.address,
-      nonce: pinNonce,
-      signature: pinSig,
-      fileName: "mri-test.enc",
+      ...(await auth(url, PATIENT, "PIN_BLOB")),
     });
     assert.ok(pinned.cid.startsWith("bafy-gw-"));
 
-    // 3. Patient stores ML-KEM-1024 envelope off-chain in Gateway
-    const { nonce: storeNonce } = await requestGatewayNonce(gatewayUrl, PATIENT.address);
-    const storeSig = await PATIENT.signMessage({
-      message: buildGatewayAuthMessage({
-        action: "STORE_ENVELOPE",
-        address: PATIENT.address,
-        nonce: storeNonce,
-        recordId,
-      }),
-    });
-    const storeRes = await storeProtectedEnvelope(gatewayUrl, {
+    // Regression M2: blob is not downloadable without a release token
+    const anon = await fetch(`${url}/api/storage/blobs/${pinned.cid}`);
+    assert.equal(anon.status, 401);
+
+    // Envelope that does not match the on-chain commitment is rejected (409)
+    const tampered = (sealed.encryptedKeyEnvelope.slice(0, -2) + "00") as `0x${string}`;
+    await assert.rejects(
+      async () =>
+        storeProtectedEnvelope(url, {
+          recordId,
+          patient: PATIENT.address,
+          ipfsCID: pinned.cid,
+          encryptedKeyEnvelope: tampered,
+          contentHash: sealed.contentHash,
+          ...(await auth(url, PATIENT, "STORE_ENVELOPE", recordId)),
+        }),
+      /409/
+    );
+
+    // Valid store
+    const storeAuth = await auth(url, PATIENT, "STORE_ENVELOPE", recordId);
+    const storeBody = {
       recordId,
       patient: PATIENT.address,
       ipfsCID: pinned.cid,
       encryptedKeyEnvelope: sealed.encryptedKeyEnvelope,
       contentHash: sealed.contentHash,
-      nonce: storeNonce,
-      signature: storeSig,
-    });
-    assert.equal(storeRes.stored, true);
+      ...storeAuth,
+    };
+    assert.equal((await storeProtectedEnvelope(url, storeBody)).stored, true);
 
-    // 4. Replay attack with already-consumed nonce must fail (401)
-    await assert.rejects(
-      () =>
-        storeProtectedEnvelope(gatewayUrl, {
-          recordId,
-          patient: PATIENT.address,
-          ipfsCID: pinned.cid,
-          encryptedKeyEnvelope: sealed.encryptedKeyEnvelope,
-          contentHash: sealed.contentHash,
-          nonce: storeNonce,
-          signature: storeSig,
-        }),
-      /401/
-    );
+    // Replay with a consumed nonce fails (401)
+    await assert.rejects(() => storeProtectedEnvelope(url, storeBody), /401/);
 
-    // 5. Unauthorized attacker attempting release must fail (403)
-    const { nonce: atkNonce } = await requestGatewayNonce(gatewayUrl, ATTACKER.address);
-    const atkSig = await ATTACKER.signMessage({
-      message: buildGatewayAuthMessage({
-        action: "RELEASE_ENVELOPE",
-        address: ATTACKER.address,
-        nonce: atkNonce,
-        recordId,
-      }),
-    });
+    // Attacker cannot release (403)
     await assert.rejects(
-      () =>
-        releaseProtectedEnvelope(gatewayUrl, {
+      async () =>
+        releaseProtectedEnvelope(url, {
           recordId,
           specialist: ATTACKER.address,
-          nonce: atkNonce,
-          signature: atkSig,
+          ...(await auth(url, ATTACKER, "RELEASE_ENVELOPE", recordId)),
         }),
       /403/
     );
 
-    // 6. Authorized specialist authenticates via SIWE & decrypts in memory
-    const { nonce: specNonce } = await requestGatewayNonce(gatewayUrl, SPECIALIST.address);
-    const specSig = await SPECIALIST.signMessage({
-      message: buildGatewayAuthMessage({
-        action: "RELEASE_ENVELOPE",
-        address: SPECIALIST.address,
-        nonce: specNonce,
-        recordId,
-      }),
-    });
-    const released = await releaseProtectedEnvelope(gatewayUrl, {
+    // Signature for a different chain is rejected (401)
+    {
+      const { nonce } = await requestGatewayNonce(url, SPECIALIST.address);
+      const wrongChainSig = await SPECIALIST.signMessage({
+        message: buildGatewayAuthMessage({
+          action: "RELEASE_ENVELOPE",
+          address: SPECIALIST.address,
+          nonce,
+          chainId: 1,
+          recordId,
+        }),
+      });
+      await assert.rejects(
+        () => releaseProtectedEnvelope(url, { recordId, specialist: SPECIALIST.address, nonce, signature: wrongChainSig }),
+        /401/
+      );
+    }
+
+    // Authorized specialist: release + single-use token download + decrypt
+    const released = await releaseProtectedEnvelope(url, {
       recordId,
       specialist: SPECIALIST.address,
-      nonce: specNonce,
-      signature: specSig,
+      ...(await auth(url, SPECIALIST, "RELEASE_ENVELOPE", recordId)),
     });
-    assert.equal(released.ipfsCID, pinned.cid);
-
-    const blobRes = await fetch(`${gatewayUrl}/api/storage/blobs/${released.ipfsCID}`);
-    assert.equal(blobRes.status, 200);
-    const downloadedBlob = new Uint8Array(await blobRes.arrayBuffer());
+    assert.ok(released.blobToken);
+    const blob = await downloadBlobViaGateway(url, released.ipfsCID, released.blobToken);
     const decrypted = await unsealAndDecryptDocument(
-      downloadedBlob,
+      blob,
       released.encryptedKeyEnvelope,
       specialistKem.secretKey,
-      released.contentHash
+      policy.contentHash
     );
     assert.deepEqual(decrypted, plaintext);
+    // Token is single-use
+    await assert.rejects(() => downloadBlobViaGateway(url, released.ipfsCID, released.blobToken!), /401/);
 
-    // 7. After on-chain Kill-Switch, specialist is strictly blocked (403)
-    currentPolicy = { ...currentPolicy, revoked: true, isActive: false };
-    const { nonce: postKillNonce } = await requestGatewayNonce(gatewayUrl, SPECIALIST.address);
-    const postKillSig = await SPECIALIST.signMessage({
-      message: buildGatewayAuthMessage({
-        action: "RELEASE_ENVELOPE",
-        address: SPECIALIST.address,
-        nonce: postKillNonce,
-        recordId,
-      }),
-    });
+    // Kill-switch: release refused (403)
+    policy = { ...policy, revoked: true, isActive: false };
     await assert.rejects(
-      () =>
-        releaseProtectedEnvelope(gatewayUrl, {
+      async () =>
+        releaseProtectedEnvelope(url, {
           recordId,
           specialist: SPECIALIST.address,
-          nonce: postKillNonce,
-          signature: postKillSig,
+          ...(await auth(url, SPECIALIST, "RELEASE_ENVELOPE", recordId)),
         }),
       /403/
     );
 
-    // 8. Right to Erasure (Ley 1581 / GDPR): patient crypto-shreds record & local blob
-    const { nonce: shredNonce } = await requestGatewayNonce(gatewayUrl, PATIENT.address);
-    const shredSig = await PATIENT.signMessage({
-      message: buildGatewayAuthMessage({
-        action: "SHRED_RECORD",
-        address: PATIENT.address,
-        nonce: shredNonce,
-        recordId,
-      }),
-    });
-    const shredRes = await shredProtectedRecord(gatewayUrl, {
+    // Crypto-shredding by the patient
+    const shred = await shredProtectedRecord(url, {
       recordId,
       patient: PATIENT.address,
-      nonce: shredNonce,
-      signature: shredSig,
+      ...(await auth(url, PATIENT, "SHRED_RECORD", recordId)),
     });
-    assert.equal(shredRes.shredded, true);
-
-    const deletedBlobRes = await fetch(`${gatewayUrl}/api/storage/blobs/${pinned.cid}`);
-    assert.equal(deletedBlobRes.status, 404);
-
-    console.log("  PASS: SIWE auth, zero-leak release, replay protection, Kill-Switch 403, and Crypto-Shredding all verified!");
+    assert.equal(shred.shredded, true);
+    console.log("  PASS");
   } finally {
     server.close();
-    rmSync(tempDir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+async function testAbuseLimits(): Promise<void> {
+  console.log("[Test 3] Abuse limits: CORS allowlist, nonce cap, pin quota, chain outage...");
+  const verifier: ChainPolicyVerifier = {
+    chainId: CHAIN_ID,
+    async getGrantPolicy() {
+      throw new ChainUnavailableError("RPC down");
+    },
+  };
+  const { url, server, dir } = await startServer({
+    verifier,
+    pinQuota: { maxPins: 2, maxBytes: 10 * 1024 * 1024, windowMs: 60_000 },
+  });
+  try {
+    // CORS: unknown origins get no Access-Control-Allow-Origin
+    const evil = await fetch(`${url}/health`, { headers: { Origin: "https://evil.example" } });
+    assert.equal(evil.headers.get("access-control-allow-origin"), null);
+    const good = await fetch(`${url}/health`, { headers: { Origin: "http://localhost:5173" } });
+    assert.equal(good.headers.get("access-control-allow-origin"), "http://localhost:5173");
+
+    // Nonce cap per address (M3)
+    const statuses: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      statuses.push((await fetch(`${url}/api/auth/nonce?address=${ATTACKER.address}`)).status);
+    }
+    assert.deepEqual(statuses.slice(0, 5), [200, 200, 200, 200, 200]);
+    assert.equal(statuses[6], 429);
+
+    // Pin quota per wallet (M1)
+    const results: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      try {
+        await pinEncryptedBlobViaGateway(url, {
+          encryptedBlob: new Uint8Array(1024),
+          address: PATIENT.address,
+          ...(await auth(url, PATIENT, "PIN_BLOB")),
+        });
+        results.push("ok");
+      } catch (err) {
+        results.push(String(err));
+      }
+    }
+    assert.equal(results[0], "ok");
+    assert.equal(results[1], "ok");
+    assert.match(results[2], /429/);
+
+    // Chain outage is a 503, not a misleading 404 (M4)
+    const recordId = keccak256(toBytes("x"));
+    await assert.rejects(
+      async () =>
+        releaseProtectedEnvelope(url, {
+          recordId,
+          specialist: SPECIALIST.address,
+          ...(await auth(url, SPECIALIST, "RELEASE_ENVELOPE", recordId)),
+        }),
+      /503/
+    );
+    console.log("  PASS");
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 
 async function main() {
   await testShamirRecovery();
   await testKeyReleaseGateway();
+  await testAbuseLimits();
   console.log("\nAll Gateway & Recovery tests passed!");
 }
 

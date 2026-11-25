@@ -36,17 +36,12 @@ contract SynapseVaultRegistryTest is Test {
         internal
         returns (bytes32)
     {
+        SynapseVaultRegistry.RecordDomain domain = partId == bytes32(0)
+            ? SynapseVaultRegistry.RecordDomain.CLINICAL
+            : SynapseVaultRegistry.RecordDomain.BIONIC_TELEMETRY;
         vm.prank(patient);
         return vault.grantTimedAccess(
-            salt,
-            CONTENT_HASH,
-            ENVELOPE_HASH,
-            partId,
-            specialist,
-            partId == bytes32(0)
-                ? SynapseVaultRegistry.RecordDomain.CLINICAL
-                : SynapseVaultRegistry.RecordDomain.BIONIC_TELEMETRY,
-            duration
+            salt, CONTENT_HASH, ENVELOPE_HASH, partId, specialist, domain, duration
         );
     }
 
@@ -61,6 +56,26 @@ contract SynapseVaultRegistryTest is Test {
             CALIBRATION_HASH,
             MLDSA_SIG
         );
+    }
+
+    /// @dev External on purpose: decoding the full BionicPart struct in its own call frame
+    ///      avoids a via_ir "stack too deep" in the test contract.
+    function partSummary(bytes32 partId)
+        external
+        view
+        returns (address bearer, address manuf, uint32 fwVersion, bytes32 sigHash)
+    {
+        // Read the ABI-encoded struct head directly (word 0 = tuple offset, then fields in order)
+        (bool ok, bytes memory data) =
+            address(vault).staticcall(abi.encodeCall(vault.getBionicPart, (partId)));
+        require(ok, "getBionicPart reverted");
+        assembly {
+            let head := add(add(data, 0x20), mload(add(data, 0x20)))
+            bearer := mload(head)
+            fwVersion := mload(add(head, 0x40))
+            manuf := mload(add(head, 0x60))
+            sigHash := mload(add(head, 0x120))
+        }
     }
 
     // =========================================================================
@@ -229,11 +244,12 @@ contract SynapseVaultRegistryTest is Test {
         bytes32 partId = _registerPart(patient);
         assertEq(partId, vault.computePartId(manufacturer, SERIAL));
 
-        SynapseVaultRegistry.BionicPart memory part = vault.getBionicPart(partId);
-        assertEq(part.bearer, patient);
-        assertEq(part.manufacturer, manufacturer);
-        assertEq(part.firmwareVersion, 1);
-        assertEq(part.pqcSignatureHash, keccak256(MLDSA_SIG));
+        (address bearer, address manuf, uint32 fwVersion, bytes32 sigHash) =
+            this.partSummary(partId);
+        assertEq(bearer, patient);
+        assertEq(manuf, manufacturer);
+        assertEq(fwVersion, 1);
+        assertEq(sigHash, keccak256(MLDSA_SIG));
 
         vm.prank(manufacturer);
         vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
@@ -258,7 +274,8 @@ contract SynapseVaultRegistryTest is Test {
         );
         bytes32 real = _registerPart(patient);
         assertTrue(fake != real);
-        assertEq(vault.getBionicPart(real).manufacturer, manufacturer);
+        (, address realManufacturer,,) = this.partSummary(real);
+        assertEq(realManufacturer, manufacturer);
     }
 
     function test_RejectsEmptySignature() public {
@@ -346,8 +363,13 @@ contract SynapseVaultRegistryTest is Test {
     /// ~6.9M gas the v1 contract used when it stored the signature twice.
     function test_RealisticMlDsaSignatureGas() public {
         bytes memory realSig = new bytes(4627);
-        vm.prank(manufacturer);
         uint256 gasBefore = gasleft();
+        _registerWithSig(realSig);
+        assertLt(gasBefore - gasleft(), 700_000);
+    }
+
+    function _registerWithSig(bytes memory sig) internal {
+        vm.prank(manufacturer);
         vault.registerBionicPart(
             patient,
             SynapseVaultRegistry.AnatomicalZone.NEURAL,
@@ -355,23 +377,13 @@ contract SynapseVaultRegistryTest is Test {
             SERIAL,
             FW_V1,
             CALIBRATION_HASH,
-            realSig
+            sig
         );
-        assertLt(gasBefore - gasleft(), 700_000);
     }
 
     function test_GrantGasIsSmall() public {
-        vm.prank(patient);
         uint256 gasBefore = gasleft();
-        vault.grantTimedAccess(
-            SALT_MRI,
-            CONTENT_HASH,
-            ENVELOPE_HASH,
-            bytes32(0),
-            doctor,
-            SynapseVaultRegistry.RecordDomain.CLINICAL,
-            1 hours
-        );
+        _grant(SALT_MRI, bytes32(0), doctor, 1 hours);
         assertLt(gasBefore - gasleft(), 250_000);
     }
 

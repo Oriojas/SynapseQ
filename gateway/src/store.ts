@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -15,8 +15,11 @@ export interface StoredEnvelopeEntry {
  * Off-chain blind custodian for ML-KEM-1024 key envelopes and encrypted blob pointers.
  * Never stores plaintext files or private keys; supports permanent Crypto-Shredding.
  */
+const BLOB_TOKEN_TTL_MS = 5 * 60_000;
+
 export class EnvelopeVaultStore {
   private readonly entries = new Map<string, StoredEnvelopeEntry>();
+  private readonly blobTokens = new Map<string, { cid: string; expiresAt: number }>();
   private readonly filePath?: string;
   private readonly blobsDir?: string;
 
@@ -55,6 +58,25 @@ export class EnvelopeVaultStore {
     }
 
     return existing;
+  }
+
+  /** Issues a single-use, short-lived token that authorizes one download of a local blob. */
+  public issueBlobToken(cid: string): string {
+    const now = Date.now();
+    for (const [key, entry] of this.blobTokens) {
+      if (now > entry.expiresAt) this.blobTokens.delete(key);
+    }
+    const token = randomBytes(24).toString("hex");
+    this.blobTokens.set(token, { cid, expiresAt: now + BLOB_TOKEN_TTL_MS });
+    return token;
+  }
+
+  /** Consumes a blob token; returns true only if it was issued for this CID and is unexpired. */
+  public consumeBlobToken(cid: string, token: string): boolean {
+    const entry = this.blobTokens.get(token);
+    if (!entry) return false;
+    this.blobTokens.delete(token);
+    return entry.cid === cid && Date.now() <= entry.expiresAt;
   }
 
   /** Stores an encrypted binary blob on local gateway disk when PINATA_JWT is not configured. */

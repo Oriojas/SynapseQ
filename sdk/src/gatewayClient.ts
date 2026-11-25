@@ -1,8 +1,13 @@
 /**
- * Browser-safe client for the SynapseQ Zero-Trust Key-Release & Pinata Proxy Gateway.
- * Ensures ML-KEM-1024 envelopes and IPFS CIDs are never exposed in public EVM storage/calldata,
- * and ensures PINATA_JWT never leaks into browser bundles.
+ * Browser-safe client for the SynapseQ Key-Release & Pinata Proxy Gateway.
+ * Keeps ML-KEM-1024 envelopes and storage CIDs out of public EVM storage/calldata (only their
+ * hashes go on-chain) and keeps PINATA_JWT out of browser bundles.
+ *
+ * Trust model: the gateway operator enforces release (it checks the wallet signature and the live
+ * on-chain `isAccessValid`). It never sees plaintext or private keys. A key that was already
+ * released cannot be recalled by a later revocation.
  */
+import { encodeAbiParameters, keccak256 } from "viem";
 
 export type GatewayAuthAction =
   | "STORE_ENVELOPE"
@@ -13,6 +18,8 @@ export type GatewayAuthAction =
 export interface NonceResponse {
   readonly nonce: string;
   readonly expiresAt: number;
+  /** Chain ID the gateway enforces; must be included in the signed message. */
+  readonly chainId: number;
 }
 
 export interface ReleasedEnvelopeResponse {
@@ -21,6 +28,15 @@ export interface ReleasedEnvelopeResponse {
   readonly encryptedKeyEnvelope: `0x${string}`;
   readonly contentHash: `0x${string}`;
   readonly validUntil: string;
+  /** Short-lived single-use token to download a gateway-local blob (absent for Pinata CIDs). */
+  readonly blobToken?: string;
+}
+
+/** recordId = keccak256(abi.encode(patient, salt)), identical to the contract's computeRecordId. */
+export function computeRecordId(patient: `0x${string}`, salt: `0x${string}`): `0x${string}` {
+  return keccak256(
+    encodeAbiParameters([{ type: "address" }, { type: "bytes32" }], [patient, salt])
+  );
 }
 
 export interface GatewayPinResponse {
@@ -30,19 +46,22 @@ export interface GatewayPinResponse {
 }
 
 /**
- * Deterministic SIWE-style challenge message signed by the wallet (patient or specialist)
- * to prove real key possession before any gateway write, key release, or crypto-shredding.
+ * Deterministic challenge message signed by the wallet (patient or specialist) to prove key
+ * possession before any gateway write, key release, or crypto-shredding. It is bound to the
+ * action, wallet, single-use nonce, chain ID and (when relevant) the recordId.
  */
 export function buildGatewayAuthMessage(params: {
   readonly action: GatewayAuthAction;
   readonly address: `0x${string}`;
   readonly nonce: string;
+  readonly chainId: number;
   readonly recordId?: `0x${string}`;
 }): string {
   const lines = [
-    "SynapseQ Zero-Trust Key-Release Gateway",
+    "SynapseQ Key-Release Gateway",
     `Action: ${params.action}`,
     `Address: ${params.address.toLowerCase()}`,
+    `Chain ID: ${params.chainId}`,
     `Nonce: ${params.nonce}`,
   ];
   if (params.recordId) {
@@ -66,6 +85,23 @@ export async function requestGatewayNonce(
     throw new Error(`Failed to obtain gateway nonce (${res.status}): ${await res.text()}`);
   }
   return (await res.json()) as NonceResponse;
+}
+
+/**
+ * Downloads a gateway-local encrypted blob using the single-use token returned by a release.
+ */
+export async function downloadBlobViaGateway(
+  gatewayUrl: string,
+  cid: string,
+  blobToken: string
+): Promise<Uint8Array> {
+  const res = await fetch(
+    `${normalizeBaseUrl(gatewayUrl)}/api/storage/blobs/${encodeURIComponent(cid)}?token=${encodeURIComponent(blobToken)}`
+  );
+  if (!res.ok) {
+    throw new Error(`Blob download denied (${res.status}): ${await res.text()}`);
+  }
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 /** Stores an ML-KEM-1024 envelope and IPFS CID off-chain in the Key-Release Gateway. */

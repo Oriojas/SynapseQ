@@ -6,7 +6,60 @@
 
 ---
 
-## 1. Resumen ejecutivo
+## 0. Estado tras las correcciones (25 de noviembre, segunda pasada)
+
+Los hallazgos de las secciones 3 a 5 se corrigieron en la misma rama, **sin commitear**. Todo se volvió a verificar en local: tests, script de ataque re-ejecutado y flujo completo en el navegador.
+
+### Verificación
+
+| Prueba | Antes | Después |
+|---|---|---|
+| Tests de contratos | 14/14 | ✅ **24/24**: incluye regresiones de cada hallazgo y gas con tamaños reales |
+| Tests del gateway | 2 suites | ✅ **3 suites**: compromisos, token de descarga, cadena distinta, cuotas, CORS, error 503 |
+| Lint y typecheck de SDK, gateway y frontend | ✅ | ✅ |
+| Build del frontend | bundle de 3.4 MB | ✅ **728 KB** (`@qorechain/rdk` en un chunk que se carga bajo demanda) |
+| Demo end-to-end (`make demo`) | ✅ pero con falsos positivos | ✅ 7 pasos que **fallan si algo revierte**: el sobre no está en el calldata; tras el Kill-Switch el gateway responde 403 |
+| Script de ataque re-ejecutado | 11 de 11 vulnerables | ✅ **13 de 13 comprobaciones "FIXED"** |
+| Navegador (wallet simulada contra Anvil) | éxitos falsos | ✅ ver la tabla siguiente |
+
+**Pruebas en el navegador después de las correcciones:**
+- Pase con una pieza de ejemplo → error claro *"es de ejemplo y no existe on-chain"*, sin enviar ninguna transacción.
+- Seal & Grant → transacción real con `status=true`, **228 bytes de calldata** (solo hashes) y 177k de gas.
+- El especialista descifra a través del gateway → muestra el JSON real subido por el paciente, con "1. QoreChain ✓" y la etiqueta *"Gateway release + verificación on-chain"*.
+- Pase de ejemplo → error *"Pase de ejemplo: no tiene datos cifrados reales"*, sin datos sintéticos.
+- Revocar → confirmado on-chain.
+- Registro HBOM → `status=true`, **442k de gas** (antes 6.86M).
+- Consola: 0 errores (antes había 6 de CORS).
+
+### Qué se cambió, por hallazgo
+
+| Hallazgo | Corrección |
+|---|---|
+| C1, C2, A4 | El contrato v2 solo guarda `contentHash` y `envelopeHash`. Se eliminó `getRecordForSpecialist`. El sobre y el CID viven en el gateway, que comprueba `keccak256(sobre) == envelopeHash` al guardar y el estado on-chain al entregar. |
+| C3 | El frontend usa el gateway para subir el blob (`PIN`), guardar el sobre (`STORE`), liberarlo (`RELEASE`) y descargarlo con token. Se eliminó `VITE_PINATA_JWT`. |
+| A1 | `contentHash` = SHAKE-256 del **texto cifrado**, verificado *antes* de descifrar. |
+| A2 | El fabricante registra la pieza (`partId = keccak256(fabricante, serial)`). Solo el fabricante publica firmware. DECOMMISSIONED es terminal. Se rechazan firmas vacías. |
+| A3 | `recordId = keccak256(paciente, salt)`. |
+| A4 (Kill-Switch) | `emergencyRevokeAll` pasa a ser O(1) por época (~46k de gas, sin importar cuántos pases haya). `extendAccess` ya no revive pases vencidos. |
+| M1 a M6 | Cuota de subida por wallet, token de descarga de un solo uso, límite de nonces pendientes por dirección y global, límite por IP, error 503 cuando la cadena no responde, mensaje firmado ligado al chain ID, lista de orígenes CORS permitidos (se rechaza `*`), carga de `.env` y rechazo de una dirección de contrato vacía. |
+| N1, N2, N6 | `useSynapseVault` simula cada transacción antes de enviarla, exige `receipt.status === "success"` y muestra el error del contrato por nombre. Ya no hay estado optimista ni `catch {}` vacíos. Ya no aparece una wallet ficticia. El badge PKI refleja la cadena. La interfaz indica **ON-CHAIN** o **DEMO LOCAL**. |
+| N5 | Se eliminó el descifrado sintético. Al cambiar de pase se borra el texto descifrado anterior (bug encontrado y corregido durante esta verificación). |
+| Claves del especialista | La clave ML-KEM-1024 se deriva de la firma de la wallet (`deriveKemKeyPairFromSignature`), así que se puede recuperar. El paciente cifra con la clave publicada **on-chain**. |
+| Demo, Makefile, CI | El demo valida cada recibo. `make init` levanta el gateway. `make down` solo detiene sus propios procesos (por PID). Se agregaron `make test-gateway`, los jobs de CI `gateway` y `frontend`, y CI corre también en `feat/**`. |
+
+### Qué queda pendiente (no se resolvió aquí)
+
+- **QoreSeal y el registro nativo `qorechain.pqc.v1`.** La categoría *Encrypted Apps* los pide, junto con la vinculación con ML-DSA. El proyecto sigue usando `@noble/post-quantum` y su propio directorio en el contrato. Integrarlos es una decisión del equipo.
+- **`registerKemPublicKey` cuesta ~1.16M de gas**, porque guarda la clave de 1568 bytes. El registro nativo de QoreChain lo resolvería.
+- **La EVM no verifica ML-DSA-87.** La firma se guarda como hash, la firma completa va en un evento y la verificación es fuera de la cadena. Si eligen *Post-Quantum dApp*, deberían usar `pqcVerify`.
+- **El gateway es un custodio de confianza:** un solo proceso, almacén en JSON, límites en memoria que se reinician con cada arranque. Sirve para el hackathon, no para producción.
+- **El Portal Especialista solo ve los pases creados en la misma sesión del navegador.** Falta cargarlos de `getGrantsBySpecialist`.
+- **No se probó** con QoreX ni MetaMask reales, ni en Diana: la wallet fue simulada sobre Anvil. Tampoco se ejecutaron los nuevos jobs de CI en GitHub.
+- **La revocación no recupera** lo que el especialista ya descifró. Está documentado en la interfaz y en el README.
+
+---
+
+## 1. Resumen ejecutivo (revisión original, antes de las correcciones)
 
 | Área | Resultado |
 |---|---|

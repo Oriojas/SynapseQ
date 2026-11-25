@@ -19,7 +19,11 @@ export interface MockEphemeralPass {
   readonly patientPseudonym: string;
   readonly domain: DataDomain;
   readonly retention: RetentionPolicy;
-  readonly storageProvider: 'pinata-ipfs' | 'qorechain-da' | 'memory-fallback';
+  readonly storageProvider: 'pinata-ipfs' | 'qorechain-da' | 'memory-fallback' | 'gateway-local';
+  /** Hard-coded example shown for the UI demo: it has no real ciphertext and is NOT on-chain. */
+  readonly isSample?: boolean;
+  /** true only when grantTimedAccess succeeded on-chain and the envelope is in the gateway. */
+  readonly onChain?: boolean;
   readonly linkedPartName: string;
   readonly linkedPartId: `0x${string}`;
   readonly contentHash: `0x${string}`;
@@ -36,6 +40,10 @@ export interface MockEphemeralPass {
 
 export interface MockBionicPart {
   readonly partId: `0x${string}`;
+  /** Hard-coded example (not registered on-chain). */
+  readonly isSample?: boolean;
+  /** true only when registerBionicPart succeeded on-chain. */
+  readonly onChain?: boolean;
   readonly modelName: string;
   readonly serialNumber: string;
   readonly zone: AnatomicalZoneLabel;

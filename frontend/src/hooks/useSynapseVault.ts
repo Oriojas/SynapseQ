@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  BaseError,
+  ContractFunctionRevertedError,
   createPublicClient,
   createWalletClient,
   custom,
@@ -13,6 +15,8 @@ import { getFrontendEnvConfig } from '@/config/env';
 
 interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, handler: (...args: unknown[]) => void) => void;
+  removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
 }
 
 declare global {
@@ -25,52 +29,48 @@ export interface OnChainTxReceiptInfo {
   readonly txHash: Hash;
   readonly action: string;
   readonly blockNumber?: bigint;
+  readonly gasUsed?: bigint;
   readonly timestamp: number;
 }
 
-export interface UseSynapseVaultResult {
-  readonly isConnected: boolean;
-  readonly walletAddress: Address | null;
-  readonly chainId: number;
-  readonly contractAddress: Address | undefined;
-  readonly isTxPending: boolean;
-  readonly txHistory: readonly OnChainTxReceiptInfo[];
-  readonly connectWallet: () => Promise<Address | null>;
-  readonly publishKemPublicKeyOnChain: (pubKeyHex: `0x${string}`) => Promise<Hash | null>;
-  readonly queryKemPublicKeyOnChain: (account: Address) => Promise<`0x${string}` | null>;
-  readonly grantTimedAccessOnChain: (params: {
-    readonly recordId: `0x${string}`;
-    readonly ipfsCID: string;
-    readonly contentHash: `0x${string}`;
-    readonly linkedPartId: `0x${string}`;
-    readonly specialist: Address;
-    readonly encryptedKeyEnvelope: `0x${string}`;
-    readonly domain: number;
-    readonly durationInSeconds: bigint;
-  }) => Promise<Hash | null>;
-  readonly extendAccessOnChain: (recordId: `0x${string}`, extraSeconds: bigint) => Promise<Hash | null>;
-  readonly revokeAccessOnChain: (recordId: `0x${string}`) => Promise<Hash | null>;
-  readonly emergencyRevokeAllOnChain: () => Promise<Hash | null>;
-  readonly registerBionicPartOnChain: (params: {
-    readonly partId: `0x${string}`;
-    readonly manufacturer: Address;
-    readonly zone: number;
-    readonly modelName: string;
-    readonly serialNumber: string;
-    readonly firmwareHash: `0x${string}`;
-    readonly calibrationHash: `0x${string}`;
-    readonly pqcSignature: `0x${string}`;
-  }) => Promise<Hash | null>;
-  readonly logFirmwareUpdateOnChain: (params: {
-    readonly partId: `0x${string}`;
-    readonly newFirmwareHash: `0x${string}`;
-    readonly newCalibrationHash: `0x${string}`;
-    readonly pqcSignature: `0x${string}`;
-  }) => Promise<Hash | null>;
-  readonly updatePartStatusOnChain: (partId: `0x${string}`, newStatus: number) => Promise<Hash | null>;
+export interface OnChainGrantMetadata {
+  readonly contentHash: `0x${string}`;
+  readonly envelopeHash: `0x${string}`;
+  readonly patient: Address;
+  readonly specialist: Address;
+  readonly validUntil: bigint;
+  readonly revoked: boolean;
+  readonly isActive: boolean;
 }
 
-export function useSynapseVault(): UseSynapseVaultResult {
+export interface TxResult<T = undefined> {
+  readonly hash: Hash;
+  readonly result: T;
+}
+
+type WritableFunction =
+  | 'registerKemPublicKey'
+  | 'grantTimedAccess'
+  | 'extendAccess'
+  | 'revokeAccess'
+  | 'emergencyRevokeAll'
+  | 'registerBionicPart'
+  | 'logFirmwareUpdate'
+  | 'updatePartStatus';
+
+/** Turns viem errors into a short, user-readable message (custom error name when available). */
+export function describeTxError(err: unknown): string {
+  if (err instanceof BaseError) {
+    const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
+    if (revert instanceof ContractFunctionRevertedError) {
+      return `La transacción revertiría: ${revert.data?.errorName ?? revert.reason ?? 'revert'}`;
+    }
+    return err.shortMessage;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+export function useSynapseVault() {
   const env = useMemo(() => getFrontendEnvConfig(), []);
   const targetChainId = env.qorechainChainId || 9800;
   const contractAddress = env.synapseVaultAddress;
@@ -79,55 +79,52 @@ export function useSynapseVault(): UseSynapseVaultResult {
   const [isTxPending, setIsTxPending] = useState<boolean>(false);
   const [txHistory, setTxHistory] = useState<readonly OnChainTxReceiptInfo[]>([]);
 
-  const qorechainDiana = useMemo(() => {
-    const rpcUrl = env.qorechainRpcUrl;
-    return defineChain({
-      id: targetChainId,
-      name: 'QoreChain Diana Testnet',
-      nativeCurrency: { name: 'QOR', symbol: 'QOR', decimals: 18 },
-      rpcUrls: {
-        default: { http: rpcUrl ? [rpcUrl] : [] },
-      },
-    });
-  }, [env.qorechainRpcUrl, targetChainId]);
+  const chain = useMemo(
+    () =>
+      defineChain({
+        id: targetChainId,
+        name: 'QoreChain Diana Testnet',
+        nativeCurrency: { name: 'QOR', symbol: 'QOR', decimals: 18 },
+        rpcUrls: { default: { http: env.qorechainRpcUrl ? [env.qorechainRpcUrl] : [] } },
+      }),
+    [env.qorechainRpcUrl, targetChainId]
+  );
 
   const publicClient = useMemo(() => {
     if (env.qorechainRpcUrl) {
-      return createPublicClient({
-        chain: qorechainDiana,
-        transport: http(env.qorechainRpcUrl),
-      });
+      return createPublicClient({ chain, transport: http(env.qorechainRpcUrl) });
     }
     if (typeof window !== 'undefined' && window.ethereum) {
-      return createPublicClient({
-        chain: qorechainDiana,
-        transport: custom(window.ethereum),
-      });
+      return createPublicClient({ chain, transport: custom(window.ethereum) });
     }
     return null;
-  }, [env.qorechainRpcUrl, qorechainDiana]);
+  }, [env.qorechainRpcUrl, chain]);
 
+  // Track the wallet's active account (account switches in the wallet update the UI)
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.ethereum) return;
-    window.ethereum
+    const eth = typeof window !== 'undefined' ? window.ethereum : undefined;
+    if (!eth) return;
+    eth
       .request({ method: 'eth_accounts' })
       .then((accounts) => {
         if (Array.isArray(accounts) && typeof accounts[0] === 'string') {
           setWalletAddress(accounts[0] as Address);
         }
       })
-      .catch(() => {
-        // Silent if wallet is locked
-      });
+      .catch(() => undefined);
+    const onAccounts = (...args: unknown[]) => {
+      const accounts = args[0];
+      setWalletAddress(
+        Array.isArray(accounts) && typeof accounts[0] === 'string' ? (accounts[0] as Address) : null
+      );
+    };
+    eth.on?.('accountsChanged', onAccounts);
+    return () => eth.removeListener?.('accountsChanged', onAccounts);
   }, []);
 
   const connectWallet = useCallback(async (): Promise<Address | null> => {
-    if (typeof window === 'undefined' || !window.ethereum) {
-      return null;
-    }
-    const accounts = (await window.ethereum.request({
-      method: 'eth_requestAccounts',
-    })) as string[];
+    if (typeof window === 'undefined' || !window.ethereum) return null;
+    const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) as string[];
     const primary = (accounts?.[0] as Address | undefined) ?? null;
     setWalletAddress(primary);
     return primary;
@@ -135,335 +132,163 @@ export function useSynapseVault(): UseSynapseVaultResult {
 
   const getWalletClient = useCallback(async () => {
     if (typeof window === 'undefined' || !window.ethereum) {
-      return null;
+      throw new Error('No hay wallet Web3 disponible (instala QoreX Wallet o MetaMask).');
     }
-    const activeAccount = walletAddress ?? (await connectWallet());
-    if (!activeAccount) return null;
-
+    const account = walletAddress ?? (await connectWallet());
+    if (!account) throw new Error('Wallet no conectada.');
     return {
-      account: activeAccount,
-      client: createWalletClient({
-        account: activeAccount,
-        chain: qorechainDiana,
-        transport: custom(window.ethereum),
-      }),
+      account,
+      client: createWalletClient({ account, chain, transport: custom(window.ethereum) }),
     };
-  }, [connectWallet, qorechainDiana, walletAddress]);
+  }, [chain, connectWallet, walletAddress]);
 
-  const recordTx = useCallback((txHash: Hash, action: string, blockNumber?: bigint) => {
-    setTxHistory((prev) => [
-      { txHash, action, blockNumber, timestamp: Date.now() },
-      ...prev.slice(0, 14),
-    ]);
-  }, []);
-
-  const publishKemPublicKeyOnChain = useCallback(
-    async (pubKeyHex: `0x${string}`): Promise<Hash | null> => {
-      if (!contractAddress) return null;
+  /**
+   * Simulates first (surfaces the revert reason BEFORE prompting the wallet), sends, waits for the
+   * receipt and throws unless `receipt.status === "success"`. Never reports a failed tx as success.
+   */
+  const write = useCallback(
+    async <T = undefined>(
+      functionName: WritableFunction,
+      args: readonly unknown[],
+      label: string
+    ): Promise<TxResult<T>> => {
+      if (!contractAddress) throw new Error('VITE_SYNAPSE_VAULT_ADDRESS no está configurada.');
+      if (!publicClient) throw new Error('No hay RPC configurado (VITE_QORECHAIN_RPC_URL).');
       const wallet = await getWalletClient();
-      if (!wallet) return null;
-
       setIsTxPending(true);
       try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'registerKemPublicKey',
-          args: [pubKeyHex],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, 'registerKemPublicKey (ML-KEM-1024)', receipt?.blockNumber);
-        return hash;
+        let simulated: { result: unknown; request: unknown };
+        try {
+          simulated = (await publicClient.simulateContract({
+            account: wallet.account,
+            address: contractAddress,
+            abi: SYNAPSE_VAULT_ABI,
+            functionName,
+            args,
+          } as never)) as { result: unknown; request: unknown };
+        } catch (err) {
+          throw new Error(describeTxError(err));
+        }
+        const hash = await wallet.client.writeContract(simulated.request as never);
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== 'success') {
+          throw new Error(`La transacción ${label} revirtió on-chain (tx ${hash.slice(0, 12)}…)`);
+        }
+        setTxHistory((prev) => [
+          { txHash: hash, action: label, blockNumber: receipt.blockNumber, gasUsed: receipt.gasUsed, timestamp: Date.now() },
+          ...prev.slice(0, 14),
+        ]);
+        return { hash, result: simulated.result as T };
       } finally {
         setIsTxPending(false);
       }
     },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
+    [contractAddress, getWalletClient, publicClient]
+  );
+
+  const signMessage = useCallback(
+    async (message: string): Promise<`0x${string}`> => {
+      const wallet = await getWalletClient();
+      return wallet.client.signMessage({ account: wallet.account, message });
+    },
+    [getWalletClient]
   );
 
   const queryKemPublicKeyOnChain = useCallback(
     async (account: Address): Promise<`0x${string}` | null> => {
       if (!contractAddress || !publicClient) return null;
-      try {
-        const hasKey = await publicClient.readContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'hasKemPublicKey',
-          args: [account],
-        });
-        if (!hasKey) return null;
-        const pubKey = await publicClient.readContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'getKemPublicKey',
-          args: [account],
-        });
-        return pubKey;
-      } catch {
-        return null;
-      }
+      const hasKey = await publicClient.readContract({
+        address: contractAddress,
+        abi: SYNAPSE_VAULT_ABI,
+        functionName: 'hasKemPublicKey',
+        args: [account],
+      });
+      if (!hasKey) return null;
+      return publicClient.readContract({
+        address: contractAddress,
+        abi: SYNAPSE_VAULT_ABI,
+        functionName: 'getKemPublicKey',
+        args: [account],
+      });
     },
     [contractAddress, publicClient]
   );
 
-  const grantTimedAccessOnChain = useCallback(
-    async (params: {
-      readonly recordId: `0x${string}`;
-      readonly ipfsCID: string;
-      readonly contentHash: `0x${string}`;
-      readonly linkedPartId: `0x${string}`;
-      readonly specialist: Address;
-      readonly encryptedKeyEnvelope: `0x${string}`;
-      readonly domain: number;
-      readonly durationInSeconds: bigint;
-    }): Promise<Hash | null> => {
-      if (!contractAddress) return null;
-      const wallet = await getWalletClient();
-      if (!wallet) return null;
-
-      setIsTxPending(true);
-      try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'grantTimedAccess',
-          args: [
-            params.recordId,
-            params.ipfsCID,
-            params.contentHash,
-            params.linkedPartId,
-            params.specialist,
-            params.encryptedKeyEnvelope,
-            params.domain,
-            params.durationInSeconds,
-          ],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, 'grantTimedAccess (ML-KEM-1024 Pass)', receipt?.blockNumber);
-        return hash;
-      } finally {
-        setIsTxPending(false);
-      }
-    },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
-  );
-
-  const extendAccessOnChain = useCallback(
-    async (recordId: `0x${string}`, extraSeconds: bigint): Promise<Hash | null> => {
-      if (!contractAddress) return null;
-      const wallet = await getWalletClient();
-      if (!wallet) return null;
-
-      setIsTxPending(true);
-      try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'extendAccess',
-          args: [recordId, extraSeconds],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, 'extendAccess', receipt?.blockNumber);
-        return hash;
-      } finally {
-        setIsTxPending(false);
-      }
-    },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
-  );
-
-  const revokeAccessOnChain = useCallback(
-    async (recordId: `0x${string}`): Promise<Hash | null> => {
-      if (!contractAddress) return null;
-      const wallet = await getWalletClient();
-      if (!wallet) return null;
-
-      setIsTxPending(true);
-      try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'revokeAccess',
-          args: [recordId],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, 'revokeAccess', receipt?.blockNumber);
-        return hash;
-      } finally {
-        setIsTxPending(false);
-      }
-    },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
-  );
-
-  const emergencyRevokeAllOnChain = useCallback(async (): Promise<Hash | null> => {
-    if (!contractAddress) return null;
-    const wallet = await getWalletClient();
-    if (!wallet) return null;
-
-    setIsTxPending(true);
-    try {
-      const hash = await wallet.client.writeContract({
+  const getGrantMetadata = useCallback(
+    async (recordId: `0x${string}`): Promise<OnChainGrantMetadata> => {
+      if (!contractAddress || !publicClient) throw new Error('Cadena no configurada.');
+      return publicClient.readContract({
         address: contractAddress,
         abi: SYNAPSE_VAULT_ABI,
-        functionName: 'emergencyRevokeAll',
-        account: wallet.account,
-        chain: qorechainDiana,
+        functionName: 'getGrantMetadata',
+        args: [recordId],
       });
-      const receipt = publicClient
-        ? await publicClient.waitForTransactionReceipt({ hash })
-        : undefined;
-      recordTx(hash, 'emergencyRevokeAll (KILL-SWITCH)', receipt?.blockNumber);
-      return hash;
-    } finally {
-      setIsTxPending(false);
-    }
-  }, [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]);
-
-  const registerBionicPartOnChain = useCallback(
-    async (params: {
-      readonly partId: `0x${string}`;
-      readonly manufacturer: Address;
-      readonly zone: number;
-      readonly modelName: string;
-      readonly serialNumber: string;
-      readonly firmwareHash: `0x${string}`;
-      readonly calibrationHash: `0x${string}`;
-      readonly pqcSignature: `0x${string}`;
-    }): Promise<Hash | null> => {
-      if (!contractAddress) return null;
-      const wallet = await getWalletClient();
-      if (!wallet) return null;
-
-      setIsTxPending(true);
-      try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'registerBionicPart',
-          args: [
-            params.partId,
-            params.manufacturer,
-            params.zone,
-            params.modelName,
-            params.serialNumber,
-            params.firmwareHash,
-            params.calibrationHash,
-            params.pqcSignature,
-          ],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, `registerBionicPart (${params.modelName})`, receipt?.blockNumber);
-        return hash;
-      } finally {
-        setIsTxPending(false);
-      }
     },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
-  );
-
-  const logFirmwareUpdateOnChain = useCallback(
-    async (params: {
-      readonly partId: `0x${string}`;
-      readonly newFirmwareHash: `0x${string}`;
-      readonly newCalibrationHash: `0x${string}`;
-      readonly pqcSignature: `0x${string}`;
-    }): Promise<Hash | null> => {
-      if (!contractAddress) return null;
-      const wallet = await getWalletClient();
-      if (!wallet) return null;
-
-      setIsTxPending(true);
-      try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'logFirmwareUpdate',
-          args: [
-            params.partId,
-            params.newFirmwareHash,
-            params.newCalibrationHash,
-            params.pqcSignature,
-          ],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, 'logFirmwareUpdate (ML-DSA-87)', receipt?.blockNumber);
-        return hash;
-      } finally {
-        setIsTxPending(false);
-      }
-    },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
-  );
-
-  const updatePartStatusOnChain = useCallback(
-    async (partId: `0x${string}`, newStatus: number): Promise<Hash | null> => {
-      if (!contractAddress) return null;
-      const wallet = await getWalletClient();
-      if (!wallet) return null;
-
-      setIsTxPending(true);
-      try {
-        const hash = await wallet.client.writeContract({
-          address: contractAddress,
-          abi: SYNAPSE_VAULT_ABI,
-          functionName: 'updatePartStatus',
-          args: [partId, newStatus],
-          account: wallet.account,
-          chain: qorechainDiana,
-        });
-        const receipt = publicClient
-          ? await publicClient.waitForTransactionReceipt({ hash })
-          : undefined;
-        recordTx(hash, 'updatePartStatus', receipt?.blockNumber);
-        return hash;
-      } finally {
-        setIsTxPending(false);
-      }
-    },
-    [contractAddress, getWalletClient, publicClient, qorechainDiana, recordTx]
+    [contractAddress, publicClient]
   );
 
   return {
     isConnected: Boolean(walletAddress),
+    isChainConfigured: Boolean(contractAddress && publicClient),
     walletAddress,
     chainId: targetChainId,
     contractAddress,
     isTxPending,
     txHistory,
     connectWallet,
-    publishKemPublicKeyOnChain,
+    signMessage,
     queryKemPublicKeyOnChain,
-    grantTimedAccessOnChain,
-    extendAccessOnChain,
-    revokeAccessOnChain,
-    emergencyRevokeAllOnChain,
-    registerBionicPartOnChain,
-    logFirmwareUpdateOnChain,
-    updatePartStatusOnChain,
+    getGrantMetadata,
+    publishKemPublicKeyOnChain: (pubKeyHex: `0x${string}`) =>
+      write('registerKemPublicKey', [pubKeyHex], 'registerKemPublicKey (ML-KEM-1024)'),
+    grantTimedAccessOnChain: (p: {
+      readonly salt: `0x${string}`;
+      readonly contentHash: `0x${string}`;
+      readonly envelopeHash: `0x${string}`;
+      readonly linkedPartId: `0x${string}`;
+      readonly specialist: Address;
+      readonly domain: number;
+      readonly durationInSeconds: bigint;
+    }) =>
+      write<`0x${string}`>(
+        'grantTimedAccess',
+        [p.salt, p.contentHash, p.envelopeHash, p.linkedPartId, p.specialist, p.domain, p.durationInSeconds],
+        'grantTimedAccess'
+      ),
+    extendAccessOnChain: (recordId: `0x${string}`, extraSeconds: bigint) =>
+      write('extendAccess', [recordId, extraSeconds], 'extendAccess'),
+    revokeAccessOnChain: (recordId: `0x${string}`) =>
+      write('revokeAccess', [recordId], 'revokeAccess'),
+    emergencyRevokeAllOnChain: () =>
+      write('emergencyRevokeAll', [], 'emergencyRevokeAll (KILL-SWITCH)'),
+    registerBionicPartOnChain: (p: {
+      readonly bearer: Address;
+      readonly zone: number;
+      readonly modelName: string;
+      readonly serialNumber: string;
+      readonly firmwareHash: `0x${string}`;
+      readonly calibrationHash: `0x${string}`;
+      readonly pqcSignature: `0x${string}`;
+    }) =>
+      write<`0x${string}`>(
+        'registerBionicPart',
+        [p.bearer, p.zone, p.modelName, p.serialNumber, p.firmwareHash, p.calibrationHash, p.pqcSignature],
+        `registerBionicPart (${p.modelName})`
+      ),
+    logFirmwareUpdateOnChain: (p: {
+      readonly partId: `0x${string}`;
+      readonly newFirmwareHash: `0x${string}`;
+      readonly newCalibrationHash: `0x${string}`;
+      readonly pqcSignature: `0x${string}`;
+    }) =>
+      write(
+        'logFirmwareUpdate',
+        [p.partId, p.newFirmwareHash, p.newCalibrationHash, p.pqcSignature],
+        'logFirmwareUpdate (ML-DSA-87)'
+      ),
+    updatePartStatusOnChain: (partId: `0x${string}`, newStatus: number) =>
+      write('updatePartStatus', [partId, newStatus], 'updatePartStatus'),
   };
 }
+
+export type UseSynapseVaultResult = ReturnType<typeof useSynapseVault>;

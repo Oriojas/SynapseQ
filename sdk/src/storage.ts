@@ -142,8 +142,9 @@ export async function unpinFromPinata(cid: string, jwt: string): Promise<boolean
 }
 
 /**
- * Unified helper that uploads to Pinata IPFS if a JWT is provided/configured,
- * or falls back transparently to browser localStorage / Node .local-ipfs.
+ * Unified helper that uploads to Pinata IPFS if a JWT is provided/configured (server-side only),
+ * or falls back to an in-memory cache (plus browser localStorage) for local development.
+ * Browsers should pin through the Key-Release Gateway instead (pinEncryptedBlobViaGateway).
  */
 export async function uploadEncryptedBlob(
   blob: Uint8Array,

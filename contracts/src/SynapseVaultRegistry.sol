@@ -98,7 +98,6 @@ contract SynapseVaultRegistry {
         AnatomicalZone zone; // 1B
         PartStatus status; // 1B
         // Slot 2..
-        bytes32 partId; // keccak256(abi.encode(manufacturer, serialNumber))
         bytes32 firmwareHash; // Active firmware SHAKE-256 hash
         bytes32 calibrationHash; // Calibration parameters hash
         bytes32 pqcSignatureHash; // keccak256 of the ML-DSA-87 attestation (full bytes in event)
@@ -291,7 +290,14 @@ contract SynapseVaultRegistry {
         _patientGrants[msg.sender].push(recordId);
 
         emit AccessGranted(
-            recordId, msg.sender, specialist, linkedPartId, domain, expiry, contentHash, envelopeHash
+            recordId,
+            msg.sender,
+            specialist,
+            linkedPartId,
+            domain,
+            expiry,
+            contentHash,
+            envelopeHash
         );
     }
 
@@ -412,21 +418,20 @@ contract SynapseVaultRegistry {
         uint64 nowTs = uint64(block.timestamp);
         bytes32 sigHash = keccak256(pqcSignature);
 
-        _bionicParts[partId] = BionicPart({
-            bearer: bearer,
-            implantedAt: nowTs,
-            firmwareVersion: 1,
-            manufacturer: msg.sender,
-            lastUpdatedAt: nowTs,
-            zone: zone,
-            status: PartStatus.ACTIVE,
-            partId: partId,
-            firmwareHash: firmwareHash,
-            calibrationHash: calibrationHash,
-            pqcSignatureHash: sigHash,
-            modelName: modelName,
-            serialNumber: serialNumber
-        });
+        // Field-by-field writes avoid "stack too deep" under via_ir with a 13-field struct literal
+        BionicPart storage part = _bionicParts[partId];
+        part.bearer = bearer;
+        part.implantedAt = nowTs;
+        part.firmwareVersion = 1;
+        part.manufacturer = msg.sender;
+        part.lastUpdatedAt = nowTs;
+        part.zone = zone;
+        part.status = PartStatus.ACTIVE;
+        part.firmwareHash = firmwareHash;
+        part.calibrationHash = calibrationHash;
+        part.pqcSignatureHash = sigHash;
+        part.modelName = modelName;
+        part.serialNumber = serialNumber;
 
         _bearerParts[bearer].push(partId);
         _firmwareHistory[partId].push(
