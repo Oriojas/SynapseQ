@@ -24,6 +24,7 @@ import {
   unsealAndDecryptDocument,
   verifyMLDSA87,
 } from "./pqc.js";
+import { fetchEncryptedBlobFromIpfs, uploadEncryptedBlobToPinata } from "./storage.js";
 
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const CONTRACT_ADDRESS = (process.env.SYNAPSE_VAULT_ADDRESS ??
@@ -44,8 +45,18 @@ const qorechainDiana = defineChain({
 });
 
 const LOCAL_IPFS_DIR = join(process.cwd(), ".local-ipfs");
+const PINATA_JWT = process.env.PINATA_JWT;
+const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL ?? "https://gateway.pinata.cloud/ipfs";
 
-function storeEncryptedBlobLocally(blob: Uint8Array): string {
+async function storeEncryptedBlob(blob: Uint8Array, fileName: string): Promise<string> {
+  if (PINATA_JWT) {
+    const res = await uploadEncryptedBlobToPinata(blob, {
+      jwt: PINATA_JWT,
+      fileName,
+      metadata: { app: "SynapseQ", encryption: "AES-256-GCM+ML-KEM-1024" },
+    });
+    return res.cid;
+  }
   mkdirSync(LOCAL_IPFS_DIR, { recursive: true });
   const digest = computeShake256(blob).slice(2, 34);
   const cid = `bafy-synapseq-${digest}`;
@@ -53,7 +64,10 @@ function storeEncryptedBlobLocally(blob: Uint8Array): string {
   return cid;
 }
 
-function fetchEncryptedBlobLocally(cid: string): Uint8Array {
+async function fetchEncryptedBlob(cid: string): Promise<Uint8Array> {
+  if (PINATA_JWT && !cid.startsWith("bafy-synapseq-")) {
+    return fetchEncryptedBlobFromIpfs(cid, IPFS_GATEWAY_URL);
+  }
   return new Uint8Array(readFileSync(join(LOCAL_IPFS_DIR, `${cid}.enc`)));
 }
 
@@ -137,10 +151,12 @@ async function main() {
   const plaintextBytes = new TextEncoder().encode(JSON.stringify(sampleDocument, null, 2));
 
   const sealed = await encryptAndSealDocument(plaintextBytes, specialistKem.publicKey);
-  const cid = storeEncryptedBlobLocally(sealed.encryptedBlob);
+  const cid = await storeEncryptedBlob(sealed.encryptedBlob, `synapseq-${runSalt}.enc`);
 
   console.log(`  - Plaintext size:        ${plaintextBytes.length} bytes`);
-  console.log(`  - Encrypted blob size:   ${sealed.encryptedBlob.length} bytes (stored at .local-ipfs/${cid}.enc)`);
+  console.log(
+    `  - Encrypted blob size:   ${sealed.encryptedBlob.length} bytes (${PINATA_JWT ? `Pinata IPFS CID: ${cid}` : `local fallback: .local-ipfs/${cid}.enc`})`
+  );
   console.log(`  - SHAKE-256 contentHash: ${sealed.contentHash}`);
   console.log(`  - ML-KEM-1024 envelope:  ${(sealed.encryptedKeyEnvelope.length - 2) / 2} bytes`);
 
@@ -180,7 +196,7 @@ async function main() {
       account: specialistAccount.address,
     });
 
-  const downloadedBlob = fetchEncryptedBlobLocally(fetchedCid);
+  const downloadedBlob = await fetchEncryptedBlob(fetchedCid);
   const decryptedBytes = await unsealAndDecryptDocument(
     downloadedBlob,
     fetchedEnvelope,
