@@ -10,7 +10,7 @@ FOUNDRY_PATH := $(HOME)/.foundry/bin
 export PATH := $(FOUNDRY_PATH):$(PATH)
 
 .DEFAULT_GOAL := help
-.PHONY: help build init down lint audit test test-contracts test-sdk test-front demo deploy-local deploy-diana clean
+.PHONY: help build init down lint audit test test-contracts test-sdk test-front test-quantum cbom demo deploy-local deploy-diana clean
 
 # Carga segura y desacoplada de .env desde la raíz del proyecto
 ENV_EXPORTS = set -a && [ -f .env ] && source .env && set +a && \
@@ -139,9 +139,16 @@ test-contracts: ## ⛓️  Smart Contracts: tests unitarios, timelocks, Kill-Swi
 	@echo "→ Ejecutando suite de tests en Foundry (forge test -vvv)..."
 	@cd contracts && forge test -vvv
 
-test-sdk: ## 🔐 SDK Post-Cuántico: validación de tipos y linting sobre ML-KEM-1024, ML-DSA-87, SHAKE-256 y StorageRouter
-	@echo "→ Verificando SDK Post-Cuántico..."
-	@cd sdk && npm run typecheck && npm run lint
+test-sdk: ## 🔐 SDK Post-Cuántico: validación de tipos, linting y simulación anti-cuántica (ML-KEM-1024 + ML-DSA-87 + SHAKE-256 + StorageRouter)
+	@echo "→ Verificando SDK Post-Cuántico y simulación de defensa Q-Day..."
+	@cd sdk && npm run typecheck && npm run lint && npm run test:quantum-defense
+
+test-quantum: ## 🛡️ Ejecutar simulación de 5 vectores de ataque post-cuántico (HNDL, Tampering, SHAKE-256, ML-DSA-87, x/rdk)
+	@cd sdk && npm run test:quantum-defense
+
+cbom: ## 📋 Auditar y validar el reporte CycloneDX CBOM v1.6 (cbom-report.json)
+	@echo "→ Verificando reporte CycloneDX CBOM v1.6 (cbom-report.json)..."
+	@node -e 'const fs=require("fs"); const b=JSON.parse(fs.readFileSync("cbom-report.json","utf8")); console.log("   ✅ CBOM Formato:", b.bomFormat, "v"+b.specVersion, "| Activos PQC:", b.components.map(c=>c.name).join(", "));'
 
 test-front: ## ⚛️  Frontend: validación de tipos y compilación de producción (Vite + React 19 + Tailwind v4)
 	@echo "→ Verificando tipado y build de producción del Frontend..."
