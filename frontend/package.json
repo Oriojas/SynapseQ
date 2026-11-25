@@ -12,6 +12,7 @@
   "dependencies": {
     "@noble/hashes": "^1.8.0",
     "@noble/post-quantum": "^0.4.1",
+    "@qorechain/rdk": "^0.9.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
