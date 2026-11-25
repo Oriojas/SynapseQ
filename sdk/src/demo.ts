@@ -1,6 +1,4 @@
 import { webcrypto } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 if (!globalThis.crypto) {
   (globalThis as unknown as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
@@ -24,11 +22,12 @@ import {
   unsealAndDecryptDocument,
   verifyMLDSA87,
 } from "./pqc.js";
-import { fetchEncryptedBlobFromIpfs, uploadEncryptedBlobToPinata } from "./storage.js";
+import { fetchEncryptedBlob, uploadEncryptedBlob } from "./storage.js";
 
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const CONTRACT_ADDRESS = (process.env.SYNAPSE_VAULT_ADDRESS ??
   "0x0B306BF915C4d645ff596e518fAf3F9669b97016") as `0x${string}`;
+const PINATA_JWT = process.env.PINATA_JWT;
 
 // Default Anvil pre-funded accounts (local fork only)
 const PATIENT_PK =
@@ -43,33 +42,6 @@ const qorechainDiana = defineChain({
   nativeCurrency: { name: "QOR", symbol: "QOR", decimals: 18 },
   rpcUrls: { default: { http: [RPC_URL] } },
 });
-
-const LOCAL_IPFS_DIR = join(process.cwd(), ".local-ipfs");
-const PINATA_JWT = process.env.PINATA_JWT;
-const IPFS_GATEWAY_URL = process.env.IPFS_GATEWAY_URL ?? "https://gateway.pinata.cloud/ipfs";
-
-async function storeEncryptedBlob(blob: Uint8Array, fileName: string): Promise<string> {
-  if (PINATA_JWT) {
-    const res = await uploadEncryptedBlobToPinata(blob, {
-      jwt: PINATA_JWT,
-      fileName,
-      metadata: { app: "SynapseQ", encryption: "AES-256-GCM+ML-KEM-1024" },
-    });
-    return res.cid;
-  }
-  mkdirSync(LOCAL_IPFS_DIR, { recursive: true });
-  const digest = computeShake256(blob).slice(2, 34);
-  const cid = `bafy-synapseq-${digest}`;
-  writeFileSync(join(LOCAL_IPFS_DIR, `${cid}.enc`), blob);
-  return cid;
-}
-
-async function fetchEncryptedBlob(cid: string): Promise<Uint8Array> {
-  if (PINATA_JWT && !cid.startsWith("bafy-synapseq-")) {
-    return fetchEncryptedBlobFromIpfs(cid, IPFS_GATEWAY_URL);
-  }
-  return new Uint8Array(readFileSync(join(LOCAL_IPFS_DIR, `${cid}.enc`)));
-}
 
 async function main() {
   const patientAccount = privateKeyToAccount(PATIENT_PK);
@@ -151,7 +123,10 @@ async function main() {
   const plaintextBytes = new TextEncoder().encode(JSON.stringify(sampleDocument, null, 2));
 
   const sealed = await encryptAndSealDocument(plaintextBytes, specialistKem.publicKey);
-  const cid = await storeEncryptedBlob(sealed.encryptedBlob, `synapseq-${runSalt}.enc`);
+  const cid = await uploadEncryptedBlob(sealed.encryptedBlob, {
+    fileName: `synapseq-${runSalt}.enc`,
+    metadata: { app: "SynapseQ", encryption: "AES-256-GCM+ML-KEM-1024" },
+  });
 
   console.log(`  - Plaintext size:        ${plaintextBytes.length} bytes`);
   console.log(

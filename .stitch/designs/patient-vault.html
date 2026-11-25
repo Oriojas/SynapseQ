@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"on-background":"#dfe2ef","surface-container":"#1c1f29","surface-tint":"#00dfc1","primary-fixed-dim":"#00dfc1","surface-container-low":"#181b25","tertiary-fixed":"#ffdadb","background":"#0f131c","primary-fixed":"#26fedc","inverse-primary":"#006b5b","inverse-on-surface":"#2c303a","secondary-container":"#4827b6","primary-container":"#00f5d4","on-surface":"#dfe2ef","surface-container-high":"#262a34","tertiary-container":"#ffced0","on-primary-fixed":"#00201a","on-tertiary-container":"#bf003c","primary":"#d7fff3","on-tertiary":"#67001c","surface":"#0f131c","on-tertiary-fixed-variant":"#91002b","on-secondary-fixed-variant":"#4827b6","on-primary-container":"#006c5c","on-secondary-fixed":"#1c0062","on-secondary":"#31009a","surface-container-lowest":"#0a0e17","on-error-container":"#ffdad6","surface-bright":"#353943","surface-variant":"#31353f","on-secondary-container":"#b9aaff","secondary":"#cabeff","secondary-fixed":"#e6deff","error-container":"#93000a","tertiary":"#fff4f3","outline":"#83948f","on-error":"#690005","surface-container-highest":"#31353f","error":"#ffb4ab","on-primary-fixed-variant":"#005144","surface-dim":"#0f131c","inverse-surface":"#dfe2ef","on-primary":"#00382f","on-surface-variant":"#b9cac4","tertiary-fixed-dim":"#ffb2b7","on-tertiary-fixed":"#40000e","outline-variant":"#3a4a46","secondary-fixed-dim":"#cabeff"},borderRadius:{DEFAULT:"0.125rem",lg:"0.25rem",xl:"0.5rem",full:"0.75rem"},spacing:{"space-sm":"0.5rem","space-lg":"1.5rem","space-xl":"2.5rem","space-md":"1rem",gutter:"1rem","margin-desktop":"2.5rem","gutter-desktop":"1.5rem","space-xs":"0.25rem",margin:"1rem"},fontFamily:{"label-sm":["JetBrains Mono"],"body-sm":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"code-lg":["JetBrains Mono"],"headline-sm":["Space Grotesk"],"body-md":["Plus Jakarta Sans"],"headline-lg-mobile":["Space Grotesk"],"headline-xl":["Space Grotesk"],"headline-xl-mobile":["Space Grotesk"],"code-sm":["JetBrains Mono"],"headline-lg":["Space Grotesk"],"code-md":["JetBrains Mono"],"label-md":["JetBrains Mono"],"headline-md":["Space Grotesk"]},fontSize:{"label-sm":["9px",{lineHeight:"12px",fontWeight:"700"}],"body-sm":["12px",{lineHeight:"16px",fontWeight:"400"}],"body-lg":["16px",{lineHeight:"24px",fontWeight:"400"}],"code-lg":["14px",{lineHeight:"20px",fontWeight:"500"}],"headline-sm":["18px",{lineHeight:"24px",fontWeight:"600"}],"body-md":["14px",{lineHeight:"20px",fontWeight:"400"}],"headline-lg-mobile":["24px",{lineHeight:"32px",fontWeight:"600"}],"headline-xl":["48px",{lineHeight:"56px",fontWeight:"700"}],"headline-xl-mobile":["32px",{lineHeight:"40px",fontWeight:"700"}],"code-sm":["10px",{lineHeight:"14px",fontWeight:"600"}],"headline-lg":["32px",{lineHeight:"40px",fontWeight:"600"}],"code-md":["12px",{lineHeight:"16px",fontWeight:"500"}],"label-md":["11px",{lineHeight:"14px",fontWeight:"600"}],"headline-md":["24px",{lineHeight:"32px",fontWeight:"600"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/90 backdrop-blur-xl border-b border-outline-variant/30 shadow-[0_1px_16px_rgba(0,0,0,0.6)]"><div class="h-16 w-full px-gutter-desktop flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><img alt="SynapseQ Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/ALJJyrDyXvZHZGDhmUq9sQ9V51ZUp5fdR7OnX5YEgv6WRIWkSNfUuKRkoZQCJnDtfOhqnSGT5fIqGl_qOCGDgu6cuWPG71hK6FS1Hu6XdeECAwjPeocA_UvJwHUi_CyUnGHHYfD7Maqy3vl7BTXf3BmfrSh4Y31VC8uceTv4ILTQOiDzIlnPb1q2z9ISEEh2XTqJQ__igwW--YJqwSRxig2_dKC5GK7s962bdXj6pb6-5t4"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm font-bold tracking-tight text-primary uppercase">SynapseQ</span><span class="font-code-sm text-code-sm text-on-surface-variant tracking-wider">POST-QUANTUM BIO-HUD</span></div></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-surface-container-high text-primary-fixed border border-primary-container/40 shadow-[0_0_12px_rgba(0,245,212,0.15)] font-bold"><a class="px-space-md py-space-xs rounded text-on-surface-variant font-label-md text-label-md tracking-wider uppercase transition-all hover:bg-surface-container-high hover:text-on-surface" data-path="patient-and-ephemeral-vault" href="#">Patient &amp; Ephemeral Vault</a><a class="px-space-md py-space-xs rounded text-on-surface-variant font-label-md text-label-md tracking-wider uppercase transition-all hover:bg-surface-container-high hover:text-on-surface" data-path="cyber-human-hbom" href="#">Cyber-Human HBOM</a><a class="px-space-md py-space-xs rounded text-on-surface-variant font-label-md text-label-md tracking-wider uppercase transition-all hover:bg-surface-container-high hover:text-on-surface" data-path="specialist-portal" href="#">Specialist Portal</a></nav></div><div class="flex items-center gap-space-sm"><div class="hidden lg:flex items-center gap-space-xs px-space-sm py-1 rounded bg-secondary-container/40 border border-secondary/30 text-on-secondary-container"><span class="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#00f5d4]"></span><span class="font-label-sm text-label-sm tracking-wider uppercase">QoreChain Diana (9800)</span></div><div class="hidden md:flex items-center gap-space-xs px-space-sm py-1 rounded bg-surface-container-low border border-outline-variant/40"><span class="font-code-sm text-code-sm text-primary">0x71C...b9F4</span><span class="px-1.5 py-0.5 rounded bg-primary-container/20 text-primary-fixed font-label-sm text-label-sm uppercase tracking-tighter">ML-KEM-1024</span></div><button class="flex items-center gap-space-xs px-space-sm py-1.5 rounded bg-error-container/40 border border-error/50 text-error hover:bg-error hover:text-on-error transition-all shadow-[0_0_16px_rgba(255,180,171,0.2)]"><span class="material-symbols-outlined text-sm font-bold animate-ping">shield</span><span class="font-label-sm text-label-sm tracking-wider uppercase font-bold">REVOKE ALL</span></button><div class="flex items-center pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-primary-container/40" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvr02ogN3l-24HYsZHui2eW8M9f0tSMRtmV4CDQw82ss2fY6-sIlZUJ3YmWrkPA9rHAGScAiaLmip5RSmXljYrZIEjzvzVlzAvSRT1eE9ihPex9efn7mVuaBBVbf9_QGwaydzvO23mYukbMfrSh6UMN0PeQy0XSDpdl7dw53QcThQXRdCI1RVUvqrog3Vj-jpIgScshrdVASen_ZTp9JMu5_Dc6n55aQy0mTQZvtj7oLsJqKj2AwTUQGyT22eK"/></div></div></div></header><main class="w-full pt-16 bg-surface min-h-[calc(100vh-2.5rem)]"><div class="flex flex-col w-full">
+<!-- Top Level HUD Telemetry Strips & Diagnostic Metrics Bar -->
+<section class="w-full px-gutter-desktop py-space-md bg-surface-container-lowest">
+<div class="flex flex-col gap-space-md">
+<!-- Breadcrumb + Protocol Banner -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="px-2 py-0.5 rounded bg-secondary-container/30 text-secondary font-label-md text-label-md uppercase tracking-wider">SEC_LEVEL_5</span>
+<span class="text-outline-variant font-code-sm text-code-sm">/</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant tracking-wider">DIANA TESTNET [9800]</span>
+<span class="text-outline-variant font-code-sm text-code-sm">/</span>
+<span class="font-code-sm text-code-sm text-primary-fixed uppercase tracking-wider">EPHEMERAL_VAULT_ROUTER_V4</span>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container-low shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#00f5d4]"></span>
+<span class="font-label-sm text-label-sm text-primary-fixed tracking-wider uppercase">LATTICE ENCLAVE: ARMORED</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">NODE: 0x9b12..d3a8</span>
+</div>
+</div>
+<!-- Core Telemetry Metric Quad-Pill Bento -->
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-sm">
+<!-- Metric 1: Quantum Entropy -->
+<div class="bg-surface-container-low rounded-xl p-space-md relative overflow-hidden shadow-md">
+<div class="absolute -right-4 -bottom-4 w-20 h-20 bg-primary-container/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Quantum Entropy Level</span>
+<span class="material-symbols-outlined text-primary-fixed text-sm">all_inclusive</span>
+</div>
+<div class="flex items-baseline gap-2 mb-2">
+<span class="font-headline-md text-headline-md font-bold text-primary tracking-tight">99.98%</span>
+<span class="font-code-sm text-code-sm text-primary-container">True Randomness</span>
+</div>
+<!-- Segmented Meter Bar -->
+<div class="flex gap-1 h-1.5 w-full">
+<div class="flex-1 bg-primary-container rounded-sm shadow-[0_0_6px_#00f5d4]"></div>
+<div class="flex-1 bg-primary-container rounded-sm"></div>
+<div class="flex-1 bg-primary-container rounded-sm"></div>
+<div class="flex-1 bg-primary-container rounded-sm"></div>
+<div class="flex-1 bg-primary-container rounded-sm"></div>
+<div class="flex-1 bg-primary-container rounded-sm opacity-90"></div>
+<div class="flex-1 bg-surface-container-high rounded-sm"></div>
+</div>
+</div>
+<!-- Metric 2: Active Ephemeral Grants -->
+<div class="bg-surface-container-low rounded-xl p-space-md relative overflow-hidden shadow-md">
+<div class="absolute -right-4 -bottom-4 w-20 h-20 bg-secondary/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Active Ephemeral Grants</span>
+<span class="material-symbols-outlined text-secondary text-sm">vpn_key_alert</span>
+</div>
+<div class="flex items-baseline gap-2 mb-2">
+<span class="font-headline-md text-headline-md font-bold text-secondary tracking-tight">3 Live</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Max concurrent: 8</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>
+<span class="font-code-sm text-code-sm text-secondary">Auto-destruct protocol active</span>
+</div>
+</div>
+<!-- Metric 3: Encrypted Shards -->
+<div class="bg-surface-container-low rounded-xl p-space-md relative overflow-hidden shadow-md">
+<div class="absolute -right-4 -bottom-4 w-20 h-20 bg-primary-container/5 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Encrypted Telemetry Shards</span>
+<span class="material-symbols-outlined text-primary-fixed text-sm">deployed_code</span>
+</div>
+<div class="flex items-baseline gap-2 mb-2">
+<span class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">14 Shards</span>
+<span class="font-code-sm text-code-sm text-primary-container">Sealed &amp; Synced</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full w-[88%] rounded-full shadow-[0_0_8px_#00f5d4]"></div>
+</div>
+</div>
+<!-- Metric 4: PQC Status -->
+<div class="bg-surface-container-low rounded-xl p-space-md relative overflow-hidden shadow-md">
+<div class="absolute -right-4 -bottom-4 w-20 h-20 bg-primary-container/10 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Post-Quantum Vault Status</span>
+<span class="material-symbols-outlined text-primary-container text-sm">lock_reset</span>
+</div>
+<div class="flex items-baseline gap-2 mb-2">
+<span class="font-headline-md text-headline-md font-bold text-primary-fixed tracking-tight">ML-KEM-1024</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Lattice Cat. 5</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-primary-container">verified_user</span>
+<span class="font-code-sm text-code-sm text-primary">NIST FIPS 203 Cryptosystem Verified</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Asymmetric Workspace Layout (45% Left / 55% Right Desktop Split) -->
+<div class="w-full px-gutter-desktop py-space-lg">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- ========================================================================= -->
+<!-- LEFT COLUMN: Encryption & Ephemeral Grant Studio (5 Cols on 12-Col Grid) -->
+<!-- ========================================================================= -->
+<div class="lg:col-span-5 flex flex-col gap-space-md">
+<!-- Header Pill Block -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container">shield_with_house</span>
+<h2 class="font-headline-sm text-headline-sm font-bold uppercase tracking-tight text-primary">Encryption &amp; Ephemeral Grant Studio</h2>
+</div>
+<span class="px-2 py-0.5 rounded bg-primary-container/15 text-primary-fixed font-label-sm text-label-sm tracking-widest uppercase">PQC ACCESS CONTROL</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Encapsulate bio-telemetric feeds into transient, lattice-armored state packets anchored via cryptographic smart permits.
+          </p>
+</div>
+<!-- Upload Container / Cyber Reticle Drop Zone -->
+<div class="bg-surface-container-low rounded-xl p-space-md relative overflow-hidden shadow-md">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+              Ingestion Matrix
+            </span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">STANDALONE HARDWARE ENCLAVE</span>
+</div>
+<!-- Interactive Drag Area -->
+<div class="relative group cursor-pointer rounded-lg p-space-lg text-center bg-surface-container-lowest transition-all hover:bg-surface-container hover:shadow-[0_0_20px_rgba(0,245,212,0.15)]" id="drop-zone">
+<!-- Corner Reticles -->
+<div class="absolute top-2 left-2 w-2 h-2 bg-primary-container"></div>
+<div class="absolute top-2 right-2 w-2 h-2 bg-primary-container"></div>
+<div class="absolute bottom-2 left-2 w-2 h-2 bg-primary-container"></div>
+<div class="absolute bottom-2 right-2 w-2 h-2 bg-primary-container"></div>
+<div class="flex flex-col items-center justify-center gap-space-sm relative z-10">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary-container group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-2xl">fingerprint</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Drop DICOM Imaging or Neural Streams</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Accepted: .dcm, .btele, .raw, .hbom-sub</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-sm">
+                Files are automatically segmented and encrypted locally before on-chain anchor. Zero plain-bytes cross enclave memory.
+              </p>
+<button class="mt-space-xs px-space-md py-1.5 rounded bg-surface-container-high text-primary-fixed hover:bg-primary-container hover:text-on-primary font-label-md text-label-md uppercase tracking-wider transition-colors shadow-sm">
+                Browse Enclave File System
+              </button>
+</div>
+</div>
+<!-- Local Cryptographic Pipeline Status Box -->
+<div class="mt-space-md bg-surface-container rounded-lg p-space-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Local Enclave Pipeline Pipeline</span>
+<span class="font-code-sm text-code-sm text-primary-container font-semibold">ALL NOMINAL</span>
+</div>
+<div class="space-y-1.5 font-code-sm text-code-sm">
+<div class="flex items-center justify-between bg-surface-container-lowest/60 px-2.5 py-1 rounded">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-xs text-primary-container">check_circle</span>
+<span>AES-256-GCM Acceleration</span>
+</div>
+<span class="text-primary-fixed font-bold">ACTIVE (Enclave Secured)</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest/60 px-2.5 py-1 rounded">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-xs text-primary-container">check_circle</span>
+<span>SHAKE-256 Digest Integrity</span>
+</div>
+<span class="font-code-sm text-on-surface-variant">0x8f3c...e92a (Verified)</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest/60 px-2.5 py-1 rounded">
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="material-symbols-outlined text-xs text-secondary">check_circle</span>
+<span>ML-KEM-1024 Encapsulation</span>
+</div>
+<span class="text-secondary font-bold">READY FOR RECIPIENT PK</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Telemetry Domain Selection & Bionic HBOM Binding -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md space-y-space-md">
+<!-- Domain Selector -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Data Domain Classification</label>
+<span class="font-code-sm text-code-sm text-secondary">POLY-CLASSIFIED</span>
+</div>
+<div class="grid grid-cols-2 gap-space-xs">
+<button class="flex items-center justify-center gap-2 px-3 py-2.5 rounded bg-surface-container text-on-surface-variant hover:text-primary font-label-md text-label-md uppercase tracking-wider transition-all" id="btn-domain-clinical">
+<span class="material-symbols-outlined text-sm">radiology</span>
+<span>Clinical (DICOM)</span>
+</button>
+<button class="flex items-center justify-center gap-2 px-3 py-2.5 rounded bg-secondary-container text-primary font-label-md text-label-md uppercase tracking-wider shadow-sm transition-all" id="btn-domain-bionic">
+<span class="material-symbols-outlined text-sm">memory</span>
+<span>Bionic Telemetry</span>
+</button>
+</div>
+</div>
+<!-- Linked Bionic Part Selector -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
+<span>Linked Bionic Hardware Substrate</span>
+<span class="text-primary-container font-code-sm text-code-sm">HBOM MAP #084</span>
+</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest text-primary font-code-md text-code-md rounded-lg px-3 py-2.5 appearance-none focus:outline-none focus:ring-1 focus:ring-primary-container shadow-inner">
+<option selected="" value="neuro-optic">Neuro-Optic Implant (Mk-IV) — [Cortex V1 Bus]</option>
+<option value="cochlear">Cochlear Synapse Bridge (v2.1) — [Acoustic Core]</option>
+<option value="prosthetic-hand">Cyber-Prosthetic Right Hand (Myo-Dex) — [Brachial Subnet]</option>
+<option value="vascular-nanobots">Vascular Nanobot Mesh — [Systemic Node Cluster]</option>
+<option value="full-neural">Full Neural Substrate HBOM — [Deep Enclave Image]</option>
+</select>
+<span class="material-symbols-outlined pointer-events-none absolute right-3 top-2.5 text-on-surface-variant text-base">arrow_drop_down</span>
+</div>
+</div>
+<!-- Specialist Destination & ML-KEM Public Key -->
+<div class="space-y-space-sm pt-space-xs">
+<div class="space-y-1">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Specialist Vault Address</label>
+<span class="font-code-sm text-code-sm text-primary flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                  QoreChain Resolver
+                </span>
+</div>
+<div class="relative flex items-center">
+<span class="absolute left-3 font-code-sm text-code-sm text-outline">QORE &gt;&gt;</span>
+<input class="w-full bg-surface-container-lowest text-primary font-code-md text-code-md rounded-lg pl-20 pr-24 py-2.5 focus:outline-none focus:ring-1 focus:ring-primary-container" type="text" value="0x892B743c089Ae904D81774CcA04cE51bC401"/>
+<button class="absolute right-2 px-2 py-1 rounded bg-surface-container-high text-primary-fixed hover:bg-primary-container hover:text-on-primary font-label-sm text-label-sm uppercase tracking-wider">
+                  VERIFY
+                </button>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Specialist ML-KEM-1024 Public Key</label>
+<button class="text-secondary font-label-sm text-label-sm hover:underline uppercase flex items-center gap-0.5">
+<span class="material-symbols-outlined text-xs">manage_search</span>
+                  Query QoreChain PKI
+                </button>
+</div>
+<textarea class="w-full bg-surface-container-lowest text-on-surface-variant font-code-sm text-code-sm rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-primary-container resize-none" readonly="" rows="2">kem1q0w4e892c90fa41189bc98dae4184c7810aa782e44c2089f4a1320efb7a091c01e74f</textarea>
+</div>
+</div>
+<!-- Duration Presets -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
+<span>Time-To-Live (Ephemeral Horizon)</span>
+<span class="font-code-sm text-code-sm text-primary">HARD DEADLINE REVOCATION</span>
+</label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-space-xs">
+<button class="px-2 py-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md uppercase tracking-wider text-center transition-colors">
+                1h <span class="block text-code-sm text-error">EMERGENCY</span>
+</button>
+<button class="px-2 py-2 rounded bg-primary-container/20 text-primary-fixed font-label-md text-label-md uppercase tracking-wider text-center shadow-sm">
+                2h <span class="block text-code-sm text-primary">CONSULT</span>
+</button>
+<button class="px-2 py-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md uppercase tracking-wider text-center transition-colors">
+                24h <span class="block text-code-sm text-on-surface-variant">DIAGNOSTIC</span>
+</button>
+<button class="px-2 py-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md uppercase tracking-wider text-center transition-colors">
+                7d <span class="block text-code-sm text-on-surface-variant">MONITOR</span>
+</button>
+</div>
+</div>
+<!-- Seal and Grant CTA -->
+<div class="pt-space-xs">
+<button class="w-full py-3.5 px-space-md rounded-lg bg-primary-container text-on-primary font-headline-sm text-headline-sm font-bold flex items-center justify-center gap-2 hover:bg-primary-fixed transition-all shadow-[0_0_24px_rgba(0,245,212,0.4)]">
+<span class="material-symbols-outlined font-bold">enhanced_encryption</span>
+<span>Seal &amp; Grant Timed Access</span>
+</button>
+<div class="flex items-center justify-between mt-2 px-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant">EST GAS: 0.0004 DIANA</span>
+<span class="font-code-sm text-code-sm text-primary-container flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">draw</span>
+                Signed via ML-DSA-87 (FIPS 204)
+              </span>
+</div>
+</div>
+</div>
+</div>
+<!-- ========================================================================= -->
+<!-- RIGHT COLUMN: Active Ephemeral Passes & Access Audit (7 Cols on 12-Col) -->
+<!-- ========================================================================= -->
+<div class="lg:col-span-7 flex flex-col gap-space-md">
+<!-- Section Header & Filter Toolbar -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex flex-wrap items-center justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">verified_user</span>
+<h2 class="font-headline-sm text-headline-sm font-bold uppercase tracking-tight text-primary">Active Ephemeral Passes</h2>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 rounded bg-primary-container/20 text-primary-fixed font-label-sm text-label-sm tracking-wider uppercase flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+                Live Smart Permits (QoreChain)
+              </span>
+</div>
+</div>
+<!-- Filter Search Strip -->
+<div class="flex flex-wrap sm:flex-nowrap items-center gap-space-xs">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-2 text-on-surface-variant text-base">search</span>
+<input class="w-full bg-surface-container-lowest text-primary font-code-sm text-code-sm rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-container" placeholder="Filter by pass ID, specialist, or bionic part..." type="text"/>
+</div>
+<button class="px-3 py-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">filter_list</span>
+<span>Filter: All Domains</span>
+</button>
+</div>
+</div>
+<!-- Ephemeral Pass Cards Container -->
+<div class="flex flex-col gap-space-sm">
+<!-- Pass Card 1: Dr. Elena Rostova -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md hover:shadow-xl transition-all">
+<div class="flex flex-wrap items-start justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-sm">
+<!-- Circular Countdown Graphic -->
+<div class="relative w-12 h-12 flex items-center justify-center">
+<svg class="w-12 h-12 transform -rotate-90" viewbox="0 0 36 36">
+<circle class="stroke-surface-container-high" cx="18" cy="18" fill="none" r="15" stroke-width="2.5"></circle>
+<circle class="stroke-primary-container" cx="18" cy="18" fill="none" r="15" stroke-dasharray="94.2" stroke-dashoffset="26" stroke-linecap="round" stroke-width="2.5"></circle>
+</svg>
+<span class="material-symbols-outlined absolute text-primary-container text-sm">timelapse</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Pass #EQ-9042</span>
+<span class="px-2 py-0.5 rounded bg-secondary-container/40 text-secondary font-label-sm text-label-sm uppercase tracking-wider shadow-[0_0_8px_rgba(202,190,255,0.2)]">BIONIC_TELEMETRY</span>
+</div>
+<div class="font-body-md text-body-md font-semibold text-on-surface">Dr. Elena Rostova</div>
+<div class="font-code-sm text-code-sm text-on-surface-variant">Neuro-Surgical Lead, Neo-Geneva BioClinic</div>
+</div>
+</div>
+<!-- Real-time Countdown Counter Badge -->
+<div class="text-right flex flex-col items-end">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Remaining Access</span>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container-lowest">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#00f5d4]"></span>
+<span class="font-code-lg text-code-lg font-bold text-primary tracking-tight">00:43:18</span>
+</div>
+</div>
+</div>
+<!-- Hardware & Hash Meta Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-xs bg-surface-container-lowest/80 p-space-sm rounded-lg mb-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Target Substrate</span>
+<div class="flex items-center gap-1.5 text-primary font-code-sm text-code-sm">
+<span class="material-symbols-outlined text-xs text-primary-container">psychology</span>
+<span>Neuro-Optic Implant (Mk-IV)</span>
+</div>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">SHAKE-256 Digest</span>
+<div class="flex items-center justify-between">
+<span class="font-code-sm text-code-sm text-primary font-mono">0x4b7f...c18a</span>
+<button class="px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-primary-container hover:text-on-primary text-on-surface font-label-sm text-label-sm transition-colors" title="Copy digest">
+                    COPY
+                  </button>
+</div>
+</div>
+</div>
+<!-- Card Bottom Bar: Encryption State & Actions -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-primary-container/10 text-primary-container font-label-sm text-label-sm uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">key</span>
+                  ML-KEM-1024 Encapsulated
+                </span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Block #4,892,088</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high text-primary font-label-md text-label-md uppercase tracking-wider transition-colors">
+                  Extend +1h
+                </button>
+<button class="px-3 py-1.5 rounded bg-error-container/20 text-error hover:bg-error hover:text-on-error font-label-md text-label-md uppercase tracking-wider transition-all shadow-sm">
+                  Revoke
+                </button>
+</div>
+</div>
+</div>
+<!-- Pass Card 2: Autonomous AI Diagnostic Node -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md hover:shadow-xl transition-all">
+<div class="flex flex-wrap items-start justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-sm">
+<!-- Circular Countdown Graphic -->
+<div class="relative w-12 h-12 flex items-center justify-center">
+<svg class="w-12 h-12 transform -rotate-90" viewbox="0 0 36 36">
+<circle class="stroke-surface-container-high" cx="18" cy="18" fill="none" r="15" stroke-width="2.5"></circle>
+<circle class="stroke-primary-container" cx="18" cy="18" fill="none" r="15" stroke-dasharray="94.2" stroke-dashoffset="48" stroke-linecap="round" stroke-width="2.5"></circle>
+</svg>
+<span class="material-symbols-outlined absolute text-primary-container text-sm">smart_toy</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Pass #EQ-8819</span>
+<span class="px-2 py-0.5 rounded bg-primary-container/20 text-primary-fixed font-label-sm text-label-sm uppercase tracking-wider shadow-[0_0_8px_rgba(0,245,212,0.2)]">CLINICAL</span>
+</div>
+<div class="font-body-md text-body-md font-semibold text-on-surface">Autonomous Diagnostic AI Node-07</div>
+<div class="font-code-sm text-code-sm text-on-surface-variant">QoreChain Decentralized Bio-Oracle</div>
+</div>
+</div>
+<!-- Remaining Time -->
+<div class="text-right flex flex-col items-end">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Remaining Access</span>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container-lowest">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#00f5d4]"></span>
+<span class="font-code-lg text-code-lg font-bold text-primary-fixed tracking-tight">01:14:52</span>
+</div>
+</div>
+</div>
+<!-- Hardware & Hash Meta Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-xs bg-surface-container-lowest/80 p-space-sm rounded-lg mb-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Target Substrate</span>
+<div class="flex items-center gap-1.5 text-primary font-code-sm text-code-sm">
+<span class="material-symbols-outlined text-xs text-primary-container">layers</span>
+<span>Cranial CT Shard Vol. 3 (High Res)</span>
+</div>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">SHAKE-256 Digest</span>
+<div class="flex items-center justify-between">
+<span class="font-code-sm text-code-sm text-primary font-mono">0x9e12...ff03</span>
+<button class="px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-primary-container hover:text-on-primary text-on-surface font-label-sm text-label-sm transition-colors" title="Copy digest">
+                    COPY
+                  </button>
+</div>
+</div>
+</div>
+<!-- Bottom Actions -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-primary-container/10 text-primary-container font-label-sm text-label-sm uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">key</span>
+                  ML-KEM-1024 Encapsulated
+                </span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Block #4,892,012</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high text-primary font-label-md text-label-md uppercase tracking-wider transition-colors">
+                  Extend +1h
+                </button>
+<button class="px-3 py-1.5 rounded bg-error-container/20 text-error hover:bg-error hover:text-on-error font-label-md text-label-md uppercase tracking-wider transition-all shadow-sm">
+                  Revoke
+                </button>
+</div>
+</div>
+</div>
+<!-- Pass Card 3: Biomarker Audit Corp -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md hover:shadow-xl transition-all">
+<div class="flex flex-wrap items-start justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-sm">
+<!-- Circular Countdown Graphic -->
+<div class="relative w-12 h-12 flex items-center justify-center">
+<svg class="w-12 h-12 transform -rotate-90" viewbox="0 0 36 36">
+<circle class="stroke-surface-container-high" cx="18" cy="18" fill="none" r="15" stroke-width="2.5"></circle>
+<circle class="stroke-secondary" cx="18" cy="18" fill="none" r="15" stroke-dasharray="94.2" stroke-dashoffset="12" stroke-linecap="round" stroke-width="2.5"></circle>
+</svg>
+<span class="material-symbols-outlined absolute text-secondary text-sm">health_and_safety</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Pass #EQ-7704</span>
+<span class="px-2 py-0.5 rounded bg-secondary-container/40 text-secondary font-label-sm text-label-sm uppercase tracking-wider shadow-[0_0_8px_rgba(202,190,255,0.2)]">BIONIC_TELEMETRY</span>
+</div>
+<div class="font-body-md text-body-md font-semibold text-on-surface">Biomarker Audit Corp</div>
+<div class="font-code-sm text-code-sm text-on-surface-variant">Regulatory Oversight Node (Zone-3)</div>
+</div>
+</div>
+<!-- Remaining Time -->
+<div class="text-right flex flex-col items-end">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Remaining Access</span>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container-lowest">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse shadow-[0_0_8px_#cabeff]"></span>
+<span class="font-code-lg text-code-lg font-bold text-secondary tracking-tight">05:58:02</span>
+</div>
+</div>
+</div>
+<!-- Hardware & Hash Meta Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-xs bg-surface-container-lowest/80 p-space-sm rounded-lg mb-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Target Substrate</span>
+<div class="flex items-center gap-1.5 text-primary font-code-sm text-code-sm">
+<span class="material-symbols-outlined text-xs text-secondary">blur_on</span>
+<span>Vascular Nanobot Mesh</span>
+</div>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">SHAKE-256 Digest</span>
+<div class="flex items-center justify-between">
+<span class="font-code-sm text-code-sm text-primary font-mono">0x1a88...33d2</span>
+<button class="px-1.5 py-0.5 rounded bg-surface-container-high hover:bg-primary-container hover:text-on-primary text-on-surface font-label-sm text-label-sm transition-colors" title="Copy digest">
+                    COPY
+                  </button>
+</div>
+</div>
+</div>
+<!-- Bottom Actions -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-primary-container/10 text-primary-container font-label-sm text-label-sm uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">key</span>
+                  ML-KEM-1024 Encapsulated
+                </span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Block #4,891,890</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high text-primary font-label-md text-label-md uppercase tracking-wider transition-colors">
+                  Extend +1h
+                </button>
+<button class="px-3 py-1.5 rounded bg-error-container/20 text-error hover:bg-error hover:text-on-error font-label-md text-label-md uppercase tracking-wider transition-all shadow-sm">
+                  Revoke
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Audit Table Footer & Batch Actions -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-sm flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs flex-wrap">
+<button class="px-space-md py-2 rounded bg-error-container/30 text-error hover:bg-error hover:text-on-error font-label-md text-label-md uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">remove_moderator</span>
+<span>Multi-Revoke Selected</span>
+</button>
+<button class="px-space-md py-2 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md uppercase tracking-wider transition-colors flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm">file_download</span>
+<span>Export Access Audit Log (JSON-LD)</span>
+</button>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Zero-knowledge proof trail indexed</span>
+</div>
+<!-- Real-Time Activity Telemetry Stream Feed -->
+<div class="bg-surface-container-low rounded-xl p-space-md shadow-md">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider">L1 State Log Stream</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">REAL-TIME TELEMETRY</span>
+</div>
+<div class="bg-surface-container-lowest rounded-lg p-space-sm space-y-2 font-code-sm text-code-sm">
+<div class="flex items-start gap-2">
+<span class="text-on-surface-variant whitespace-nowrap">09:41:02</span>
+<span class="text-primary-container whitespace-nowrap">&gt;&gt;</span>
+<span class="text-on-surface">Access granted to <span class="text-primary font-bold">Dr. Elena Rostova</span> (ML-KEM-1024 Shared Secret Decapsulated locally).</span>
+</div>
+<div class="flex items-start gap-2">
+<span class="text-on-surface-variant whitespace-nowrap">09:35:14</span>
+<span class="text-error whitespace-nowrap">&gt;&gt;</span>
+<span class="text-on-surface">Pass <span class="text-error font-bold">#EQ-7102</span> Expired &amp; Enclave Ephemeral Keys Zeroized automatically via Diana Smart Contract.</span>
+</div>
+<div class="flex items-start gap-2">
+<span class="text-on-surface-variant whitespace-nowrap">09:12:48</span>
+<span class="text-secondary whitespace-nowrap">&gt;&gt;</span>
+<span class="text-on-surface">SHAKE-256 integrity challenge verified across 16 validator nodes on Chain 9800.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Persistent Cryptographic Telemetry Ribbon Along Bottom HUD -->
+<section class="w-full bg-surface-container-lowest py-space-sm px-gutter-desktop shadow-lg">
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<!-- Security Protocol Certifications -->
+<div class="flex items-center gap-space-lg flex-wrap">
+<div class="flex items-center gap-1.5 text-primary-fixed">
+<span class="material-symbols-outlined text-sm text-primary-container">lock</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-bold">NIST FIPS 203 (ML-KEM-1024): ENFORCED</span>
+</div>
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-sm text-primary-container">verified</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider">NIST FIPS 204 (ML-DSA-87): SIGNED &amp; VERIFIED</span>
+</div>
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="material-symbols-outlined text-sm text-secondary">data_object</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider">SHAKE-256 INTEGRITY: ZK PROOF ENGINE</span>
+</div>
+</div>
+<!-- Live Network Chain Indicators -->
+<div class="flex items-center gap-space-lg flex-wrap">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-code-sm text-code-sm text-primary">QORECHAIN DIANA TESTNET (9800) • BLOCK #4,892,104</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">EPOCH: 412 • L1 FINALITY: 0.8s</span>
+<div class="flex items-center gap-1 text-primary-container">
+<span class="material-symbols-outlined text-sm">shield</span>
+<span class="font-label-sm text-label-sm uppercase font-semibold">LOCAL ENCLAVE ARMORED</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Interactive Client-Side Domain Switching Micro-Script -->
+<script>
+    (function initVaultControls() {
+      const btnClinical = document.getElementById('btn-domain-clinical');
+      const btnBionic = document.getElementById('btn-domain-bionic');
+      
+      if (btnClinical && btnBionic) {
+        btnClinical.addEventListener('click', () => {
+          btnClinical.classList.remove('bg-surface-container', 'text-on-surface-variant');
+          btnClinical.classList.add('bg-primary-container', 'text-on-primary', 'shadow-sm');
+
+          btnBionic.classList.remove('bg-secondary-container', 'text-primary', 'shadow-sm');
+          btnBionic.classList.add('bg-surface-container', 'text-on-surface-variant');
+        });
+
+        btnBionic.addEventListener('click', () => {
+          btnBionic.classList.remove('bg-surface-container', 'text-on-surface-variant');
+          btnBionic.classList.add('bg-secondary-container', 'text-primary', 'shadow-sm');
+
+          btnClinical.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-sm');
+          btnClinical.classList.add('bg-surface-container', 'text-on-surface-variant');
+        });
+      }
+
+      // Drag & drop dropzone visual feedback
+      const dropZone = document.getElementById('drop-zone');
+      if (dropZone) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+          dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('bg-surface-container-high', 'scale-[1.01]');
+          });
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+          dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-surface-container-high', 'scale-[1.01]');
+          });
+        });
+      }
+    })();
+  </script>
+</div></main><footer class="w-full bg-surface-container-lowest/95 border-t border-outline-variant/30 py-space-xs px-gutter-desktop"><div class="w-full flex flex-wrap items-center justify-between gap-space-md text-on-surface-variant font-code-sm text-code-sm"><div class="flex items-center gap-space-md flex-wrap"><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span><span>NIST FIPS 203: ML-KEM-1024 ACTIVE</span></div><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span><span>NIST FIPS 204: ML-DSA-87 OPERATIONAL</span></div><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span><span>SHAKE-256 SYNCED</span></div></div><div class="flex items-center gap-space-md flex-wrap"><div class="flex items-center gap-1 text-primary-fixed"><span class="material-symbols-outlined text-xs">tag</span><span>BLOCK #4,892,104 [DIANA 9800]</span></div><div class="flex items-center gap-1"><span class="text-primary-container">0 ms</span><span>QUANTUM ENTROPY LATENCY</span></div></div></div></footer></body></html>

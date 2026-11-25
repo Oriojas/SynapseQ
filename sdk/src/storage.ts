@@ -1,6 +1,10 @@
+import { bytesToHex, hexToBytes } from "viem";
+import { computeShake256 } from "./pqc.js";
+
 /**
  * Browser-safe encrypted blob storage adapters for SynapseQ.
- * Supports Pinata IPFS pinning (production/hackathon demo) and custom IPFS gateways.
+ * Supports Pinata IPFS pinning (production/hackathon demo), custom IPFS gateways,
+ * and automatic browser/Node local fallback.
  * All payloads MUST be encrypted client-side (AES-256-GCM) before calling these functions.
  */
 
@@ -21,8 +25,17 @@ export interface PinataUploadResult {
   timestamp: string;
 }
 
+export interface StorageConfig {
+  pinataJwt?: string;
+  ipfsGatewayUrl?: string;
+  fileName?: string;
+  metadata?: Record<string, string>;
+}
+
 const DEFAULT_PINATA_PIN_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";
 const DEFAULT_IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs";
+
+const memoryBlobCache = new Map<string, Uint8Array>();
 
 /**
  * Uploads an already-encrypted binary blob (.enc) to Pinata IPFS.
@@ -70,6 +83,8 @@ export async function uploadEncryptedBlobToPinata(
     Timestamp: string;
   };
 
+  memoryBlobCache.set(data.IpfsHash, encryptedBlob);
+
   return {
     cid: data.IpfsHash,
     size: data.PinSize,
@@ -86,7 +101,9 @@ export async function fetchEncryptedBlobFromIpfs(
 ): Promise<Uint8Array> {
   const normalizedGateway = gatewayUrl.replace(/\/+$/, "");
   const cleanCid = cid.replace(/^ipfs:\/\//, "");
-  const url = `${normalizedGateway}/${cleanCid}`;
+  const url = normalizedGateway.endsWith("/ipfs")
+    ? `${normalizedGateway}/${cleanCid}`
+    : `${normalizedGateway}/ipfs/${cleanCid}`;
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -94,5 +111,86 @@ export async function fetchEncryptedBlobFromIpfs(
   }
 
   const buffer = await response.arrayBuffer();
-  return new Uint8Array(buffer);
+  const bytes = new Uint8Array(buffer);
+  memoryBlobCache.set(cleanCid, bytes);
+  return bytes;
+}
+
+/**
+ * Unified helper that uploads to Pinata IPFS if a JWT is provided/configured,
+ * or falls back transparently to browser localStorage / Node .local-ipfs.
+ */
+export async function uploadEncryptedBlob(
+  blob: Uint8Array,
+  config?: StorageConfig
+): Promise<string> {
+  const digest = computeShake256(blob).slice(2, 34);
+  const pinataJwt =
+    config?.pinataJwt ||
+    (typeof process !== "undefined" ? process.env?.PINATA_JWT : undefined);
+
+  if (pinataJwt && pinataJwt.trim().length > 0) {
+    const res = await uploadEncryptedBlobToPinata(blob, {
+      jwt: pinataJwt,
+      fileName: config?.fileName ?? `synapseq-${digest}.enc`,
+      metadata: config?.metadata,
+    });
+    return res.cid;
+  }
+
+  const cid = `bafy-synapseq-${digest}`;
+  memoryBlobCache.set(cid, blob);
+
+  if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+    window.localStorage.setItem(`synapseq_ipfs_${cid}`, bytesToHex(blob));
+  } else if (typeof window === "undefined") {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const localIpfsDir = join(process.cwd(), ".local-ipfs");
+    mkdirSync(localIpfsDir, { recursive: true });
+    writeFileSync(join(localIpfsDir, `${cid}.enc`), blob);
+  }
+
+  return cid;
+}
+
+/**
+ * Unified helper that retrieves an encrypted blob from cache, local fallback, or IPFS gateway.
+ */
+export async function fetchEncryptedBlob(
+  cid: string,
+  config?: StorageConfig
+): Promise<Uint8Array> {
+  const cached = memoryBlobCache.get(cid);
+  if (cached) {
+    return cached;
+  }
+
+  if (cid.startsWith("bafy-synapseq-")) {
+    if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+      const hex = window.localStorage.getItem(`synapseq_ipfs_${cid}`);
+      if (!hex) {
+        throw new Error(`Encrypted blob not found in browser storage for CID: ${cid}`);
+      }
+      const bytes = hexToBytes(hex as `0x${string}`);
+      memoryBlobCache.set(cid, bytes);
+      return bytes;
+    }
+
+    if (typeof window === "undefined") {
+      const { readFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const filePath = join(process.cwd(), ".local-ipfs", `${cid}.enc`);
+      const bytes = new Uint8Array(readFileSync(filePath));
+      memoryBlobCache.set(cid, bytes);
+      return bytes;
+    }
+  }
+
+  const gatewayUrl =
+    config?.ipfsGatewayUrl ||
+    (typeof process !== "undefined" ? process.env?.IPFS_GATEWAY_URL : undefined) ||
+    DEFAULT_IPFS_GATEWAY;
+
+  return fetchEncryptedBlobFromIpfs(cid, gatewayUrl);
 }

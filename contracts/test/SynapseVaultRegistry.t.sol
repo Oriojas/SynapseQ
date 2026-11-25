@@ -324,6 +324,39 @@ contract SynapseVaultRegistryTest is Test {
     }
 
     // =========================================================================
+    // Module 3: On-Chain ML-KEM-1024 Public Key Directory (QoreChain PKI) Tests
+    // =========================================================================
+
+    function test_RegisterAndGetKemPublicKey() public {
+        assertFalse(vault.hasKemPublicKey(doctor));
+
+        bytes memory dummyPubKey = new bytes(1568);
+        dummyPubKey[0] = 0x42;
+        dummyPubKey[1567] = 0x99;
+
+        vm.prank(doctor);
+        vault.registerKemPublicKey(dummyPubKey);
+
+        assertTrue(vault.hasKemPublicKey(doctor));
+        bytes memory storedKey = vault.getKemPublicKey(doctor);
+        assertEq(storedKey.length, 1568);
+        assertEq(storedKey[0], bytes1(0x42));
+        assertEq(storedKey[1567], bytes1(0x99));
+    }
+
+    function test_RejectsInvalidKemPublicKeyLength() public {
+        vm.startPrank(doctor);
+
+        vm.expectRevert(SynapseVaultRegistry.InvalidKemPublicKey.selector);
+        vault.registerKemPublicKey(new bytes(0));
+
+        vm.expectRevert(SynapseVaultRegistry.InvalidKemPublicKey.selector);
+        vault.registerKemPublicKey(new bytes(32));
+
+        vm.stopPrank();
+    }
+
+    // =========================================================================
     // Fuzz Tests
     // =========================================================================
 

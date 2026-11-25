@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  --reb-bg: #0B100E;
+  --reb-surface: #131B18;
+  --reb-surface-card: #17221E;
+  --reb-surface-code: #0E1513;
+  --reb-border: #23332C;
+  --reb-border-subtle: #1B2822;
+  --reb-mint: #A8F0C6;
+  --reb-mint-bright: #5EEAD4;
+  --reb-pink: #F4729B;
+  --reb-crimson: #E14D79;
+  --reb-blue: #3B66E8;
+  --reb-periwinkle: #60A5FA;
+  --reb-yellow: #FACC15;
+  --reb-text-light: #F1F5F9;
+  --reb-text-muted: #86A798;
+  --reb-text-dim: #5B7569;
+}
+
+@theme inline {
+  --color-reb-bg: #0B100E;
+  --color-reb-surface: #131B18;
+  --color-reb-surface-card: #17221E;
+  --color-reb-surface-code: #0E1513;
+  --color-reb-border: #23332C;
+  --color-reb-border-subtle: #1B2822;
+  --color-reb-mint: #A8F0C6;
+  --color-reb-mint-bright: #5EEAD4;
+  --color-reb-pink: #F4729B;
+  --color-reb-crimson: #E14D79;
+  --color-reb-blue: #3B66E8;
+  --color-reb-periwinkle: #60A5FA;
+  --color-reb-yellow: #FACC15;
+  --color-reb-text-light: #F1F5F9;
+  --color-reb-text-muted: #86A798;
+  --color-reb-text-dim: #5B7569;
+
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-display: "Space Grotesk", sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-reb-bg);
+    color: var(--color-reb-text-light);
+    font-family: var(--font-sans);
+    overscroll-behavior: none;
+  }
+}
+
+.reb-glass {
+  background: rgba(19, 27, 24, 0.36);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(168, 240, 198, 0.28);
+}
+
+.reb-glass-pink {
+  background: rgba(19, 27, 24, 0.36);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(244, 114, 155, 0.35);
+}

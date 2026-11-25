@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_standard" name="shell-type"/>
+<title>Specialist Portal (Minimalist Rebecca GPS Edition) - SynapseQ</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "reb-bg": "#0B100E",
+            "reb-surface": "#131B18",
+            "reb-surface-card": "#17221E",
+            "reb-surface-code": "#0E1513",
+            "reb-border": "#23332C",
+            "reb-border-subtle": "#1B2822",
+            "reb-mint": "#A8F0C6",
+            "reb-mint-bright": "#5EEAD4",
+            "reb-pink": "#F4729B",
+            "reb-crimson": "#E14D79",
+            "reb-blue": "#3B66E8",
+            "reb-periwinkle": "#60A5FA",
+            "reb-yellow": "#FACC15",
+            "reb-text-light": "#F1F5F9",
+            "reb-text-muted": "#86A798",
+            "reb-text-dim": "#5B7569"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"],
+            display: ["Space Grotesk", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #0B100E;
+        color: #F1F5F9;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-reb-bg text-reb-text-light antialiased min-h-screen selection:bg-reb-mint selection:text-reb-bg flex flex-col justify-between"><div class="fixed inset-0 z-0 pointer-events-none overflow-hidden"><svg class="w-full h-full opacity-60" preserveaspectratio="xMidYMid slice" viewbox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"><defs><radialgradient cx="50%" cy="50%" id="gps-vignette" r="70%"><stop offset="0%" stop-color="#0B100E" stop-opacity="0.2"></stop><stop offset="60%" stop-color="#0B100E" stop-opacity="0.7"></stop><stop offset="100%" stop-color="#0B100E" stop-opacity="0.95"></stop></radialgradient><pattern height="80" id="gps-grid-pattern" patternunits="userSpaceOnUse" width="80"><path d="M 80 0 L 0 0 0 80" fill="none" stroke="#1B2822" stroke-opacity="0.6" stroke-width="1"></path></pattern><lineargradient id="route-gradient" x1="0%" x2="100%" y1="0%" y2="100%"><stop offset="0%" stop-color="#5EEAD4"></stop><stop offset="50%" stop-color="#3B66E8"></stop><stop offset="100%" stop-color="#F4729B"></stop></lineargradient><filter height="200%" id="glow-mint" width="200%" x="-50%" y="-50%"><fegaussianblur result="blur" stddeviation="4"></fegaussianblur><femerge><femergenode in="blur"></femergenode><femergenode in="SourceGraphic"></femergenode></femerge></filter><filter height="200%" id="glow-pink" width="200%" x="-50%" y="-50%"><fegaussianblur result="blur" stddeviation="4"></fegaussianblur><femerge><femergenode in="blur"></femergenode><femergenode in="SourceGraphic"></femergenode></femerge></filter></defs><rect fill="#0B100E" height="100%" width="100%"></rect><rect fill="url(#gps-grid-pattern)" height="100%" width="100%"></rect><g fill="none" opacity="0.55" stroke="#23332C" stroke-width="1.5"><path d="M -100 240 C 250 210, 480 340, 850 310 S 1400 180, 2020 220"></path><path d="M -100 360 C 220 340, 520 460, 920 430 S 1450 320, 2020 370"></path><path d="M -100 520 C 300 500, 600 620, 1040 590 S 1500 470, 2020 540"></path><path d="M -100 680 C 280 660, 580 790, 1100 760 S 1580 640, 2020 710"></path><path d="M -100 840 C 260 820, 610 930, 1180 900 S 1650 810, 2020 870"></path><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" letter-spacing="1" x="240" y="335">ELEV +34.2m</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" letter-spacing="1" x="1380" y="195">ELEV +58.0m</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" letter-spacing="1" x="720" y="615">ELEV +42.8m</text></g><g fill="none" opacity="0.7" stroke="#1B2822" stroke-width="1.5"><path d="M 180 -100 L 180 1180 M 360 -100 L 360 1180 M 620 -100 L 620 1180 M 960 -100 L 960 1180 M 1280 -100 L 1280 1180 M 1580 -100 L 1580 1180 M 1760 -100 L 1760 1180" stroke-dasharray="10 6"></path><path d="M -100 160 L 2020 160 M -100 320 L 2020 320 M -100 580 L 2020 580 M -100 740 L 2020 740 M -100 920 L 2020 920" stroke-dasharray="10 6"></path><path d="M 220 200 L 320 200 L 320 280 L 220 280 Z" fill="#131B18" fill-opacity="0.4"></path><path d="M 660 360 L 880 360 L 880 520 L 660 520 Z" fill="#131B18" fill-opacity="0.4"></path><path d="M 1000 620 L 1240 620 L 1240 700 L 1000 700 Z" fill="#131B18" fill-opacity="0.4"></path><path d="M 1340 240 L 1520 240 L 1520 400 L 1340 400 Z" fill="#131B18" fill-opacity="0.4"></path><text fill="#86A798" font-family="JetBrains Mono" font-size="9" letter-spacing="2" x="225" y="190">NEO-SHINJUKU SECTOR 09</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" letter-spacing="2" x="665" y="350">LATTICE BLVD // EXPRESS</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" letter-spacing="2" x="1345" y="230">CHOME 4 / ENCLAVE BUFFER</text></g><g fill="none" stroke="#23332C" transform="translate(560, 480)"><circle r="120" stroke-dasharray="4 4" stroke-opacity="0.4" stroke-width="1"></circle><circle r="240" stroke-opacity="0.5" stroke-width="1"></circle><circle r="360" stroke-dasharray="6 6" stroke-opacity="0.35" stroke-width="1"></circle><circle r="480" stroke-opacity="0.3" stroke-width="1"></circle><line stroke-opacity="0.4" stroke-width="1" x1="-520" x2="520" y1="0" y2="0"></line><line stroke-opacity="0.4" stroke-width="1" x1="0" x2="0" y1="-520" y2="520"></line><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" x="125" y="-6">1.0 km</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" x="245" y="-6">2.0 km</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" x="365" y="-6">3.0 km</text><text fill="#5B7569" font-family="JetBrains Mono" font-size="9" x="485" y="-6">4.0 km</text><text fill="#86A798" font-family="JetBrains Mono" font-size="10" font-weight="bold" x="-4" y="-490">000° N</text><text fill="#86A798" font-family="JetBrains Mono" font-size="10" font-weight="bold" x="495" y="4">090° E</text><text fill="#86A798" font-family="JetBrains Mono" font-size="10" font-weight="bold" x="-4" y="505">180° S</text><text fill="#86A798" font-family="JetBrains Mono" font-size="10" font-weight="bold" x="-540" y="4">270° W</text></g><g stroke-linecap="round"><path d="M 480 340 Q 640 400 860 480 T 1180 580" fill="none" filter="url(#glow-mint)" stroke="url(#route-gradient)" stroke-dasharray="8 6" stroke-width="3"></path><path d="M 650 405 L 665 410 L 655 422" fill="none" stroke="#3B66E8" stroke-width="2"></path><path d="M 980 515 L 995 520 L 985 532" fill="none" stroke="#F4729B" stroke-width="2"></path><g transform="translate(740, 420)"><rect fill="#131B18" fill-opacity="0.9" height="22" rx="4" stroke="#23332C" stroke-width="1" width="340" x="0" y="0"></rect><text fill="#A8F0C6" font-family="JetBrains Mono" font-size="9" font-weight="600" letter-spacing="1" x="10" y="15">GPS ROUTE // 2.4 km • EST. LATENCY 0.42ms • LAT 35.6762° N LON 139.6503° E</text></g></g><g transform="translate(480, 340)"><circle class="animate-pulse" fill="none" r="32" stroke="#A8F0C6" stroke-opacity="0.3" stroke-width="1"></circle><circle fill="none" r="18" stroke="#A8F0C6" stroke-opacity="0.6" stroke-width="1.5"></circle><circle fill="#A8F0C6" filter="url(#glow-mint)" r="7"></circle><circle fill="#0B100E" r="3"></circle><g transform="translate(16, -10)"><rect fill="#131B18" fill-opacity="0.95" height="20" rx="3" stroke="#A8F0C6" stroke-width="1" width="170" x="0" y="-12"></rect><text fill="#A8F0C6" font-family="JetBrains Mono" font-size="9" font-weight="bold" letter-spacing="1" x="8" y="2">ENCLAVE NODE [DIANA-9800]</text></g></g><g transform="translate(1180, 580)"><circle class="animate-pulse" fill="none" r="36" stroke="#F4729B" stroke-opacity="0.3" stroke-width="1"></circle><circle fill="none" r="20" stroke="#F4729B" stroke-dasharray="3 3" stroke-opacity="0.6" stroke-width="1.5"></circle><circle fill="#F4729B" filter="url(#glow-pink)" r="7"></circle><circle fill="#0B100E" r="3"></circle><g transform="translate(16, -10)"><rect fill="#131B18" fill-opacity="0.95" height="20" rx="3" stroke="#F4729B" stroke-width="1" width="160" x="0" y="-12"></rect><text fill="#F4729B" font-family="JetBrains Mono" font-size="9" font-weight="bold" letter-spacing="1" x="8" y="2">PATIENT BEACON [#EQ-9042]</text></g></g><g fill="#5B7569" font-family="JetBrains Mono" font-size="9" letter-spacing="1"><text x="40" y="90">SATELLITE SYNC: QORE-SAT-4 // CARRIER LOCK ACTIVE // EPHEMERAL MESH RELAY</text><text x="40" y="1040">AZIMUTH 042.8° // ELEV ANGLE +61.4° // DOPPLER COMPENSATED</text><text x="1480" y="1040">PQC CIPHER: ML-KEM-1024 // FIPS 203</text></g><rect fill="url(#gps-vignette)" height="100%" width="100%"></rect></svg></div>
+<!-- TOP HEADER -->
+<header class="sticky top-0 z-50 w-full bg-[#0B100E]/90 backdrop-blur-xl border-b border-reb-border">
+<div class="max-w-[1480px] mx-auto h-16 px-6 lg:px-10 flex items-center justify-between gap-6">
+<!-- Brand & Navigation -->
+<div class="flex items-center gap-10">
+<!-- Logo -->
+<a class="flex items-center gap-3 group" href="#">
+<div class="w-8 h-8 rounded-lg bg-reb-surface-card border border-reb-border flex items-center justify-center relative overflow-hidden group-hover:border-reb-mint transition-colors">
+<span class="w-2 h-2 rounded-full bg-reb-mint shadow-[0_0_10px_#A8F0C6] animate-pulse"></span>
+<div class="absolute -right-1 -bottom-1 w-2 h-2 rounded-full bg-reb-pink"></div>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-display font-bold text-lg tracking-tight text-reb-text-light">Synapse<span class="text-reb-mint">Q</span></span>
+<span class="w-1.5 h-1.5 rounded-full bg-reb-pink"></span>
+</div>
+<span class="font-mono text-[9px] uppercase tracking-widest text-reb-text-muted">POST-QUANTUM BIO-HUD</span>
+</div>
+</a>
+<!-- 3-Tab Clean Navigation -->
+<nav class="hidden md:flex items-center gap-1">
+<a class="px-3.5 py-1.5 rounded-md font-mono text-xs uppercase tracking-wider text-reb-text-muted hover:text-reb-text-light hover:bg-reb-surface transition-all" href="#">
+            Patient Vault
+          </a>
+<a class="px-3.5 py-1.5 rounded-md font-mono text-xs uppercase tracking-wider text-reb-text-muted hover:text-reb-text-light hover:bg-reb-surface transition-all" href="#">
+            Cyber-Human HBOM
+          </a>
+<a class="relative px-3.5 py-1.5 rounded-md font-mono text-xs uppercase tracking-wider text-reb-mint font-semibold bg-reb-surface border border-reb-border shadow-[0_0_12px_rgba(168,240,198,0.08)]" href="#">
+            Specialist Portal
+            <span class="absolute bottom-0 left-3 right-3 h-[2px] bg-reb-mint rounded-full shadow-[0_0_6px_#A8F0C6]"></span>
+</a>
+</nav>
+</div>
+<!-- Right Profile & Network Status -->
+<div class="flex items-center gap-3">
+<!-- Diana Chain Pill -->
+<div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface border border-reb-border text-reb-text-muted font-mono text-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-reb-mint shadow-[0_0_6px_#A8F0C6]"></span>
+<span class="text-reb-text-light">Diana</span>
+<span class="text-reb-text-dim">[9800]</span>
+</div>
+<!-- Connected Wallet Pill -->
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface border border-reb-border font-mono text-xs text-reb-text-muted">
+<span class="text-reb-mint">0x71c...b9F4</span>
+<span class="px-1.5 py-0.2 rounded bg-reb-surface-card text-[10px] text-reb-mint font-semibold">ML-KEM</span>
+</div>
+<!-- Specialist Avatar -->
+<div class="relative ml-1">
+<img alt="Specialist Avatar" class="w-8 h-8 rounded-full object-cover ring-2 ring-reb-mint/60 shadow-[0_0_10px_rgba(168,240,198,0.2)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvr02ogN3l-24HYsZHui2eW8M9f0tSMRtmV4CDQw82ss2fY6-sIlZUJ3YmWrkPA9rHAGScAiaLmip5RSmXljYrZIEjzvzVlzAvSRT1eE9ihPex9efn7mVuaBBVbf9_QGwaydzvO23mYukbMfrSh6UMN0PeQy0XSDpdl7dw53QcThQXRdCI1RVUvqrog3Vj-jpIgScshrdVASen_ZTp9JMu5_Dc6n55aQy0mTQZvtj7oLsJqKj2AwTUQGyT22eK"/>
+<span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-reb-mint ring-2 ring-reb-bg"></span>
+</div>
+</div>
+</div>
+</header>
+<!-- MAIN WORKSPACE -->
+<main class="w-full max-w-[1480px] mx-auto px-6 lg:px-10 py-8 flex flex-col gap-8 flex-1 relative z-10"><div class="flex flex-col w-full relative">
+<!-- 1. FULL-SCREEN HIGH-CONTRAST VIVID TACTICAL GPS MAP LAYER (NO dark vignette, clear vector geometry) -->
+<div class="absolute inset-0 pointer-events-none -z-10 overflow-hidden select-none min-h-[960px]">
+<svg class="w-full h-full min-w-[1280px]" fill="none" viewbox="0 0 1440 980" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<!-- Vivid Navigation Gradients -->
+<lineargradient gradientunits="userSpaceOnUse" id="vivid-nav-glow" x1="180" x2="1140" y1="220" y2="760">
+<stop offset="0%" stop-color="#3B66E8" stop-opacity="0.95"></stop>
+<stop offset="45%" stop-color="#5EEAD4" stop-opacity="1"></stop>
+<stop offset="85%" stop-color="#F4729B" stop-opacity="0.95"></stop>
+</lineargradient>
+<pattern height="48" id="tactical-grid-ticks" patternunits="userSpaceOnUse" width="48">
+<path d="M 48 0 L 0 0 0 48" fill="none" stroke="#23332C" stroke-opacity="0.6" stroke-width="0.75"></path>
+<circle cx="24" cy="24" fill="#5EEAD4" fill-opacity="0.35" r="0.8"></circle>
+</pattern>
+</defs>
+<!-- Grid Foundation -->
+<rect fill="url(#tactical-grid-ticks)" height="100%" width="100%"></rect>
+<!-- High-Contrast Topographic Contour Elevation Lines -->
+<g fill="none" stroke="#A8F0C6" stroke-linecap="round" stroke-width="1.8">
+<!-- Contour Line 1 -->
+<path d="M -80 140 C 260 80, 520 230, 890 190 C 1180 150, 1340 90, 1540 120" stroke-opacity="0.55"></path>
+<!-- Contour Line 2 -->
+<path d="M -80 270 C 290 220, 560 380, 960 320 C 1220 270, 1380 210, 1540 250" stroke-opacity="0.5"></path>
+<!-- Contour Line 3 -->
+<path d="M -80 430 C 240 390, 600 520, 1020 460 C 1280 410, 1420 330, 1540 370" stroke-dasharray="8 3" stroke-opacity="0.58"></path>
+<!-- Contour Line 4 -->
+<path d="M -80 590 C 270 540, 640 680, 1080 610 C 1320 560, 1440 490, 1540 520" stroke-opacity="0.5"></path>
+<!-- Contour Line 5 -->
+<path d="M -80 750 C 310 700, 680 840, 1140 770 C 1350 710, 1460 650, 1540 680" stroke-opacity="0.52"></path>
+<!-- Contour Line 6 -->
+<path d="M -80 890 C 340 850, 720 970, 1200 910 C 1380 860, 1490 810, 1540 840" stroke-opacity="0.45"></path>
+</g>
+<!-- Contour Elevation Text Callouts Stamped on Curves -->
+<g class="font-code-sm text-code-sm" fill="#A8F0C6" opacity="0.85">
+<text letter-spacing="1.5" x="360" y="170">ELEV +34.2m</text>
+<text letter-spacing="1.5" x="890" y="300">ELEV +42.8m</text>
+<text letter-spacing="1.5" x="310" y="555">CONTOUR INTERVAL 5m</text>
+<text letter-spacing="1.5" x="1210" y="390">ELEV +58.0m</text>
+<text letter-spacing="1.5" x="760" y="790">ELEV +64.5m [SHINJUKU CREST]</text>
+</g>
+<!-- Crisp City Sector Street Grid & District Blocks in Neon Mint / Teal -->
+<g fill="none" stroke="#5EEAD4" stroke-opacity="0.42" stroke-width="1.2">
+<!-- Arterial Streets -->
+<line stroke-dasharray="12 6" x1="160" x2="160" y1="0" y2="980"></line>
+<line x1="390" x2="390" y1="0" y2="980"></line>
+<line stroke-dasharray="16 8" x1="720" x2="720" y1="0" y2="980"></line>
+<line x1="1040" x2="1040" y1="0" y2="980"></line>
+<line stroke-dasharray="10 5" x1="1290" x2="1290" y1="0" y2="980"></line>
+<line x1="0" x2="1440" y1="210" y2="210"></line>
+<line stroke-dasharray="12 6" x1="0" x2="1440" y1="460" y2="460"></line>
+<line x1="0" x2="1440" y1="690" y2="690"></line>
+<line stroke-dasharray="14 7" x1="0" x2="1440" y1="880" y2="880"></line>
+<!-- District Block Polygons -->
+<polygon fill="#131B18" fill-opacity="0.35" points="180,230 360,230 360,330 180,330" stroke="#A8F0C6" stroke-opacity="0.45" stroke-width="1.2"></polygon>
+<polygon fill="#131B18" fill-opacity="0.3" points="410,230 690,230 690,430 410,430" stroke="#5EEAD4" stroke-opacity="0.4" stroke-width="1.2"></polygon>
+<polygon fill="#131B18" fill-opacity="0.32" points="740,480 1010,480 1010,660 740,660" stroke="#A8F0C6" stroke-opacity="0.45" stroke-width="1.2"></polygon>
+<polygon fill="#131B18" fill-opacity="0.28" points="1060,230 1260,230 1260,430 1060,430" stroke="#5EEAD4" stroke-opacity="0.38" stroke-width="1.2"></polygon>
+</g>
+<!-- Street Block Labels & Coordinates -->
+<g class="font-code-sm text-code-sm" fill="#5EEAD4" opacity="0.9">
+<text letter-spacing="1" x="195" y="255">NEO-SHINJUKU SEC-09</text>
+<text letter-spacing="1" x="425" y="255">LATTICE BOULEVARD // EXPRESS ROUTE</text>
+<text letter-spacing="1" x="755" y="505">Q-ENCLAVE BUFFER 4 [ISOLATION ZONE]</text>
+<text letter-spacing="1" x="1075" y="255">KEM-RELAY ALLEY [CAT-5 PQC]</text>
+</g>
+<!-- Radar Range Rings & Azimuth Circles (Anchored over Sector) -->
+<g fill="none" stroke="#A8F0C6" stroke-opacity="0.38" transform="translate(680, 520)">
+<circle r="140" stroke-dasharray="4 4" stroke-width="1.2"></circle>
+<circle r="260" stroke-width="1.4"></circle>
+<circle r="380" stroke-dasharray="8 6" stroke-width="1.2"></circle>
+<circle r="520" stroke-width="1.4"></circle>
+<!-- Reticle Crosshairs -->
+<line stroke-opacity="0.35" stroke-width="1" x1="-560" x2="560" y1="0" y2="0"></line>
+<line stroke-opacity="0.35" stroke-width="1" x1="0" x2="0" y1="-560" y2="560"></line>
+<!-- Range Distance Labels -->
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" x="145" y="-6">1.0 km</text>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" x="265" y="-6">2.0 km</text>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" x="385" y="-6">3.0 km</text>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" x="525" y="-6">4.0 km</text>
+<!-- Cardinal Markers -->
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" font-weight="700" x="-4" y="-530">000° N [POLARIS LOCK]</text>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" font-weight="700" x="535" y="4">090° E</text>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" font-weight="700" x="-4" y="545">180° S</text>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" font-weight="700" x="-555" y="4">270° W</text>
+</g>
+<!-- Vibrant Navigation Trajectory Line (Cobalt Blue + Pastel Mint Dash) -->
+<path d="M 280 290 Q 520 380 730 490 T 1160 680" fill="none" opacity="0.95" stroke="url(#vivid-nav-glow)" stroke-dasharray="9 5" stroke-linecap="round" stroke-width="3.5"></path>
+<!-- Trajectory Data Strip -->
+<g transform="translate(480, 420)">
+<rect fill="#131B18" fill-opacity="0.9" height="24" rx="4" stroke="#3B66E8" stroke-width="1.2" width="370" x="0" y="0"></rect>
+<text class="font-code-sm text-code-sm" fill="#5EEAD4" font-weight="600" letter-spacing="1" x="12" y="16">GPS ROUTE // 2.4 km • AZIMUTH 284° • LAT 35.6762° N // LON 139.6503° E</text>
+</g>
+<!-- Waypoint 1: Enclave Specialist Node (Bright Pastel Mint) -->
+<g transform="translate(280, 290)">
+<circle fill="none" r="36" stroke="#A8F0C6" stroke-dasharray="4 4" stroke-opacity="0.4" stroke-width="1.2"></circle>
+<circle fill="none" r="20" stroke="#A8F0C6" stroke-opacity="0.8" stroke-width="1.8"></circle>
+<circle fill="#A8F0C6" r="8"></circle>
+<circle fill="#0B100E" r="3"></circle>
+<!-- Tag -->
+<g transform="translate(18, -14)">
+<rect fill="#131B18" fill-opacity="0.95" height="22" rx="3" stroke="#A8F0C6" stroke-width="1" width="220" x="0" y="0"></rect>
+<text class="font-code-sm text-code-sm" fill="#A8F0C6" font-weight="700" letter-spacing="0.5" x="8" y="15">ENCLAVE NODE [DIANA-9800] // SECTOR 09</text>
+</g>
+</g>
+<!-- Waypoint 2: Bionic Patient Telemetry Node (Bright Coral Pink) -->
+<g transform="translate(1160, 680)">
+<circle fill="none" r="42" stroke="#F4729B" stroke-dasharray="6 4" stroke-opacity="0.45" stroke-width="1.2"></circle>
+<circle fill="none" r="22" stroke="#F4729B" stroke-opacity="0.9" stroke-width="2"></circle>
+<circle fill="#F4729B" r="8"></circle>
+<circle fill="#0B100E" r="3"></circle>
+<!-- Tag -->
+<g transform="translate(18, -14)">
+<rect fill="#131B18" fill-opacity="0.95" height="22" rx="3" stroke="#F4729B" stroke-width="1" width="245" x="0" y="0"></rect>
+<text class="font-code-sm text-code-sm" fill="#F4729B" font-weight="700" letter-spacing="0.5" x="8" y="15">PATIENT BEACON [#EQ-9042] // NON-INVASIVE CORTEX</text>
+</g>
+</g>
+</svg>
+</div>
+<!-- 2. FOREGROUND CONTENT WORKSPACE (Clean, Minimalist, True Translucent Glass) -->
+<div class="flex flex-col gap-6 w-full">
+<!-- Translucent Key Management Banner -->
+<div class="w-full bg-[#131B18]/35 backdrop-blur-[3px] border border-[#A8F0C6]/35 rounded-xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+<!-- Left: Key Details -->
+<div class="flex items-center gap-4 min-w-0">
+<div class="w-11 h-11 rounded-lg bg-[#17221E]/60 border border-[#A8F0C6]/40 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
+<span class="material-symbols-outlined text-[#A8F0C6]" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
+<div class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#F4729B]"></div>
+</div>
+<div class="flex flex-col gap-1 min-w-0">
+<div class="flex items-center gap-2.5 flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">ML-KEM-1024 Public Key</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">(1,568 B • NIST PQC Cat 5)</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#131B18]/80 border border-[#A8F0C6]/50 text-[#A8F0C6] font-code-sm text-code-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-[#A8F0C6] animate-pulse"></span>
+              LATTICE KEYPAIR ACTIVE
+            </span>
+</div>
+<!-- Monospace Snippet Pill -->
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#0E1513]/70 hover:bg-[#0E1513] border border-[#23332C] hover:border-[#A8F0C6]/60 transition-all font-code-sm text-code-sm text-[#A8F0C6] group" id="copy-key-btn" onclick="navigator.clipboard.writeText('kem1q0w4e892c90fa41189c4a899bc27e0fa88c7f91'); this.innerText='COPIED!';">
+<span class="truncate max-w-[240px] sm:max-w-[340px]">kem1q0w4e892c90fa41189...88c7f91</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant group-hover:text-[#A8F0C6] transition-colors">content_copy</span>
+</button>
+<span class="font-code-sm text-code-sm text-on-surface-variant hidden md:inline">Diana Chain ID: 9800</span>
+</div>
+</div>
+</div>
+<!-- Right: Action CTA -->
+<div class="flex items-center gap-3">
+<button class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#A8F0C6] hover:bg-[#5EEAD4] text-[#0B100E] font-label-md text-label-md font-bold tracking-wide transition-all shadow-[0_0_18px_rgba(168,240,198,0.35)] active:scale-95">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
+          PUBLISH KEY ON-CHAIN (REGISTERKEMPUBLICKEY)
+        </button>
+</div>
+</div>
+<!-- Main 2-Column Translucent Workspace -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- LEFT COLUMN: ASSIGNED TELEMETRY GRANTS (5 Columns) -->
+<div class="lg:col-span-5 flex flex-col gap-4">
+<!-- Section Header with Filter Tabs -->
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#A8F0C6] text-lg">folder_shared</span>
+<h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface tracking-tight">ASSIGNED TELEMETRY GRANTS</h2>
+</div>
+<!-- Filter Tabs -->
+<div class="flex items-center gap-1 bg-[#131B18]/50 p-1 rounded-lg border border-[#23332C]">
+<button class="px-2.5 py-0.5 rounded font-label-sm text-label-sm text-[#A8F0C6] bg-[#17221E] font-semibold">Active (2)</button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface">Revoked (1)</button>
+<button class="px-2 py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface">All (3)</button>
+</div>
+</div>
+<!-- Grant Card 1: Active Bionic Telemetry (Focus Selection) -->
+<div class="w-full bg-[#131B18]/35 backdrop-blur-[3px] border-2 border-[#A8F0C6] rounded-xl p-5 flex flex-col gap-3.5 shadow-[0_0_20px_rgba(168,240,198,0.12)] transition-all">
+<!-- Card Badges & Expiry -->
+<div class="flex items-center justify-between gap-2">
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded bg-[#3B66E8]/20 border border-[#3B66E8]/50 text-[#60A5FA] font-label-sm text-label-sm font-bold uppercase tracking-wider">
+                BIONIC_TELEMETRY
+              </span>
+<span class="px-2 py-0.5 rounded bg-[#17221E]/60 border border-[#23332C] text-[#5EEAD4] font-code-sm text-code-sm">
+                SEC-09 // 2.4 KM
+              </span>
+</div>
+<div class="flex items-center gap-1.5 text-[#FACC15] font-code-sm text-code-sm font-semibold">
+<span class="material-symbols-outlined text-xs">timer</span>
+              00:43:18
+            </div>
+</div>
+<!-- Card Body -->
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">NeuroLink-X9 BCI Shard</h3>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Pass #EQ-9042</span>
+</div>
+<div class="flex items-center gap-2 mt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span>Patient: <strong class="text-on-surface font-code-sm">AnonPatient-0x94B</strong></span>
+<span>•</span>
+<span>64 Ch • 1.2 kHz Sync</span>
+</div>
+</div>
+<!-- RAM Stream Live Indicator -->
+<div class="flex items-center justify-between py-1.5 px-3 rounded-lg bg-[#0E1513]/60 border border-[#23332C]">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#A8F0C6] animate-pulse"></span>
+<span class="font-code-sm text-code-sm text-[#A8F0C6] font-semibold">ACTIVE RAM STREAM</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Ephemeral Shard Verified</span>
+</div>
+<!-- CTA Buttons -->
+<div class="flex items-center gap-2 pt-1">
+<button class="flex-1 py-2 px-3 rounded-lg bg-[#A8F0C6] hover:bg-[#5EEAD4] text-[#0B100E] font-label-md text-label-md font-bold tracking-wider uppercase transition-all shadow-[0_0_12px_rgba(168,240,198,0.25)] flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">lock_open</span>
+              UNSEAL IN MEMORY
+            </button>
+<button class="p-2 rounded-lg bg-[#17221E]/60 border border-[#23332C] hover:border-[#A8F0C6]/40 text-on-surface-variant hover:text-on-surface transition-all" title="Inspect Node Attestation">
+<span class="material-symbols-outlined text-sm">visibility</span>
+</button>
+</div>
+</div>
+<!-- Grant Card 2: Active Clinical DICOM -->
+<div class="w-full bg-[#131B18]/35 backdrop-blur-[3px] border border-[#A8F0C6]/35 rounded-xl p-5 flex flex-col gap-3.5 shadow-lg transition-all hover:border-[#A8F0C6]/60">
+<div class="flex items-center justify-between gap-2">
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded bg-[#17221E]/70 border border-[#A8F0C6]/50 text-[#A8F0C6] font-label-sm text-label-sm font-bold uppercase tracking-wider">
+                CLINICAL_DICOM
+              </span>
+<span class="px-2 py-0.5 rounded bg-[#17221E]/60 border border-[#23332C] text-on-surface-variant font-code-sm text-code-sm">
+                BUFFER 4 // 1.8 KM
+              </span>
+</div>
+<div class="flex items-center gap-1.5 text-[#FACC15] font-code-sm text-code-sm font-semibold">
+<span class="material-symbols-outlined text-xs">timer</span>
+              01:14:52
+            </div>
+</div>
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">Cranial CT &amp; Synaptic Mesh Shard Vol. 3</h3>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Pass #EQ-8819</span>
+</div>
+<div class="flex items-center gap-2 mt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span>Patient: <strong class="text-on-surface font-code-sm">AnonPatient-0x12A</strong></span>
+<span>•</span>
+<span>420MB Spatial Voxel</span>
+</div>
+</div>
+<div class="flex items-center gap-2 pt-1">
+<button class="w-full py-2 px-3 rounded-lg bg-[#17221E]/60 hover:bg-[#1B2640] border border-[#A8F0C6]/40 hover:border-[#A8F0C6] text-[#A8F0C6] font-label-md text-label-md font-semibold tracking-wider uppercase transition-all flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-sm">lock_open</span>
+              UNSEAL IN MEMORY
+            </button>
+</div>
+</div>
+<!-- Grant Card 3: Revoked / Zeroized Shard -->
+<div class="w-full bg-[#131B18]/35 backdrop-blur-[3px] border border-[#F4729B]/35 rounded-xl p-5 flex flex-col gap-3 shadow-lg opacity-80">
+<div class="flex items-center justify-between gap-2">
+<span class="px-2 py-0.5 rounded bg-[#E14D79]/20 border border-[#F4729B]/50 text-[#F4729B] font-label-sm text-label-sm font-bold uppercase tracking-wider">
+              REVOKED / ZEROIZED
+            </span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Pass #EQ-6211</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm font-medium text-on-surface-variant line-through">CardioPulse Nano-Mesh Shard</h3>
+<p class="font-body-sm text-body-sm text-[#F4729B] mt-0.5">Enclave decoupled on block #4,110,880</p>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Zero-fill RAM Overwritten</span>
+<span class="px-2.5 py-1 rounded bg-[#17221E]/60 border border-[#23332C] text-on-surface-variant font-code-sm text-code-sm cursor-not-allowed">
+              DECOUPLED
+            </span>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: IN-MEMORY DECRYPTION STREAM (7 Columns) -->
+<div class="lg:col-span-7 flex flex-col gap-4">
+<!-- Stream Window HUD Panel -->
+<div class="w-full bg-[#131B18]/35 backdrop-blur-[3px] border border-[#A8F0C6]/35 rounded-xl p-5 sm:p-6 flex flex-col gap-6 shadow-2xl relative">
+<!-- Stream Window Header -->
+<div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#23332C]/60 pb-4">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-[#A8F0C6] shadow-[0_0_8px_#A8F0C6] animate-pulse"></span>
+<h2 class="font-headline-sm text-headline-sm font-bold text-on-surface tracking-tight">
+                  IN-MEMORY DECRYPTION STREAM: NEUROLINK-X9 BCI
+                </h2>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">GRANT PASS IDENTIFIER: #EQ-9042 // REBECCA DIANA TESTNET HUD</span>
+</div>
+<!-- Isolation Pill -->
+<div class="px-3 py-1 rounded-full bg-[#17221E]/80 border border-[#A8F0C6]/50 text-[#A8F0C6] font-code-sm text-code-sm font-semibold flex items-center gap-1.5 shadow-[0_0_10px_rgba(168,240,198,0.1)]">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">security</span>
+              Enclave RAM: Active (Isolated Zero-Disk)
+            </div>
+</div>
+<!-- 4-Step Attestation Verification Chain -->
+<div class="flex flex-col gap-2">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Post-Quantum Attestation Chain</span>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+<div class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/40 text-[#A8F0C6] font-code-sm text-code-sm font-semibold">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+                1. QoreChain
+              </div>
+<div class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/40 text-[#A8F0C6] font-code-sm text-code-sm font-semibold">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+                2. ML-KEM-1024
+              </div>
+<div class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/40 text-[#A8F0C6] font-code-sm text-code-sm font-semibold">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+                3. AES-256-GCM
+              </div>
+<div class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/40 text-[#A8F0C6] font-code-sm text-code-sm font-semibold">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+                4. SHAKE-256
+              </div>
+</div>
+</div>
+<!-- 3 Translucent Telemetry Metric Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+<!-- Metric 1 -->
+<div class="p-3.5 rounded-lg bg-[#17221E]/50 border border-[#A8F0C6]/30 flex flex-col gap-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Neural Latency</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md font-bold text-[#A8F0C6] tracking-tight font-display">0.42</span>
+<span class="font-code-sm text-code-sm text-[#A8F0C6]">ms</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Sub-millisecond nominal</span>
+</div>
+<!-- Metric 2 -->
+<div class="p-3.5 rounded-lg bg-[#17221E]/50 border border-[#A8F0C6]/30 flex flex-col gap-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Impedance</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md font-bold text-[#5EEAD4] tracking-tight font-display">12.4</span>
+<span class="font-code-sm text-code-sm text-[#5EEAD4]">kΩ</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Stable lattice matrix</span>
+</div>
+<!-- Metric 3 -->
+<div class="p-3.5 rounded-lg bg-[#17221E]/50 border border-[#A8F0C6]/30 flex flex-col gap-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Coherence</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-md text-headline-md font-bold text-[#A8F0C6] tracking-tight font-display">99.8</span>
+<span class="font-code-sm text-code-sm text-[#A8F0C6]">%</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Zero quantum drift</span>
+</div>
+</div>
+<!-- Ephemeral In-Memory Payload Preview Box (Translucent Dark Box) -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-[#A8F0C6] flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs">terminal</span>
+                EPHEMERAL DECRYPTED PAYLOAD (ZERO-PERSISTENCE PREVIEW)
+              </span>
+<button class="inline-flex items-center gap-1 font-code-sm text-code-sm text-on-surface-variant hover:text-[#A8F0C6] transition-colors" onclick="navigator.clipboard.writeText(document.getElementById('payload-code').innerText); alert('Payload snippet copied.');">
+<span class="material-symbols-outlined text-xs">content_copy</span>
+                COPY SNIPPET
+              </button>
+</div>
+<!-- Formatted JSON-LD snippet -->
+<pre class="p-4 rounded-lg bg-[#0E1513]/80 border border-[#23332C] font-code-sm text-code-sm text-on-surface overflow-x-auto leading-relaxed selection:bg-[#A8F0C6] selection:text-[#0B100E]" id="payload-code"><code>{
+  <span class="text-[#F4729B]">"@context"</span>: <span class="text-[#A8F0C6]">"https://synapseq.io/ns/telemetry/v2"</span>,
+  <span class="text-[#F4729B]">"passId"</span>: <span class="text-[#5EEAD4]">"EQ-9042"</span>,
+  <span class="text-[#F4729B]">"patientPseudonym"</span>: <span class="text-[#A8F0C6]">"AnonPatient-0x94B"</span>,
+  <span class="text-[#F4729B]">"deviceClass"</span>: <span class="text-[#FACC15]">"NEURAL_BCI_MK5"</span>,
+  <span class="text-[#F4729B]">"gpsCoordinates"</span>: {
+    <span class="text-[#F4729B]">"lat"</span>: 35.6762,
+    <span class="text-[#F4729B]">"lon"</span>: 139.6503,
+    <span class="text-[#F4729B]">"sector"</span>: <span class="text-[#5EEAD4]">"NEO-SHINJUKU-09"</span>
+  },
+  <span class="text-[#F4729B]">"ephemeralDecryptionExpiry"</span>: <span class="text-[#A8F0C6]">"Block #4,892,300"</span>,
+  <span class="text-[#F4729B]">"zeroizationFlag"</span>: <span class="text-[#F4729B]">"ON_TERMINATE"</span>
+}</code></pre>
+</div>
+<!-- Bottom Action Row -->
+<div class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[#23332C]/60">
+<div class="flex items-center gap-2 text-on-surface-variant font-code-sm text-code-sm">
+<span class="material-symbols-outlined text-sm text-[#A8F0C6]">verified_user</span>
+<span>Zero-disk write guarantee strictly enforced by Diana Enclave.</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#17221E]/60 border border-[#23332C] hover:border-[#A8F0C6]/40 text-on-surface hover:text-[#A8F0C6] font-label-md text-label-md transition-all">
+<span class="material-symbols-outlined text-sm">download</span>
+                EXPORT ATTESTATION
+              </button>
+<button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#E14D79]/15 border border-[#F4729B] text-[#F4729B] hover:bg-[#F4729B] hover:text-[#0B100E] font-label-md text-label-md font-bold transition-all shadow-[0_0_16px_rgba(244,114,155,0.25)]">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">delete_forever</span>
+                FLUSH SESSION MEMORY
+              </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div></main>
+<!-- MINIMAL CLEAN FOOTER -->
+<footer class="w-full border-t border-reb-border bg-reb-bg/80 py-4 px-6 lg:px-10 mt-8 relative z-10">
+<div class="max-w-[1480px] mx-auto flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-reb-text-dim">
+<div class="flex items-center gap-4 flex-wrap">
+<span class="flex items-center gap-1.5 text-reb-text-muted"><span class="w-1.5 h-1.5 rounded-full bg-reb-mint"></span>NIST FIPS 203: ML-KEM-1024</span>
+<span class="flex items-center gap-1.5 text-reb-text-muted">
+<span class="w-1.5 h-1.5 rounded-full bg-reb-mint"></span>
+          FIPS 204: ML-DSA-87
+        </span>
+<span class="flex items-center gap-1.5 text-reb-text-muted">
+<span class="w-1.5 h-1.5 rounded-full bg-reb-periwinkle"></span>
+          SHAKE-256 Synced
+        </span>
+</div>
+<div>
+<span>Block #4,892,104 • <span class="text-reb-mint font-medium">0 ms Latency</span></span>
+</div>
+</div>
+</footer>
+</body></html>
