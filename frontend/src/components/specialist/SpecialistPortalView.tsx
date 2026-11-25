@@ -28,6 +28,19 @@ export interface UnsealResult {
   readonly envelopeByteSize: number;
   readonly ciphertextByteSize: number;
   readonly provenance: UnsealProvenance;
+  /** Storage reference released by the gateway (passes read from the chain only learn it here). */
+  readonly storageReference?: string;
+  readonly storageProvider?: MockEphemeralPass['storageProvider'];
+}
+
+/** State of the getGrantsBySpecialist scan for the connected wallet. */
+export interface ChainGrantSyncState {
+  readonly status: 'off' | 'loading' | 'ok' | 'error';
+  readonly error?: string;
+  readonly count: number;
+  /** Ids listed on-chain whose metadata read reverted (skipped). */
+  readonly skipped: number;
+  readonly syncedAt?: number;
 }
 
 export interface SpecialistPortalViewProps {
@@ -44,6 +57,21 @@ export interface SpecialistPortalViewProps {
   readonly onPublishKemKeyOnChain: () => void;
   /** Real decryption: gateway release + chain checks, or the local demo cache. Never synthetic. */
   readonly onUnsealPass: (pass: MockEphemeralPass) => Promise<UnsealResult>;
+  readonly chainSync: ChainGrantSyncState;
+  readonly onRefreshChainGrants: () => void;
+}
+
+function passSourceBadge(pass: MockEphemeralPass): { label: string; className: string } {
+  if (pass.isSample) {
+    return { label: 'EJEMPLO', className: 'border-reb-border text-reb-text-muted' };
+  }
+  if (pass.onChain) {
+    return {
+      label: pass.fromChainScan ? 'ON-CHAIN • leído de la cadena' : 'ON-CHAIN',
+      className: 'border-reb-mint/60 text-reb-mint',
+    };
+  }
+  return { label: 'DEMO LOCAL', className: 'border-reb-yellow/60 text-reb-yellow' };
 }
 
 type GrantFilterTab = 'active' | 'revoked' | 'all';
@@ -91,6 +119,8 @@ export function SpecialistPortalView(
     onRegenerateKemKeyPair,
     onPublishKemKeyOnChain,
     onUnsealPass,
+    chainSync,
+    onRefreshChainGrants,
   } = props;
 
   const [filterTab, setFilterTab] = useState<GrantFilterTab>('active');
@@ -159,8 +189,8 @@ export function SpecialistPortalView(
         setUnsealedSession({
           passId: pass.id,
           passTitle: pass.title,
-          ipfsCid: pass.ipfsCid,
-          storageProvider: pass.storageProvider,
+          ipfsCid: result.storageReference ?? pass.ipfsCid,
+          storageProvider: result.storageProvider ?? pass.storageProvider,
           decryptedJsonText: decodedText,
           verifiedShake256Hash: result.verifiedHash,
           envelopeByteSize: result.envelopeByteSize,
@@ -397,6 +427,39 @@ export function SpecialistPortalView(
             </div>
           </div>
 
+          {/* On-chain grant scan status (getGrantsBySpecialist) */}
+          <div className="flex items-center justify-between gap-2 flex-wrap px-3 py-2 rounded-lg bg-reb-surface-code/70 border border-reb-border font-mono text-[11px]">
+            <span
+              className={
+                chainSync.status === 'error'
+                  ? 'text-reb-pink'
+                  : chainSync.status === 'ok'
+                    ? 'text-reb-mint'
+                    : 'text-reb-text-muted'
+              }
+            >
+              {chainSync.status === 'off' &&
+                'Conecta la wallet (modo ON-CHAIN) para leer tus pases de la cadena.'}
+              {chainSync.status === 'loading' && 'Leyendo getGrantsBySpecialist on-chain…'}
+              {chainSync.status === 'ok' &&
+                `${chainSync.count} pase(s) on-chain para tu wallet${
+                  chainSync.skipped > 0 ? ` • ${chainSync.skipped} omitido(s) (lectura revertida)` : ''
+                }${chainSync.syncedAt ? ` • ${new Date(chainSync.syncedAt).toLocaleTimeString()}` : ''}`}
+              {chainSync.status === 'error' && `Error leyendo la cadena: ${chainSync.error ?? 'desconocido'}`}
+            </span>
+            {chainSync.status !== 'off' && (
+              <button
+                type="button"
+                onClick={onRefreshChainGrants}
+                disabled={chainSync.status === 'loading'}
+                className="flex items-center gap-1 px-2 py-0.5 rounded border border-reb-border text-reb-text-muted hover:text-reb-mint hover:border-reb-mint/60 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${chainSync.status === 'loading' ? 'animate-spin' : ''}`} />
+                Recargar
+              </button>
+            )}
+          </div>
+
           {/* Grant Cards List */}
           {filteredPasses.map((pass) => {
             const isRevokedOrExpired = pass.revoked || pass.remainingSeconds <= 0;
@@ -433,6 +496,11 @@ export function SpecialistPortalView(
 
                     <span className="px-2 py-0.5 rounded bg-reb-surface-card/70 border border-reb-border text-reb-mint-bright font-mono text-[11px]">
                       {pass.gpsSector}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded bg-reb-surface-card/70 border font-mono text-[11px] ${passSourceBadge(pass).className}`}
+                    >
+                      {passSourceBadge(pass).label}
                     </span>
                   </div>
 
@@ -664,7 +732,8 @@ export function SpecialistPortalView(
                 </div>
               </div>
 
-              {/* 3 Translucent Telemetry Metric Cards */}
+              {/* 3 Translucent Telemetry Metric Cards (only when the pass carries telemetry) */}
+              {selectedPass.metrics && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Metric 1: Neural Latency */}
                 <div className="p-3.5 rounded-lg bg-reb-surface-card/60 border border-reb-mint/30 flex flex-col gap-1">
@@ -714,6 +783,7 @@ export function SpecialistPortalView(
                   </span>
                 </div>
               </div>
+              )}
 
               {/* Ephemeral In-Memory Payload Preview Box */}
               <div className="flex flex-col gap-2">

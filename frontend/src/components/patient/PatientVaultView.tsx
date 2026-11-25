@@ -756,6 +756,7 @@ export function PatientVaultView({
 
                   {/* Footer Actions & Live Neural Telemetry Metrics */}
                   <div className="mt-3 pt-3 border-t border-reb-border/60 flex flex-wrap items-center justify-between gap-3">
+                    {pass.metrics ? (
                     <div className="flex items-center gap-4 text-[11px] font-mono text-reb-text-muted">
                       <span>
                         Latency:{' '}
@@ -776,6 +777,9 @@ export function PatientVaultView({
                         </strong>
                       </span>
                     </div>
+                    ) : (
+                      <span className="text-[11px] font-mono text-reb-text-muted">Sin telemetría</span>
+                    )}
 
                     {!isExpiredOrRevoked && (
                       <div className="flex items-center gap-2">

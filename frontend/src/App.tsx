@@ -27,10 +27,11 @@ import { PatientVaultView, type SealGrantRequest } from '@/components/patient/Pa
 import { CyberHbomView } from '@/components/hbom/CyberHbomView';
 import {
   SpecialistPortalView,
+  type ChainGrantSyncState,
   type UnsealResult,
 } from '@/components/specialist/SpecialistPortalView';
 import { getFrontendEnvConfig } from '@/config/env';
-import { useSynapseVault } from '@/hooks/useSynapseVault';
+import { useSynapseVault, type OnChainGrant } from '@/hooks/useSynapseVault';
 import {
   INITIAL_BIONIC_PARTS,
   INITIAL_EPHEMERAL_PASSES,
@@ -61,6 +62,58 @@ function randomBytes32(): `0x${string}` {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 }
 
+function shortAddress(addr: string): string {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+/** Remaining seconds of an on-chain grant; the contract's isActive is the authority. */
+function remainingFromChain(grant: OnChainGrant): number {
+  if (!grant.isActive) return 0;
+  const left = Number(grant.validUntil) - Math.floor(Date.now() / 1000);
+  return Math.max(1, left);
+}
+
+/**
+ * Builds a pass from on-chain metadata only. Anything the chain does not store (title, CID,
+ * storage provider, telemetry) is an explicit placeholder, never invented data.
+ */
+function passFromChainGrant(
+  grant: OnChainGrant,
+  parts: readonly MockBionicPart[]
+): MockEphemeralPass {
+  const linkedPart =
+    grant.linkedPartId === ZERO_BYTES32
+      ? undefined
+      : parts.find((p) => p.partId.toLowerCase() === grant.linkedPartId.toLowerCase());
+  return {
+    id: `OC-${grant.recordId.slice(2, 10).toUpperCase()}`,
+    recordIdHex: grant.recordId,
+    title: 'Pase on-chain',
+    specialistName: 'Tu wallet (especialista)',
+    specialistAddress: grant.specialist,
+    patientPseudonym: shortAddress(grant.patient),
+    domain: grant.domain === 1 ? 'BIONIC_TELEMETRY' : 'CLINICAL',
+    retention: 'ephemeral',
+    storageProvider: 'gateway-custody',
+    isSample: false,
+    onChain: true,
+    fromChainScan: true,
+    linkedPartName:
+      grant.linkedPartId === ZERO_BYTES32
+        ? 'Unlinked Clinical Shard'
+        : linkedPart
+          ? `${linkedPart.modelName} (${linkedPart.serialNumber})`
+          : `Pieza ${grant.linkedPartId.slice(0, 10)}…`,
+    linkedPartId: grant.linkedPartId,
+    contentHash: grant.contentHash,
+    ipfsCid: '(se obtiene del gateway)',
+    remainingSeconds: remainingFromChain(grant),
+    revoked: grant.revoked,
+    gpsSector: '—',
+    metrics: null,
+  };
+}
+
 export function App(): React.JSX.Element {
   const env = useMemo(() => getFrontendEnvConfig(), []);
   const vault = useSynapseVault();
@@ -86,6 +139,8 @@ export function App(): React.JSX.Element {
   const [bannerTone, setBannerTone] = useState<BannerTone>('ok');
 
   const localCacheRef = useRef<Map<string, CachedSealedPayload>>(new Map());
+  const [chainSync, setChainSync] = useState<ChainGrantSyncState>({ status: 'off', count: 0, skipped: 0 });
+  const chainSyncSeqRef = useRef(0);
 
   const specialistKemPublicKeyHex = useMemo(
     () => bytesToHex(specialistKemKeyPair.publicKey),
@@ -140,6 +195,54 @@ export function App(): React.JSX.Element {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vault.walletAddress, vault.isChainConfigured, specialistKemPublicKeyHex]);
+
+  // ---------------------------------------------------------------------------
+  // Specialist inbox: passes granted to the connected wallet, read from the chain
+  // ---------------------------------------------------------------------------
+  const { getGrantsForSpecialist } = vault;
+  const walletAddress = vault.walletAddress;
+  const bionicPartsRef = useRef(bionicParts);
+  bionicPartsRef.current = bionicParts;
+
+  const refreshSpecialistGrants = useCallback(async () => {
+    const seq = ++chainSyncSeqRef.current;
+    if (!chainMode || !walletAddress) {
+      // Passes discovered for another (or no) wallet are not this viewer's: drop them
+      setPasses((prev) => prev.filter((p) => !p.fromChainScan));
+      setChainSync({ status: 'off', count: 0, skipped: 0 });
+      return;
+    }
+    const wallet = walletAddress.toLowerCase();
+    setChainSync((prev) => ({ ...prev, status: 'loading', error: undefined }));
+    try {
+      const { grants, failedIds } = await getGrantsForSpecialist(walletAddress);
+      if (seq !== chainSyncSeqRef.current) return; // a newer scan (e.g. wallet switch) won
+      const byId = new Map(grants.map((g) => [g.recordId.toLowerCase(), g]));
+      setPasses((prev) => {
+        const kept = prev
+          .filter((p) => !p.fromChainScan || p.specialistAddress.toLowerCase() === wallet)
+          .map((p) => {
+            const g = byId.get(p.recordIdHex.toLowerCase());
+            // Already known (e.g. created in this tab): keep its richer fields, take state from chain
+            return g && p.onChain ? { ...p, revoked: g.revoked, remainingSeconds: remainingFromChain(g) } : p;
+          });
+        const known = new Set(kept.map((p) => p.recordIdHex.toLowerCase()));
+        const discovered = grants
+          .filter((g) => !known.has(g.recordId.toLowerCase()))
+          .sort((a, b) => Number(b.createdAt - a.createdAt))
+          .map((g) => passFromChainGrant(g, bionicPartsRef.current));
+        return [...discovered, ...kept];
+      });
+      setChainSync({ status: 'ok', count: grants.length, skipped: failedIds.length, syncedAt: Date.now() });
+    } catch (err) {
+      if (seq !== chainSyncSeqRef.current) return;
+      setChainSync((prev) => ({ ...prev, status: 'error', error: errorText(err) }));
+    }
+  }, [chainMode, getGrantsForSpecialist, walletAddress]);
+
+  useEffect(() => {
+    void refreshSpecialistGrants();
+  }, [refreshSpecialistGrants]);
 
   const handleConnectWallet = useCallback(async () => {
     try {
@@ -368,7 +471,10 @@ export function App(): React.JSX.Element {
 
   const handleEmergencyKillSwitch = useCallback(async () => {
     const revokeAllLocal = () => {
-      setPasses((prev) => prev.map((p) => ({ ...p, revoked: true, remainingSeconds: 0 })));
+      // The kill-switch only revokes the patient's own grants, not passes granted to this wallet
+      setPasses((prev) =>
+        prev.map((p) => (p.fromChainScan ? p : { ...p, revoked: true, remainingSeconds: 0 }))
+      );
       localCacheRef.current.clear();
     };
     if (!chainMode) {
@@ -379,11 +485,12 @@ export function App(): React.JSX.Element {
     try {
       const tx = await vault.emergencyRevokeAllOnChain();
       revokeAllLocal();
+      void refreshSpecialistGrants();
       notify(`EMERGENCY KILL-SWITCH confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`);
     } catch (err) {
       notify(`El Kill-Switch NO se ejecutó: ${errorText(err)}`, 'error');
     }
-  }, [chainMode, notify, vault]);
+  }, [chainMode, notify, refreshSpecialistGrants, vault]);
 
   // ---------------------------------------------------------------------------
   // Specialist: real decryption (gateway + chain), or the local demo cache
@@ -403,11 +510,23 @@ export function App(): React.JSX.Element {
         }
         const keyPair = keySource === 'wallet' ? specialistKemKeyPair : await deriveWalletKemKey();
         const gatewayUrl = env.gatewayUrl as string;
-        const released = await releaseProtectedEnvelope(gatewayUrl, {
-          recordId: pass.recordIdHex,
-          specialist: vault.walletAddress,
-          ...(await gatewayAuth('RELEASE_ENVELOPE', pass.recordIdHex)),
-        });
+        let released: Awaited<ReturnType<typeof releaseProtectedEnvelope>>;
+        try {
+          released = await releaseProtectedEnvelope(gatewayUrl, {
+            recordId: pass.recordIdHex,
+            specialist: vault.walletAddress,
+            ...(await gatewayAuth('RELEASE_ENVELOPE', pass.recordIdHex)),
+          });
+        } finally {
+          // The gateway re-checked isActive on-chain: re-read our grants so revocations/expiry show up
+          void refreshSpecialistGrants();
+        }
+        const storageProvider = released.blobToken ? 'gateway-local' : 'pinata-ipfs';
+        setPasses((prev) =>
+          prev.map((p) =>
+            p.recordIdHex === pass.recordIdHex ? { ...p, ipfsCid: released.ipfsCID, storageProvider } : p
+          )
+        );
         // Do not trust the gateway blindly: check its envelope against the on-chain commitment
         const meta = await vault.getGrantMetadata(pass.recordIdHex);
         if (computeEnvelopeHash(released.encryptedKeyEnvelope) !== meta.envelopeHash) {
@@ -428,6 +547,8 @@ export function App(): React.JSX.Element {
           envelopeByteSize: (released.encryptedKeyEnvelope.length - 2) / 2,
           ciphertextByteSize: blob.byteLength,
           provenance: 'gateway-chain',
+          storageReference: released.ipfsCID,
+          storageProvider,
         };
       }
 
@@ -451,7 +572,7 @@ export function App(): React.JSX.Element {
         throw new Error('La clave del especialista cambió desde que se selló este pase (demo local): no se puede descifrar.');
       }
     },
-    [deriveWalletKemKey, env.gatewayUrl, env.ipfsGatewayUrl, gatewayAuth, keySource, liveMode, specialistKemKeyPair, vault]
+    [deriveWalletKemKey, env.gatewayUrl, env.ipfsGatewayUrl, gatewayAuth, keySource, liveMode, refreshSpecialistGrants, specialistKemKeyPair, vault]
   );
 
   // ---------------------------------------------------------------------------
@@ -597,9 +718,12 @@ export function App(): React.JSX.Element {
     }
   }, [chainMode, deriveWalletKemKey, keySource, notify, specialistKemKeyPair, vault]);
 
+  // Passes granted TO this wallet (specialist inbox) are not the patient's to manage
+  const patientPasses = useMemo(() => passes.filter((p) => !p.fromChainScan), [passes]);
+
   const activePassCount = useMemo(
-    () => passes.filter((p) => !p.revoked && p.remainingSeconds > 0).length,
-    [passes]
+    () => patientPasses.filter((p) => !p.revoked && p.remainingSeconds > 0).length,
+    [patientPasses]
   );
 
   const displayAddress = vault.walletAddress
@@ -760,7 +884,7 @@ export function App(): React.JSX.Element {
       <main className="w-full max-w-[1480px] mx-auto px-6 lg:px-10 py-6 flex-1 relative z-10">
         {activeTab === 'patient-vault' && (
           <PatientVaultView
-            passes={passes}
+            passes={patientPasses}
             bionicParts={bionicParts}
             specialistKemPublicKeyHex={specialistKemPublicKeyHex}
             liveMode={liveMode}
@@ -794,6 +918,8 @@ export function App(): React.JSX.Element {
             onRegenerateKemKeyPair={() => void handleRegenerateKemKeyPair()}
             onPublishKemKeyOnChain={() => void handlePublishKemKeyOnChain()}
             onUnsealPass={handleUnsealPass}
+            chainSync={chainSync}
+            onRefreshChainGrants={() => void refreshSpecialistGrants()}
           />
         )}
       </main>

@@ -36,11 +36,25 @@ export interface OnChainTxReceiptInfo {
 export interface OnChainGrantMetadata {
   readonly contentHash: `0x${string}`;
   readonly envelopeHash: `0x${string}`;
+  readonly linkedPartId: `0x${string}`;
   readonly patient: Address;
   readonly specialist: Address;
+  /** 0 = CLINICAL, 1 = TELEMETRY */
+  readonly domain: number;
+  readonly createdAt: bigint;
   readonly validUntil: bigint;
   readonly revoked: boolean;
   readonly isActive: boolean;
+}
+
+export interface OnChainGrant extends OnChainGrantMetadata {
+  readonly recordId: `0x${string}`;
+}
+
+export interface SpecialistGrantsResult {
+  readonly grants: readonly OnChainGrant[];
+  /** recordIds listed by getGrantsBySpecialist whose metadata read reverted/failed. */
+  readonly failedIds: readonly `0x${string}`[];
 }
 
 export interface TxResult<T = undefined> {
@@ -227,6 +241,43 @@ export function useSynapseVault() {
     [contractAddress, publicClient]
   );
 
+  /**
+   * Reads every grant addressed to `specialist` straight from the contract:
+   * getGrantsBySpecialist(specialist) then getGrantMetadata(id) for each id in parallel (plain
+   * eth_calls: Diana/Anvil do not guarantee a Multicall3 deployment). Ids whose metadata read reverts are skipped
+   * and reported in `failedIds`.
+   */
+  const getGrantsForSpecialist = useCallback(
+    async (specialist: Address): Promise<SpecialistGrantsResult> => {
+      if (!contractAddress || !publicClient) throw new Error('Cadena no configurada.');
+      const ids = await publicClient.readContract({
+        address: contractAddress,
+        abi: SYNAPSE_VAULT_ABI,
+        functionName: 'getGrantsBySpecialist',
+        args: [specialist],
+      });
+      const uniqueIds = [...new Set(ids.map((id) => id.toLowerCase() as `0x${string}`))];
+      const settled = await Promise.allSettled(
+        uniqueIds.map((recordId) =>
+          publicClient.readContract({
+            address: contractAddress,
+            abi: SYNAPSE_VAULT_ABI,
+            functionName: 'getGrantMetadata',
+            args: [recordId],
+          })
+        )
+      );
+      const grants: OnChainGrant[] = [];
+      const failedIds: `0x${string}`[] = [];
+      settled.forEach((r, i) => {
+        if (r.status === 'fulfilled') grants.push({ ...r.value, recordId: uniqueIds[i] });
+        else failedIds.push(uniqueIds[i]);
+      });
+      return { grants, failedIds };
+    },
+    [contractAddress, publicClient]
+  );
+
   return {
     isConnected: Boolean(walletAddress),
     isChainConfigured: Boolean(contractAddress && publicClient),
@@ -239,6 +290,7 @@ export function useSynapseVault() {
     signMessage,
     queryKemPublicKeyOnChain,
     getGrantMetadata,
+    getGrantsForSpecialist,
     publishKemPublicKeyOnChain: (pubKeyHex: `0x${string}`) =>
       write('registerKemPublicKey', [pubKeyHex], 'registerKemPublicKey (ML-KEM-1024)'),
     grantTimedAccessOnChain: (p: {
