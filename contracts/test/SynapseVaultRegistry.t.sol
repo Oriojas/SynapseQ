@@ -21,7 +21,8 @@ contract SynapseVaultRegistryTest is Test {
     bytes32 public constant FW_V2 = keccak256("firmware-v2.0.0-mldsa87");
     bytes32 public constant CALIBRATION_HASH = keccak256("calibration-profile-v1");
 
-    string public constant SAMPLE_CID = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    string public constant SAMPLE_CID =
+        "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
     bytes public constant MLKEM_ENVELOPE = hex"a1b2c3d4e5f60102030405060708090a";
     bytes public constant MLDSA_SIG = hex"deadbeefcafebabe1122334455667788";
 
@@ -306,13 +307,29 @@ contract SynapseVaultRegistryTest is Test {
         );
     }
 
+    function test_RejectsDurationExceedingMax() public {
+        uint256 tooLong = vault.MAX_ACCESS_DURATION() + 1;
+        vm.prank(patient);
+        vm.expectRevert(SynapseVaultRegistry.InvalidDuration.selector);
+        vault.grantTimedAccess(
+            RECORD_MRI,
+            SAMPLE_CID,
+            CONTENT_HASH,
+            bytes32(0),
+            doctor,
+            MLKEM_ENVELOPE,
+            SynapseVaultRegistry.RecordDomain.CLINICAL,
+            tooLong
+        );
+    }
+
     // =========================================================================
     // Fuzz Tests
     // =========================================================================
 
     function testFuzz_TimedAccessExpiry(uint32 duration, uint32 elapsed) public {
-        vm.assume(duration > 0);
-        bytes32 recordId = keccak256(abi.encodePacked("FUZZ", duration, elapsed));
+        uint256 boundedDuration = bound(duration, 1, vault.MAX_ACCESS_DURATION());
+        bytes32 recordId = keccak256(abi.encodePacked("FUZZ", boundedDuration, elapsed));
 
         vm.prank(patient);
         vault.grantTimedAccess(
@@ -323,12 +340,12 @@ contract SynapseVaultRegistryTest is Test {
             doctor,
             MLKEM_ENVELOPE,
             SynapseVaultRegistry.RecordDomain.CLINICAL,
-            duration
+            boundedDuration
         );
 
         vm.warp(block.timestamp + elapsed);
 
-        if (elapsed <= duration) {
+        if (elapsed <= boundedDuration) {
             assertTrue(vault.isAccessValid(recordId));
         } else {
             assertFalse(vault.isAccessValid(recordId));

@@ -54,16 +54,16 @@ contract SynapseVaultRegistry {
     }
 
     struct AccessGrant {
-        string ipfsCID;              // IPFS CID of AES-256-GCM encrypted payload
-        bytes32 contentHash;         // SHAKE-256 integrity hash (also compatible with x/rdk DA commitment)
-        bytes32 linkedPartId;        // bytes32(0) for pure clinical records, or HBOM partId for bionic passes
-        address patient;             // Data owner / cyber-human bearer
-        address specialist;          // Authorized doctor or bio-engineer
-        bytes encryptedKeyEnvelope;  // ML-KEM-1024 (QoreSeal) encapsulated symmetric key
-        RecordDomain domain;         // CLINICAL or BIONIC_TELEMETRY
-        uint64 createdAt;            // Creation timestamp
-        uint64 validUntil;           // Expiration timestamp
-        bool revoked;                // Manual or Kill-Switch revocation flag
+        string ipfsCID; // IPFS CID of AES-256-GCM encrypted payload
+        bytes32 contentHash; // SHAKE-256 integrity hash (also compatible with x/rdk DA commitment)
+        bytes32 linkedPartId; // bytes32(0) for pure clinical records, or HBOM partId for bionic passes
+        address patient; // Data owner / cyber-human bearer
+        address specialist; // Authorized doctor or bio-engineer
+        bytes encryptedKeyEnvelope; // ML-KEM-1024 (QoreSeal) encapsulated symmetric key
+        RecordDomain domain; // CLINICAL or BIONIC_TELEMETRY
+        uint64 createdAt; // Creation timestamp
+        uint64 validUntil; // Expiration timestamp
+        bool revoked; // Manual or Kill-Switch revocation flag
     }
 
     struct GrantMetadata {
@@ -78,29 +78,36 @@ contract SynapseVaultRegistry {
     }
 
     struct BionicPart {
-        bytes32 partId;              // Unique Cyber-Part ID
-        address bearer;              // Cyber-human owner wallet
-        address manufacturer;        // OEM / implant clinic wallet
-        AnatomicalZone zone;         // Anatomical implant zone
-        PartStatus status;           // Lifecycle status
-        string modelName;            // e.g. "NeuroLink-X9 BCI"
-        string serialNumber;         // Factory serial number
-        bytes32 firmwareHash;        // Active firmware SHAKE-256 hash
-        bytes32 calibrationHash;     // Calibration parameters hash
-        bytes pqcSignature;          // ML-DSA-87 attestation signature
-        uint64 implantedAt;          // Registration timestamp
-        uint64 lastUpdatedAt;        // Last firmware/status update timestamp
-        uint32 firmwareVersion;      // Monotonic firmware counter
+        bytes32 partId; // Unique Cyber-Part ID
+        address bearer; // Cyber-human owner wallet
+        address manufacturer; // OEM / implant clinic wallet
+        AnatomicalZone zone; // Anatomical implant zone
+        PartStatus status; // Lifecycle status
+        string modelName; // e.g. "NeuroLink-X9 BCI"
+        string serialNumber; // Factory serial number
+        bytes32 firmwareHash; // Active firmware SHAKE-256 hash
+        bytes32 calibrationHash; // Calibration parameters hash
+        bytes pqcSignature; // ML-DSA-87 attestation signature
+        uint64 implantedAt; // Registration timestamp
+        uint64 lastUpdatedAt; // Last firmware/status update timestamp
+        uint32 firmwareVersion; // Monotonic firmware counter
     }
 
     struct FirmwareRecord {
         uint32 version;
         bytes32 firmwareHash;
         bytes32 calibrationHash;
-        bytes pqcSignature;          // ML-DSA-87 signature of the firmware patch
+        bytes pqcSignature; // ML-DSA-87 signature of the firmware patch
         address updatedBy;
         uint64 timestamp;
     }
+
+    // =========================================================================
+    // Constants
+    // =========================================================================
+
+    /// @notice Maximum validity window for a single ephemeral access pass (prevents unbounded grants & uint64 truncation).
+    uint256 public constant MAX_ACCESS_DURATION = 365 days;
 
     // =========================================================================
     // Storage
@@ -130,22 +137,12 @@ contract SynapseVaultRegistry {
         bytes32 contentHash
     );
 
-    event AccessExtended(
-        bytes32 indexed recordId,
-        address indexed patient,
-        uint64 newValidUntil
-    );
+    event AccessExtended(bytes32 indexed recordId, address indexed patient, uint64 newValidUntil);
 
-    event AccessRevoked(
-        bytes32 indexed recordId,
-        address indexed patient,
-        uint64 revokedAt
-    );
+    event AccessRevoked(bytes32 indexed recordId, address indexed patient, uint64 revokedAt);
 
     event EmergencyKillSwitchActivated(
-        address indexed patient,
-        uint256 revokedCount,
-        uint64 timestamp
+        address indexed patient, uint256 revokedCount, uint64 timestamp
     );
 
     event BionicPartRegistered(
@@ -166,10 +163,7 @@ contract SynapseVaultRegistry {
     );
 
     event PartStatusChanged(
-        bytes32 indexed partId,
-        PartStatus oldStatus,
-        PartStatus newStatus,
-        uint64 timestamp
+        bytes32 indexed partId, PartStatus oldStatus, PartStatus newStatus, uint64 timestamp
     );
 
     // =========================================================================
@@ -177,13 +171,13 @@ contract SynapseVaultRegistry {
     // =========================================================================
 
     modifier onlyPatient(bytes32 recordId) {
-        if (_grants[recordId].createdAt == 0) revert RecordNotFound();
+        if (_grants[recordId].patient == address(0)) revert RecordNotFound();
         if (_grants[recordId].patient != msg.sender) revert Unauthorized();
         _;
     }
 
     modifier onlyPartBearer(bytes32 partId) {
-        if (_bionicParts[partId].implantedAt == 0) revert PartNotFound();
+        if (_bionicParts[partId].bearer == address(0)) revert PartNotFound();
         if (_bionicParts[partId].bearer != msg.sender) revert Unauthorized();
         _;
     }
@@ -214,19 +208,28 @@ contract SynapseVaultRegistry {
         uint256 durationInSeconds
     ) external {
         if (specialist == address(0)) revert ZeroAddress();
-        if (durationInSeconds == 0) revert InvalidDuration();
+        if (durationInSeconds == 0 || durationInSeconds > MAX_ACCESS_DURATION) {
+            revert InvalidDuration();
+        }
         if (bytes(ipfsCID).length == 0 && contentHash == bytes32(0)) revert EmptyCID();
-        if (_grants[recordId].createdAt != 0) revert RecordAlreadyExists();
+        if (_grants[recordId].patient != address(0)) revert RecordAlreadyExists();
 
         // If linked to a bionic part, ensure the part exists and belongs to msg.sender
         if (linkedPartId != bytes32(0)) {
             BionicPart storage part = _bionicParts[linkedPartId];
-            if (part.implantedAt == 0) revert PartNotFound();
+            if (part.bearer == address(0)) revert PartNotFound();
             if (part.bearer != msg.sender) revert Unauthorized();
         }
 
+        uint256 expiry256 = block.timestamp + durationInSeconds;
+        if (expiry256 > type(uint64).max) revert InvalidDuration();
+
+        // casting to 'uint64' is safe because block.timestamp fits in uint64 for ~584 billion years
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
-        uint64 expiry = uint64(block.timestamp + durationInSeconds);
+        // casting to 'uint64' is safe because expiry256 was explicitly bounds-checked against type(uint64).max
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 expiry = uint64(expiry256);
 
         _grants[recordId] = AccessGrant({
             ipfsCID: ipfsCID,
@@ -245,13 +248,7 @@ contract SynapseVaultRegistry {
         _patientGrants[msg.sender].push(recordId);
 
         emit AccessGranted(
-            recordId,
-            msg.sender,
-            specialist,
-            linkedPartId,
-            domain,
-            expiry,
-            contentHash
+            recordId, msg.sender, specialist, linkedPartId, domain, expiry, contentHash
         );
     }
 
@@ -259,14 +256,18 @@ contract SynapseVaultRegistry {
      * @notice Extends an active, non-revoked ephemeral pass.
      */
     function extendAccess(bytes32 recordId, uint256 extraSeconds) external onlyPatient(recordId) {
-        if (extraSeconds == 0) revert InvalidDuration();
+        if (extraSeconds == 0 || extraSeconds > MAX_ACCESS_DURATION) revert InvalidDuration();
         AccessGrant storage grant = _grants[recordId];
         if (grant.revoked) revert AccessAlreadyRevoked();
 
-        uint64 baseTime = block.timestamp > grant.validUntil
-            ? uint64(block.timestamp)
-            : grant.validUntil;
-        uint64 newExpiry = uint64(uint256(baseTime) + extraSeconds);
+        uint256 baseTime =
+            block.timestamp > grant.validUntil ? block.timestamp : uint256(grant.validUntil);
+        uint256 newExpiry256 = baseTime + extraSeconds;
+        if (newExpiry256 > type(uint64).max) revert InvalidDuration();
+
+        // casting to 'uint64' is safe because newExpiry256 was explicitly bounds-checked against type(uint64).max
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint64 newExpiry = uint64(newExpiry256);
         grant.validUntil = newExpiry;
 
         emit AccessExtended(recordId, msg.sender, newExpiry);
@@ -319,7 +320,7 @@ contract SynapseVaultRegistry {
         )
     {
         AccessGrant storage grant = _grants[recordId];
-        if (grant.createdAt == 0) revert RecordNotFound();
+        if (grant.patient == address(0)) revert RecordNotFound();
         if (grant.specialist != msg.sender) revert Unauthorized();
         if (grant.revoked) revert AccessAlreadyRevoked();
         if (block.timestamp > grant.validUntil) revert AccessExpired();
@@ -339,7 +340,8 @@ contract SynapseVaultRegistry {
      */
     function isAccessValid(bytes32 recordId) external view returns (bool) {
         AccessGrant storage grant = _grants[recordId];
-        return (grant.createdAt != 0 && !grant.revoked && block.timestamp <= grant.validUntil);
+        return
+            (grant.patient != address(0) && !grant.revoked && block.timestamp <= grant.validUntil);
     }
 
     /**
@@ -347,7 +349,7 @@ contract SynapseVaultRegistry {
      */
     function getGrantMetadata(bytes32 recordId) external view returns (GrantMetadata memory) {
         AccessGrant storage grant = _grants[recordId];
-        if (grant.createdAt == 0) revert RecordNotFound();
+        if (grant.patient == address(0)) revert RecordNotFound();
 
         return GrantMetadata({
             linkedPartId: grant.linkedPartId,
@@ -396,7 +398,7 @@ contract SynapseVaultRegistry {
     ) external {
         if (manufacturer == address(0)) revert ZeroAddress();
         if (firmwareHash == bytes32(0)) revert InvalidHash();
-        if (_bionicParts[partId].implantedAt != 0) revert PartAlreadyRegistered();
+        if (_bionicParts[partId].bearer != address(0)) revert PartAlreadyRegistered();
 
         uint64 nowTs = uint64(block.timestamp);
 
@@ -429,14 +431,7 @@ contract SynapseVaultRegistry {
             })
         );
 
-        emit BionicPartRegistered(
-            partId,
-            msg.sender,
-            manufacturer,
-            zone,
-            modelName,
-            firmwareHash
-        );
+        emit BionicPartRegistered(partId, msg.sender, manufacturer, zone, modelName, firmwareHash);
     }
 
     /**
@@ -450,7 +445,7 @@ contract SynapseVaultRegistry {
         bytes calldata pqcSignature
     ) external {
         BionicPart storage part = _bionicParts[partId];
-        if (part.implantedAt == 0) revert PartNotFound();
+        if (part.bearer == address(0)) revert PartNotFound();
         if (msg.sender != part.bearer && msg.sender != part.manufacturer) revert Unauthorized();
         if (part.status == PartStatus.DECOMMISSIONED) revert PartDecommissioned();
         if (newFirmwareHash == bytes32(0)) revert InvalidHash();
@@ -496,7 +491,7 @@ contract SynapseVaultRegistry {
     }
 
     function getBionicPart(bytes32 partId) external view returns (BionicPart memory) {
-        if (_bionicParts[partId].implantedAt == 0) revert PartNotFound();
+        if (_bionicParts[partId].bearer == address(0)) revert PartNotFound();
         return _bionicParts[partId];
     }
 
@@ -505,7 +500,7 @@ contract SynapseVaultRegistry {
     }
 
     function getFirmwareHistory(bytes32 partId) external view returns (FirmwareRecord[] memory) {
-        if (_bionicParts[partId].implantedAt == 0) revert PartNotFound();
+        if (_bionicParts[partId].bearer == address(0)) revert PartNotFound();
         return _firmwareHistory[partId];
     }
 }
