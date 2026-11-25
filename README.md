@@ -42,7 +42,7 @@ SynapseQ combina cifrado post-cuántico en cliente (100% compatible con navegado
 |       +---> Cifrado simétrico local (Web Crypto AES-256-GCM) + Hash de integridad (SHAKE-256):              |
 |       |     • Datos Clínicos: Resonancias (DICOM), laboratorios, genómica.                                  |
 |       |     • Telemetría Ciber-Humana: Logs de implantes BCI, calibración, diagnósticos biónicos.           |
-|       |     Blob cifrado (.enc) enviado a IPFS (o almacenamiento local en desarrollo) ---> Obtiene CID      |
+|       |     Blob cifrado (.enc) se sube vía Key-Release Gateway (Pinata server-side) ---> Obtiene CID       |
 |       |                                                                                                     |
 |       +---> Encapsulamiento Post-Cuántico (NIST FIPS 203 ML-KEM-1024):                                      |
 |       |     Encapsula la clave AES-256 usando la clave pública ML-KEM-1024 del Médico o Bio-Ingeniero.      |
@@ -52,17 +52,24 @@ SynapseQ combina cifrado post-cuántico en cliente (100% compatible con navegado
 |       |                                                                                                     |
 |  [ 2. SMART CONTRACT: SynapseVaultRegistry.sol (Foundry / QoreChain Diana Chain ID 9800) ]                  |
 |       |                                                                                                     |
-|       +---> Storage privado (_grants): nadie puede leer CID ni sobres saltándose las validaciones.          |
+|       +---> Solo compromisos on-chain: contentHash (SHAKE-256 del CIFRADO) y envelopeHash. El sobre y   |
+|       |     el CID NUNCA van al contrato (storage y calldata EVM son públicos aunque digan `private`).     |
 |       +---> Módulo Clínico / Efímero: grantTimedAccess, extendAccess, revokeAccess, emergencyRevokeAll.     |
-|       +---> Módulo HBOM: registerBionicPart, logFirmwareUpdate, updatePartStatus, getFirmwareHistory.       |
-|       +---> Valida estrictamente specialist == msg.sender, !revoked y block.timestamp <= validUntil.        |
+|       |     recordId = keccak256(patient, salt); Kill-Switch O(1) por época.                               |
+|       +---> Módulo HBOM: el fabricante registra (partId = keccak256(fabricante, serial)); solo él publica  |
+|       |     firmware; DECOMMISSIONED es terminal; la firma ML-DSA-87 completa va en un evento.           |
 |       |                                                                                                     |
-|  [ 3. PORTAL ESPECIALISTA (Médico / Bio-Ingeniero) ]                                                        |
+|  [ 3. KEY-RELEASE GATEWAY (gateway/) ]                                                                      |
 |       |                                                                                                     |
-|       +---> Invoca getRecordForSpecialist(recordId) en QoreChain Diana Testnet.                             |
-|       |     • Vigente: recibe (ipfsCID, contentHash, linkedPartId, encryptedKeyEnvelope, validUntil).       |
-|       |     • Expirado o Revocado: RECHAZADO on-chain (AccessExpired / AccessAlreadyRevoked).               |
-|       +---> Desencapsula ML-KEM-1024 localmente, descifra AES-256-GCM en memoria y verifica SHAKE-256.      |
+|       +---> Custodia el sobre ML-KEM-1024 y el CID. Lo entrega solo si la wallet firma un reto            |
+|       |     (nonce de un uso + chain ID + recordId) y getGrantMetadata(recordId).isActive es true.         |
+|       +---> Verifica que el sobre coincida con envelopeHash on-chain; cuotas, CORS y tokens de descarga.   |
+|       |                                                                                                     |
+|  [ 4. PORTAL ESPECIALISTA (Médico / Bio-Ingeniero) ]                                                        |
+|       |                                                                                                     |
+|       +---> Pide el sobre al gateway, comprueba envelopeHash y contentHash contra la cadena,              |
+|       |     desencapsula ML-KEM-1024 localmente y descifra AES-256-GCM en memoria.                        |
+|       +---> Límite honesto: revocar impide NUEVAS entregas; no recupera lo que ya se descifró.          |
 |                                                                                                             |
 +-------------------------------------------------------------------------------------------------------------+
 ```
@@ -135,24 +142,24 @@ SynapseQ/
 
 ### Integración Web3 & Frontend
 * **Cliente EVM:** `viem`, `wagmi`, `@qorechain/react`, QoreX Wallet.
-* **Almacenamiento Cifrado:** IPFS / Pinata (con fallback local `.local-ipfs/` para desarrollo y demos offline).
+* **Almacenamiento Cifrado:** IPFS / Pinata a través del Key-Release Gateway (el `PINATA_JWT` solo vive en el servidor; en desarrollo sin JWT el gateway guarda el blob en `gateway/data/`).
 
 ---
 
 ## 📜 Especificación de `SynapseVaultRegistry.sol`
 
 ### Módulo 1: Acceso Efímero Post-Cuántico
-* `grantTimedAccess(recordId, ipfsCID, contentHash, linkedPartId, specialist, encryptedKeyEnvelope, domain, durationInSeconds)`: Emite un pase temporal clínico o ligado a una pieza biónica.
-* `extendAccess(recordId, extraSeconds)`: Extiende la vigencia de un pase no revocado.
+* `grantTimedAccess(salt, contentHash, envelopeHash, linkedPartId, specialist, domain, durationInSeconds) → recordId`: Emite un pase temporal. Solo guarda compromisos; `recordId = computeRecordId(msg.sender, salt)`.
+* `extendAccess(recordId, extraSeconds)`: Extiende un pase **activo** (no revive pases vencidos, revocados o apagados por Kill-Switch).
 * `revokeAccess(recordId)`: Revoca instantáneamente un pase específico.
-* `emergencyRevokeAll()`: **Kill-Switch** que extingue todos los pases activos del paciente/ciber-humano en una sola transacción.
-* `getRecordForSpecialist(recordId)`: Retorna `(ipfsCID, contentHash, linkedPartId, encryptedKeyEnvelope, domain, validUntil)` únicamente si `specialist == msg.sender`, `!revoked` y `block.timestamp <= validUntil`.
-* `getGrantMetadata(recordId)`: Expone metadatos no sensibles para dashboards sin filtrar `ipfsCID` ni el sobre `ML-KEM-1024`.
+* `emergencyRevokeAll()`: **Kill-Switch** O(1): sube la época del paciente e invalida todos sus pases anteriores.
+* `isAccessValid(recordId)` / `getGrantMetadata(recordId)`: Política consultada por el Key-Release Gateway (solo hashes, nunca el sobre ni el CID).
 
 ### Módulo 2: Registro HBOM & Firmware Biónico
-* `registerBionicPart(partId, manufacturer, zone, modelName, serialNumber, firmwareHash, calibrationHash, pqcSignature)`: Registra una pieza ciber-humana con atestación `ML-DSA-87`.
-* `logFirmwareUpdate(partId, newFirmwareHash, newCalibrationHash, pqcSignature)`: Registra parches de firmware inmutables (solo portador o fabricante OEM).
-* `updatePartStatus(partId, newStatus)`: Cambia el estado operativo (`ACTIVE`, `MAINTENANCE`, `DECOMMISSIONED`).
+* `registerBionicPart(bearer, zone, modelName, serialNumber, firmwareHash, calibrationHash, pqcSignature) → partId`: Lo llama el fabricante (`msg.sender`); `partId = computePartId(fabricante, serial)`. Guarda `keccak256` de la firma `ML-DSA-87` y emite la firma completa en `FirmwareAttestation`.
+* `logFirmwareUpdate(partId, newFirmwareHash, newCalibrationHash, pqcSignature)`: Parches de firmware (solo el fabricante).
+* `updatePartStatus(partId, newStatus)`: Cambia el estado operativo; `DECOMMISSIONED` es terminal.
+* Nota: la EVM no verifica la firma `ML-DSA-87` (no hay precompilado en el contrato); se verifica fuera de la cadena con la clave pública del fabricante.
 * `getBionicPart(partId)` / `getPartsByBearer(bearer)` / `getFirmwareHistory(partId)`: Consultas completas del inventario corporal y su auditoría histórica.
 
 ### Módulo 3: Directorio On-Chain de Claves Públicas `ML-KEM-1024` (QoreChain PKI)

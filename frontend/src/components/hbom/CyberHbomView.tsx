@@ -37,18 +37,23 @@ export interface CyberHbomViewProps {
     readonly publicKey: Uint8Array;
     readonly secretKey: Uint8Array;
   };
+  /** Resolves with the final partId (the on-chain one in live mode). Rejects on failure. */
   readonly onRegisterPart: (
     newPart: MockBionicPart,
-    genesisHistory: MockFirmwareHistoryEntry
-  ) => void;
+    genesisHistory: MockFirmwareHistoryEntry,
+    signatureHex: `0x${string}`
+  ) => Promise<`0x${string}`>;
   readonly onPushFirmwareUpdate: (
     partId: `0x${string}`,
-    entry: MockFirmwareHistoryEntry
-  ) => void;
+    entry: MockFirmwareHistoryEntry,
+    signatureHex: `0x${string}`
+  ) => Promise<void>;
   readonly onUpdatePartStatus: (
     partId: `0x${string}`,
     newStatus: PartStatusLabel
-  ) => void;
+  ) => Promise<void>;
+  /** In live mode the connected wallet is the manufacturer AND the bearer. */
+  readonly liveWallet: `0x${string}` | null;
   readonly onGrantTelemetryPassForPart: (part: MockBionicPart) => void;
 }
 
@@ -93,7 +98,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
   onPushFirmwareUpdate,
   onUpdatePartStatus,
   onGrantTelemetryPassForPart,
+  liveWallet,
 }) => {
+  const [regError, setRegError] = useState<string | null>(null);
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
   // Filter & selection states
   const [selectedZone, setSelectedZone] = useState<'ALL' | AnatomicalZoneLabel>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | PartStatusLabel>('ALL');
@@ -176,8 +184,9 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
   };
 
   // Sign & Register New Bionic Part with Felipe's @sdk/pqc ML-DSA-87 & SHAKE-256
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setRegError(null);
     const encoder = new TextEncoder();
     const cleanSerial = regSerialNumber.trim() || `SN-${Math.floor(1000 + Math.random() * 9000)}`;
     const cleanModel = regModelName.trim() || 'Cyber-Synapse Implant';
@@ -212,7 +221,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
       status: 'ACTIVE',
       statusIndex: 0,
       manufacturerName: regManufacturerName.trim() || 'BioNeural OEM Enclave',
-      manufacturerAddress: regManufacturerAddress,
+      manufacturerAddress: liveWallet ?? regManufacturerAddress,
       firmwareVersion: 1,
       firmwareSemver: cleanSemver,
       firmwareHash,
@@ -229,7 +238,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
       blockNumber: currentBlock,
       firmwareHash,
       calibrationHash,
-      signerAddress: regManufacturerAddress,
+      signerAddress: liveWallet ?? regManufacturerAddress,
       description: `Genesis HBOM surgical registration for ${cleanModel} (${cleanSerial}). Attested via NIST FIPS 204 ML-DSA-87 (${signatureBytesLen.toLocaleString()} bytes).`,
     };
 
@@ -242,8 +251,16 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
       serial: cleanSerial,
     });
 
-    onRegisterPart(newPart, genesisHistory);
-    setSelectedPartId(partId);
+    setIsRegistering(true);
+    try {
+      const finalPartId = await onRegisterPart(newPart, genesisHistory, signatureHex);
+      setSelectedPartId(finalPartId);
+    } catch (err) {
+      setRegSignatureResult(null);
+      setRegError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   // Open Firmware Patcher for a Bionic Part
@@ -266,7 +283,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
   };
 
   // Execute ML-DSA-87 Firmware Patch
-  const handleExecuteFirmwarePatch = (part: MockBionicPart) => {
+  const handleExecuteFirmwarePatch = async (part: MockBionicPart) => {
     if (part.status === 'DECOMMISSIONED') {
       setPatchErrorMsg(
         'REVERTED: SynapseVaultRegistry__PartAlreadyDecommissioned() — Decommissioned implants reject all firmware mutations on QoreChain L1.'
@@ -306,7 +323,12 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
       description: `${patchDescription} (ML-DSA-87 verified: ${sigBytes.toLocaleString()}B sig).`,
     };
 
-    onPushFirmwareUpdate(part.partId, entry);
+    try {
+      await onPushFirmwareUpdate(part.partId, entry, signatureHex);
+    } catch (err) {
+      setPatchErrorMsg(err instanceof Error ? err.message : String(err));
+      return;
+    }
     setPatchSuccessBanner({
       partId: part.partId,
       semver: cleanSemver,
@@ -629,7 +651,13 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 <input
                   type="text"
                   required
-                  value={regManufacturerAddress}
+                  value={liveWallet ?? regManufacturerAddress}
+                  disabled={Boolean(liveWallet)}
+                  title={
+                    liveWallet
+                      ? 'En modo on-chain el fabricante es la wallet conectada (el contrato lo exige)'
+                      : undefined
+                  }
                   onChange={(e) =>
                     setRegManufacturerAddress(e.target.value as `0x${string}`)
                   }
@@ -652,12 +680,24 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 />
               </div>
 
+              {regError && (
+                <div className="p-2.5 rounded-lg bg-reb-pink/15 border border-reb-pink text-[11px] font-mono text-reb-pink">
+                  {regError}
+                </div>
+              )}
               <button
                 type="submit"
-                className="mt-1 w-full py-2.5 px-4 rounded-lg bg-reb-mint text-reb-bg font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_20px_rgba(168,240,198,0.3)] flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isRegistering}
+                className="mt-1 w-full py-2.5 disabled:opacity-50 px-4 rounded-lg bg-reb-mint text-reb-bg font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_20px_rgba(168,240,198,0.3)] flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Fingerprint className="w-4 h-4" />
-                <span>Sign with ML-DSA-87 &amp; Register HBOM Part</span>
+                <span>
+                  {isRegistering
+                    ? 'Registrando…'
+                    : liveWallet
+                      ? 'Sign with ML-DSA-87 & Register HBOM Part (on-chain)'
+                      : 'Sign with ML-DSA-87 & Register (demo local, sin cadena)'}
+                </span>
               </button>
             </form>
 
@@ -950,7 +990,12 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                             <button
                               key={statusOption}
                               type="button"
-                              onClick={() => onUpdatePartStatus(part.partId, statusOption)}
+                              onClick={() => {
+                                setPatchErrorMsg(null);
+                                onUpdatePartStatus(part.partId, statusOption).catch((err: unknown) =>
+                                  setPatchErrorMsg(err instanceof Error ? err.message : String(err))
+                                );
+                              }}
                               className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase transition-all cursor-pointer ${activeStyle}`}
                               title={`Set lifecycle status to ${statusOption} (Index ${getStatusIndex(statusOption)})`}
                             >
@@ -1034,7 +1079,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                           <div className="flex items-center justify-end gap-2 pt-1">
                             <button
                               type="button"
-                              onClick={() => handleExecuteFirmwarePatch(part)}
+                              onClick={() => void handleExecuteFirmwarePatch(part)}
                               className="px-3.5 py-1.5 rounded-lg bg-reb-mint text-reb-bg font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 cursor-pointer flex items-center gap-1.5"
                             >
                               <ShieldCheck className="w-3.5 h-3.5" />

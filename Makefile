@@ -2,6 +2,8 @@ SHELL := /bin/bash
 
 ANVIL_PID    := /tmp/synapseq-anvil.pid
 FRONTEND_PID := /tmp/synapseq-frontend.pid
+GATEWAY_PID  := /tmp/synapseq-gateway.pid
+GATEWAY_LOG  := /tmp/synapseq-gateway.log
 ANVIL_LOG    := /tmp/synapseq-anvil.log
 FRONTEND_LOG := /tmp/synapseq-frontend.log
 INIT_TIMEOUT ?= 60
@@ -10,12 +12,16 @@ FOUNDRY_PATH := $(HOME)/.foundry/bin
 export PATH := $(FOUNDRY_PATH):$(PATH)
 
 .DEFAULT_GOAL := help
-.PHONY: help build init down lint audit test test-contracts test-sdk test-front test-quantum cbom demo deploy-local deploy-diana clean
+.PHONY: help build init down lint audit test test-contracts test-sdk test-gateway test-front test-quantum cbom demo deploy-local deploy-diana clean
+
+# Dirección del último despliegue local (leída del broadcast de Foundry)
+VAULT_ADDR_CMD = grep -m1 -o '"contractAddress": *"0x[0-9a-fA-F]*"' contracts/broadcast/DeploySynapseVault.s.sol/$${QORECHAIN_CHAIN_ID:-9800}/run-latest.json | grep -o '0x[0-9a-fA-F]*'
 
 # Carga segura y desacoplada de .env desde la raíz del proyecto
 ENV_EXPORTS = set -a && [ -f .env ] && source .env && set +a && \
               export ANVIL_PORT="$${ANVIL_PORT:-8545}" && \
               export FRONTEND_PORT="$${FRONTEND_PORT:-5173}" && \
+              export GATEWAY_PORT="$${GATEWAY_PORT:-4000}" && \
               export LOCAL_RPC_URL="$${LOCAL_RPC_URL:-http://127.0.0.1:$${ANVIL_PORT:-8545}}"
 
 # ── Ayuda ──────────────────────────────────────────────────────────────────────
@@ -27,13 +33,15 @@ help: ## Mostrar comandos disponibles
 # ── Comandos principales ───────────────────────────────────────────────────────
 
 build: ## ⚙️  Primera vez: instalar forge-std + compilar contratos Foundry + dependencias SDK & Frontend + build
-	@echo "→ 1/4 Instalando librería forge-std y compilando contratos Solidity (Foundry)..."
+	@echo "→ 1/5 Instalando librería forge-std y compilando contratos Solidity (Foundry)..."
 	@cd contracts && ([ -d lib/forge-std ] || forge install foundry-rs/forge-std --no-git) && forge build
-	@echo "→ 2/4 Instalando dependencias del SDK Post-Cuántico (@synapseq/sdk)..."
+	@echo "→ 2/5 Instalando dependencias del SDK Post-Cuántico (@synapseq/sdk)..."
 	@cd sdk && npm install --silent
-	@echo "→ 3/4 Instalando dependencias del Frontend React + Tailwind v4 (@synapseq/frontend)..."
+	@echo "→ 3/5 Instalando dependencias del Key-Release Gateway (@synapseq/gateway)..."
+	@cd gateway && npm install --silent
+	@echo "→ 4/5 Instalando dependencias del Frontend React + Tailwind v4 (@synapseq/frontend)..."
 	@cd frontend && npm install --silent
-	@echo "→ 4/4 Verificando build de producción del Frontend..."
+	@echo "→ 5/5 Verificando build de producción del Frontend..."
 	@cd frontend && npm run build
 	@echo ""
 	@echo "✅ Build completo — ejecuta 'make init' para levantar el stack local o 'make test' para correr la suite."
@@ -53,11 +61,19 @@ init: ## 🚀 Levantar el stack local (Anvil QoreChain 9800 :8545 · Deploy Syna
 	    if [ "$$code" = "200" ]; then echo "   ✅ Anvil EVM (Chain ID $${QORECHAIN_CHAIN_ID:-9800}) → $$LOCAL_RPC_URL"; break; fi; \
 	    sleep 1; \
 	  done
-	@echo "→ 2/3 Desplegando SynapseVaultRegistry.sol en el nodo local..."
+	@echo "→ 2/4 Desplegando SynapseVaultRegistry.sol en el nodo local..."
 	@$(MAKE) --no-print-directory deploy-local
-	@echo "→ 3/3 Levantando Frontend React + Tailwind v4 en :5173..."
+	@echo "→ 3/4 Levantando Key-Release Gateway..."
 	@$(ENV_EXPORTS) && \
-	  cd frontend && nohup npm run dev -- --host 0.0.0.0 --port "$$FRONTEND_PORT" \
+	  vault=$$($(VAULT_ADDR_CMD)); \
+	  cd gateway && SYNAPSE_VAULT_ADDRESS="$$vault" QORECHAIN_RPC_URL="$$LOCAL_RPC_URL" \
+	    nohup npx tsx src/index.ts > $(GATEWAY_LOG) 2>&1 & echo $$! > $(GATEWAY_PID)
+	@echo "→ 4/4 Levantando Frontend React + Tailwind v4 en :5173..."
+	@$(ENV_EXPORTS) && \
+	  vault=$$($(VAULT_ADDR_CMD)); \
+	  cd frontend && VITE_SYNAPSE_VAULT_ADDRESS="$$vault" VITE_QORECHAIN_RPC_URL="$$LOCAL_RPC_URL" \
+	    VITE_GATEWAY_URL="http://127.0.0.1:$$GATEWAY_PORT" \
+	    nohup npm run dev -- --host 127.0.0.1 --port "$$FRONTEND_PORT" --strictPort \
 	    > $(FRONTEND_LOG) 2>&1 & echo $$! > $(FRONTEND_PID)
 	@echo ""
 	@echo "→ Verificando que cada servicio responda (máx. $(INIT_TIMEOUT) s)..."
@@ -76,6 +92,7 @@ init: ## 🚀 Levantar el stack local (Anvil QoreChain 9800 :8545 · Deploy Syna
 	  return 1; \
 	}; \
 	fail=0; \
+	check "Key-Release Gateway" "http://127.0.0.1:$$GATEWAY_PORT/health" "$(GATEWAY_PID)" "$(GATEWAY_LOG)" || fail=1; \
 	check "Frontend Bio-HUD" "http://127.0.0.1:$$FRONTEND_PORT" "$(FRONTEND_PID)" "$(FRONTEND_LOG)" || fail=1; \
 	echo ""; \
 	if [ $$fail -ne 0 ]; then \
@@ -84,41 +101,46 @@ init: ## 🚀 Levantar el stack local (Anvil QoreChain 9800 :8545 · Deploy Syna
 	fi; \
 	echo "✅ Stack SynapseQ arriba:"; \
 	echo "   Frontend Bio-HUD → http://localhost:$$FRONTEND_PORT"; \
+	echo "   Gateway          → http://127.0.0.1:$$GATEWAY_PORT"; \
 	echo "   Anvil EVM (9800) → $$LOCAL_RPC_URL"; \
 	echo ""; \
 	echo "   Logs:  tail -f $(ANVIL_LOG)"; \
+	echo "          tail -f $(GATEWAY_LOG)"; \
 	echo "          tail -f $(FRONTEND_LOG)"
 
-down: ## 🛑 Detener el stack local y liberar puertos (:8545, :5173)
-	@echo "→ Deteniendo procesos Anvil y Frontend..."
-	@if [ -f $(ANVIL_PID) ]; then \
-	  kill -9 $$(cat $(ANVIL_PID)) 2>/dev/null || true; rm -f $(ANVIL_PID); fi
-	@if [ -f $(FRONTEND_PID) ]; then \
-	  kill -9 $$(cat $(FRONTEND_PID)) 2>/dev/null || true; rm -f $(FRONTEND_PID); fi
-	@pkill -9 -f "[a]nvil --chain-id" 2>/dev/null || true
-	@pkill -9 -f "[v]ite" 2>/dev/null || true
-	@$(ENV_EXPORTS) && \
-	  (lsof -ti:"$$ANVIL_PORT" 2>/dev/null | xargs -r kill -9 2>/dev/null || true) && \
-	  (lsof -ti:"$$FRONTEND_PORT" 2>/dev/null | xargs -r kill -9 2>/dev/null || true)
-	@echo "✅ Stack SynapseQ detenido."
+down: ## 🛑 Detener SOLO los procesos que lanzó 'make init' (PID files)
+	@echo "→ Deteniendo Anvil, Gateway y Frontend de SynapseQ..."
+	@for pidf in $(ANVIL_PID) $(GATEWAY_PID) $(FRONTEND_PID); do \
+	  if [ -f $$pidf ]; then \
+	    pid=$$(cat $$pidf); \
+	    pkill -TERM -P "$$pid" 2>/dev/null || true; \
+	    kill -TERM "$$pid" 2>/dev/null || true; \
+	    unlink $$pidf; \
+	  fi; \
+	done
+	@echo "✅ Stack SynapseQ detenido (no se tocan otros procesos Vite/Anvil de la máquina)."
 
 # ── Calidad, Linting y Auditoría ───────────────────────────────────────────────
 
-lint: ## 🔍 Linting y validación de tipos estricta (forge fmt + ESLint SDK + tsc SDK & Frontend)
-	@echo "→ 1/4 Verificando formato de Smart Contracts con forge fmt..."
+lint: ## 🔍 Linting y validación de tipos estricta (forge fmt + ESLint/tsc SDK, Gateway & Frontend)
+	@echo "→ 1/5 Verificando formato de Smart Contracts con forge fmt..."
 	@cd contracts && forge fmt --check
-	@echo "→ 2/4 Verificando tipado estricto del SDK con tsc..."
+	@echo "→ 2/5 Verificando tipado estricto del SDK con tsc..."
 	@cd sdk && npm run typecheck
-	@echo "→ 3/4 Verificando SDK con ESLint..."
+	@echo "→ 3/5 Verificando SDK con ESLint..."
 	@cd sdk && npm run lint
-	@echo "→ 4/4 Verificando tipado estricto del Frontend con tsc..."
+	@echo "→ 4/5 Verificando Gateway (tsc + ESLint)..."
+	@cd gateway && npm run typecheck && npm run lint
+	@echo "→ 5/5 Verificando tipado estricto del Frontend con tsc..."
 	@cd frontend && npm run typecheck
 	@echo "✅ Verificación de código limpia (0 errores de lint y tipado)."
 
 audit: ## 🛡️ Auditoría de dependencias de seguridad (npm audit en SDK y Frontend)
-	@echo "→ 1/2 Auditando dependencias del SDK (npm audit)..."
+	@echo "→ 1/3 Auditando dependencias del SDK (npm audit)..."
 	@cd sdk && npm audit --audit-level=moderate
-	@echo "→ 2/2 Auditando dependencias del Frontend (npm audit)..."
+	@echo "→ 2/3 Auditando dependencias del Gateway (npm audit)..."
+	@cd gateway && npm audit --audit-level=moderate
+	@echo "→ 3/3 Auditando dependencias del Frontend (npm audit)..."
 	@cd frontend && npm audit --audit-level=moderate
 	@echo "✅ Auditoría de dependencias sin vulnerabilidades conocidas."
 
@@ -131,6 +153,7 @@ test: ## 🧪 Suite completa acumulada (Lint + Contratos Foundry + SDK + Build F
 	@$(MAKE) lint
 	@$(MAKE) test-contracts
 	@$(MAKE) test-sdk
+	@$(MAKE) test-gateway
 	@$(MAKE) test-front
 	@echo ""
 	@echo "✅ Toda la suite acumulada de SynapseQ ha finalizado con éxito."
@@ -150,14 +173,19 @@ cbom: ## 📋 Auditar y validar el reporte CycloneDX CBOM v1.6 (cbom-report.json
 	@echo "→ Verificando reporte CycloneDX CBOM v1.6 (cbom-report.json)..."
 	@node -e 'const fs=require("fs"); const b=JSON.parse(fs.readFileSync("cbom-report.json","utf8")); console.log("   ✅ CBOM Formato:", b.bomFormat, "v"+b.specVersion, "| Activos PQC:", b.components.map(c=>c.name).join(", "));'
 
+test-gateway: ## 🛡️  Gateway: firma de wallet, release condicionado, tokens de descarga, cuotas, CORS y crypto-shredding
+	@echo "→ Ejecutando tests del Key-Release Gateway..."
+	@cd gateway && npm test
+
 test-front: ## ⚛️  Frontend: validación de tipos y compilación de producción (Vite + React 19 + Tailwind v4)
 	@echo "→ Verificando tipado y build de producción del Frontend..."
 	@cd frontend && npm run typecheck && npm run build
 
-demo: ## 🎯 Ejecutar demo end-to-end post-cuántica (6 pasos reales ML-KEM-1024 + ML-DSA-87 + Kill-Switch) contra nodo local
+demo: ## 🎯 Demo end-to-end (PKI on-chain, HBOM, gateway, grant solo-hashes, release, Kill-Switch) contra 'make init'
 	@$(ENV_EXPORTS) && \
-	  anvil_key=$$(grep -m 1 -A 2 "Private Keys" $(ANVIL_LOG) 2>/dev/null | tail -n 1 | awk '{print $$2}'); \
-	  cd sdk && QORECHAIN_RPC_URL="$$LOCAL_RPC_URL" npm run demo
+	  vault=$$($(VAULT_ADDR_CMD)); \
+	  cd sdk && QORECHAIN_RPC_URL="$$LOCAL_RPC_URL" SYNAPSE_VAULT_ADDRESS="$$vault" \
+	    GATEWAY_URL="http://127.0.0.1:$$GATEWAY_PORT" npm run demo
 
 # ── Despliegue On-Chain ────────────────────────────────────────────────────────
 

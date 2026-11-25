@@ -117,8 +117,34 @@ export async function fetchEncryptedBlobFromIpfs(
 }
 
 /**
- * Unified helper that uploads to Pinata IPFS if a JWT is provided/configured,
- * or falls back transparently to browser localStorage / Node .local-ipfs.
+ * Unpins an encrypted blob from Pinata IPFS (supports Right to Erasure / Ley 1581 / GDPR).
+ * Intended to be called from a trusted backend/gateway holding PINATA_JWT.
+ */
+export async function unpinFromPinata(cid: string, jwt: string): Promise<boolean> {
+  if (!jwt) {
+    throw new Error("Pinata JWT is required to unpin a CID.");
+  }
+  const cleanCid = cid.replace(/^ipfs:\/\//, "");
+  const response = await fetch(`https://api.pinata.cloud/pinning/unpin/${encodeURIComponent(cleanCid)}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+    },
+  });
+  if (response.status === 404) {
+    return false;
+  }
+  if (!response.ok) {
+    throw new Error(`Pinata unpin failed (${response.status}): ${await response.text()}`);
+  }
+  memoryBlobCache.delete(cleanCid);
+  return true;
+}
+
+/**
+ * Unified helper that uploads to Pinata IPFS if a JWT is provided/configured (server-side only),
+ * or falls back to an in-memory cache (plus browser localStorage) for local development.
+ * Browsers should pin through the Key-Release Gateway instead (pinEncryptedBlobViaGateway).
  */
 export async function uploadEncryptedBlob(
   blob: Uint8Array,
@@ -143,19 +169,13 @@ export async function uploadEncryptedBlob(
 
   if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
     window.localStorage.setItem(`synapseq_ipfs_${cid}`, bytesToHex(blob));
-  } else if (typeof window === "undefined") {
-    const { mkdirSync, writeFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const localIpfsDir = join(process.cwd(), ".local-ipfs");
-    mkdirSync(localIpfsDir, { recursive: true });
-    writeFileSync(join(localIpfsDir, `${cid}.enc`), blob);
   }
 
   return cid;
 }
 
 /**
- * Unified helper that retrieves an encrypted blob from cache, local fallback, or IPFS gateway.
+ * Unified helper that retrieves an encrypted blob from cache, browser localStorage, or IPFS gateway.
  */
 export async function fetchEncryptedBlob(
   cid: string,
@@ -177,14 +197,7 @@ export async function fetchEncryptedBlob(
       return bytes;
     }
 
-    if (typeof window === "undefined") {
-      const { readFileSync } = await import("node:fs");
-      const { join } = await import("node:path");
-      const filePath = join(process.cwd(), ".local-ipfs", `${cid}.enc`);
-      const bytes = new Uint8Array(readFileSync(filePath));
-      memoryBlobCache.set(cid, bytes);
-      return bytes;
-    }
+    throw new Error(`Encrypted blob not found in memory cache for CID: ${cid}`);
   }
 
   const gatewayUrl =

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -19,37 +19,38 @@ import {
   Upload,
   Zap,
 } from 'lucide-react';
-import { encryptAndSealDocument } from '@sdk/pqc';
-import { buildSynapseSovereignConfig, prepareEncryptedDaBlob } from '@sdk/rdkDa';
-import {
-  SynapseStorageRouter,
-  type DataDomain,
-  type RetentionPolicy,
-  type StorageMode,
-} from '@sdk/storageStrategy';
+import type { DataDomain, RetentionPolicy, StorageMode } from '@sdk/storageStrategy';
 import {
   STORAGE_MODE_OPTIONS,
   type MockBionicPart,
   type MockEphemeralPass,
 } from '../../data/mockData';
 
+export const ZERO_PART_ID =
+  '0x0000000000000000000000000000000000000000000000000000000000000000' as const;
+
+export interface SealGrantRequest {
+  readonly payloadBytes: Uint8Array;
+  readonly title: string;
+  readonly specialistName: string;
+  readonly specialistAddress: `0x${string}`;
+  readonly domain: DataDomain;
+  readonly retention: RetentionPolicy;
+  readonly durationSeconds: number;
+  readonly linkedPart: MockBionicPart | null;
+}
+
 export interface PatientVaultViewProps {
   readonly passes: readonly MockEphemeralPass[];
   readonly bionicParts: readonly MockBionicPart[];
-  readonly specialistKemPublicKey: Uint8Array;
+  /** Local demo key (only used when there is no wallet/gateway). */
   readonly specialistKemPublicKeyHex: string;
-  readonly pinataJwt?: string;
-  readonly ipfsGatewayUrl?: string;
-  readonly onGrantCreated: (newPass: MockEphemeralPass, receiptInfo: string) => void;
+  /** true when wallet + contract + gateway are configured: everything goes through the chain. */
+  readonly liveMode: boolean;
+  readonly onSealAndGrant: (request: SealGrantRequest) => Promise<void>;
   readonly onExtendPass: (id: string, extraSeconds: number) => void;
   readonly onRevokePass: (id: string) => void;
   readonly onEmergencyKillSwitch: () => void;
-  readonly onSealPayloadToCache: (
-    cid: string,
-    encryptedBlob: Uint8Array,
-    envelopeHex: `0x${string}`,
-    contentHash: `0x${string}`
-  ) => void;
 }
 
 const DEFAULT_TELEMETRY_JSON = JSON.stringify(
@@ -109,15 +110,12 @@ function formatCountdown(totalSeconds: number): string {
 export function PatientVaultView({
   passes,
   bionicParts,
-  specialistKemPublicKey,
   specialistKemPublicKeyHex,
-  pinataJwt,
-  ipfsGatewayUrl,
-  onGrantCreated,
+  liveMode,
+  onSealAndGrant,
   onExtendPass,
   onRevokePass,
   onEmergencyKillSwitch,
-  onSealPayloadToCache,
 }: Readonly<PatientVaultViewProps>): React.ReactElement {
   const [payloadText, setPayloadText] = useState<string>(DEFAULT_TELEMETRY_JSON);
   const [uploadedFileName, setUploadedFileName] = useState<string>('neurolink-x9-telemetry.json');
@@ -125,10 +123,7 @@ export function PatientVaultView({
   const [domain, setDomain] = useState<DataDomain>('BIONIC_TELEMETRY');
   const [retention, setRetention] = useState<RetentionPolicy>('ephemeral');
   const [preferredMode, setPreferredMode] = useState<StorageMode>('auto');
-  const [selectedPartId, setSelectedPartId] = useState<`0x${string}`>(
-    bionicParts[0]?.partId ??
-      '0x4b7f8c9d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6fc18a'
-  );
+  const [selectedPartId, setSelectedPartId] = useState<`0x${string}`>(ZERO_PART_ID);
   const [specialistName, setSpecialistName] = useState<string>(
     'Dr. Elena Rostova (Neo-Geneva BioClinic)'
   );
@@ -145,47 +140,53 @@ export function PatientVaultView({
     [passes]
   );
 
-  const sovereignRollup = useMemo(
-    () => buildSynapseSovereignConfig('synapseq-hbom-v1'),
-    []
-  );
-
-  const storageRouter = useMemo(
-    () =>
-      new SynapseStorageRouter({
-        pinataJwt,
-        ipfsGatewayUrl,
-        allowFallback: true,
-      }),
-    [pinataJwt, ipfsGatewayUrl]
-  );
+  // @qorechain/rdk is heavy (pulls cosmjs): load it lazily, only to show the roadmap config
+  const [sovereignRollup, setSovereignRollup] = useState<{
+    readonly rollupId: string;
+    readonly valid: boolean;
+  } | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    import('@sdk/rdkDa')
+      .then((mod) => {
+        if (!mounted) return;
+        const built = mod.buildSynapseSovereignConfig('synapseq-hbom-v1');
+        setSovereignRollup({ rollupId: built.config.rollupId, valid: built.validation.valid });
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const payloadBytes = useMemo(
     () => new TextEncoder().encode(payloadText),
     [payloadText]
   );
 
+  // Honest storage preview: what will ACTUALLY happen with the encrypted blob
   const strategyPreview = useMemo(() => {
-    try {
-      const decision = storageRouter.resolveStrategy(payloadBytes, {
-        domain,
-        retention,
-        preferredMode,
-        fileName: uploadedFileName,
-      });
+    const wantsDa =
+      preferredMode === 'qorechain-da' ||
+      (preferredMode === 'auto' && domain === 'BIONIC_TELEMETRY' && retention === 'ephemeral');
+    if (liveMode) {
       return {
-        providerId: decision.strategy.id,
-        reason: decision.reason,
+        providerId: 'pinata-ipfs' as const,
+        label: 'Key-Release Gateway',
+        reason: wantsDa
+          ? 'x/rdk DA es roadmap (aún no hay rollups en producción): el blob cifrado se guarda vía Key-Release Gateway (Pinata server-side o disco del gateway).'
+          : 'El blob cifrado se guarda vía Key-Release Gateway (Pinata server-side o disco del gateway). El JWT nunca llega al navegador.',
         error: false,
       };
-    } catch (err) {
-      return {
-        providerId: 'memory-fallback' as const,
-        reason: err instanceof Error ? err.message : String(err),
-        error: true,
-      };
     }
-  }, [storageRouter, payloadBytes, domain, retention, preferredMode, uploadedFileName]);
+    return {
+      providerId: 'memory-fallback' as const,
+      label: 'Memoria local (demo)',
+      reason:
+        'Modo demo local: sin wallet, contrato o gateway configurados el blob queda solo en la memoria de esta pestaña y NO se registra on-chain.',
+      error: true,
+    };
+  }, [liveMode, preferredMode, domain, retention]);
 
   const handleDomainSwitch = (nextDomain: DataDomain): void => {
     setDomain(nextDomain);
@@ -223,65 +224,20 @@ export function PatientVaultView({
     setStatusError(null);
     setIsSealing(true);
     try {
-      const selectedPart =
-        bionicParts.find((part) => part.partId === selectedPartId) ?? bionicParts[0];
-
-      const sealed =
-        strategyPreview.providerId === 'qorechain-da'
-          ? await prepareEncryptedDaBlob(payloadBytes, specialistKemPublicKey)
-          : await encryptAndSealDocument(payloadBytes, specialistKemPublicKey);
-
-      const receipt = await storageRouter.store(sealed.encryptedBlob, {
-        domain,
-        retention,
-        preferredMode,
-        fileName: uploadedFileName,
-      });
-
-      onSealPayloadToCache(
-        receipt.reference,
-        sealed.encryptedBlob,
-        sealed.encryptedKeyEnvelope,
-        sealed.contentHash
-      );
-
-      const randomNum = Math.floor(1000 + Math.random() * 8999);
-      const passId = `EQ-${randomNum}`;
-      const recordIdHex =
-        `0x${randomNum}${sealed.contentHash.slice(2, 62)}` as `0x${string}`;
-
-      const newPass: MockEphemeralPass = {
-        id: passId,
-        recordIdHex,
+      const linkedPart =
+        selectedPartId === ZERO_PART_ID
+          ? null
+          : bionicParts.find((part) => part.partId === selectedPartId) ?? null;
+      await onSealAndGrant({
+        payloadBytes,
         title: recordTitle.trim() || 'Encrypted Bionic Shard',
         specialistName: specialistName.trim() || 'Authorized Specialist Node',
         specialistAddress,
-        patientPseudonym: 'AnonPatient-0x94B',
         domain,
         retention,
-        storageProvider: receipt.provider,
-        linkedPartName: selectedPart
-          ? `${selectedPart.modelName} (${selectedPart.serialNumber})`
-          : 'Unlinked Clinical Shard',
-        linkedPartId:
-          selectedPart?.partId ??
-          '0x0000000000000000000000000000000000000000000000000000000000000000',
-        contentHash: sealed.contentHash,
-        ipfsCid: receipt.reference,
-        remainingSeconds: durationSeconds,
-        revoked: false,
-        gpsSector: 'SEC-11 // 1.2 KM',
-        metrics: {
-          neuralLatencyMs: 0.39,
-          impedanceKOhm: 11.8,
-          coherencePct: 99.87,
-        },
-      };
-
-      onGrantCreated(
-        newPass,
-        `${receipt.provider.toUpperCase()} (${receipt.size}B) • ${receipt.reason}`
-      );
+        durationSeconds,
+        linkedPart,
+      });
     } catch (err) {
       setStatusError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -322,11 +278,7 @@ export function PatientVaultView({
           <div className="mt-2">
             <div className="text-sm font-mono font-bold text-reb-text-light flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-reb-mint animate-pulse" />
-              {strategyPreview.providerId === 'qorechain-da'
-                ? 'QoreChain x/rdk Native DA'
-                : strategyPreview.providerId === 'pinata-ipfs'
-                ? 'Pinata IPFS Archive'
-                : 'Memory Fallback Enclave'}
+              {strategyPreview.label}
             </div>
             <div className="text-[11px] font-mono text-reb-text-muted mt-1 truncate">
               Policy: {preferredMode.toUpperCase()} • {domain} ({retention})
@@ -365,11 +317,11 @@ export function PatientVaultView({
           </div>
           <div className="mt-2">
             <div className="text-xs font-mono font-bold text-reb-mint">
-              Rollup ID: {sovereignRollup.config.rollupId} • Sovereign + Native DA{' '}
-              {sovereignRollup.validation.valid ? 'Validated' : 'Warning'}
+              Rollup ID: {sovereignRollup?.rollupId ?? 'cargando…'} • Sovereign + Native DA{' '}
+              {sovereignRollup ? (sovereignRollup.valid ? 'config válida' : 'config con avisos') : ''}
             </div>
             <div className="text-[11px] font-mono text-reb-text-muted mt-1">
-              EndBlocker Auto-Prune • Max Blob 2 MiB
+              ROADMAP Fase 2 • x/rdk aún sin rollups en producción
             </div>
           </div>
         </div>
@@ -528,14 +480,12 @@ export function PatientVaultView({
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                    strategyPreview.providerId === 'qorechain-da'
-                      ? 'bg-reb-blue/25 text-reb-periwinkle border border-reb-blue/40'
-                      : strategyPreview.providerId === 'pinata-ipfs'
+                    strategyPreview.providerId === 'pinata-ipfs'
                       ? 'bg-reb-mint/20 text-reb-mint border border-reb-mint/40'
                       : 'bg-reb-yellow/20 text-reb-yellow border border-reb-yellow/40'
                   }`}
                 >
-                  {strategyPreview.providerId}
+                  {strategyPreview.label}
                 </span>
               </div>
               <p className="text-[11px] text-reb-text-muted leading-relaxed">
@@ -554,9 +504,11 @@ export function PatientVaultView({
               onChange={(e) => setSelectedPartId(e.target.value as `0x${string}`)}
               className="w-full px-3 py-2.5 rounded-lg bg-reb-surface-code border border-reb-border text-xs font-mono text-reb-text-light focus:outline-none focus:border-reb-mint"
             >
+              <option value={ZERO_PART_ID}>Sin pieza vinculada (registro clínico)</option>
               {bionicParts.map((part) => (
                 <option key={part.partId} value={part.partId}>
                   {part.modelName} ({part.serialNumber}) — [{part.zone} // {part.status}]
+                  {part.onChain ? ' • on-chain' : ' • ejemplo (no on-chain)'}
                 </option>
               ))}
             </select>
@@ -595,11 +547,13 @@ export function PatientVaultView({
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles className="w-4 h-4 text-reb-mint shrink-0" />
                 <span className="text-[11px] font-mono text-reb-mint truncate">
-                  {specialistKemPublicKeyHex.slice(0, 32)}...
+                  {liveMode
+                    ? 'getKemPublicKey(especialista) se consulta on-chain al sellar'
+                    : `${specialistKemPublicKeyHex.slice(0, 32)}...`}
                 </span>
               </div>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-reb-mint/15 text-reb-mint border border-reb-mint/30 shrink-0">
-                1,568 Bytes Resolved from QoreChain PKI
+                {liveMode ? 'ML-KEM-1024 desde el directorio on-chain' : 'Clave local de demo (no on-chain)'}
               </span>
             </div>
           </div>
@@ -802,6 +756,7 @@ export function PatientVaultView({
 
                   {/* Footer Actions & Live Neural Telemetry Metrics */}
                   <div className="mt-3 pt-3 border-t border-reb-border/60 flex flex-wrap items-center justify-between gap-3">
+                    {pass.metrics ? (
                     <div className="flex items-center gap-4 text-[11px] font-mono text-reb-text-muted">
                       <span>
                         Latency:{' '}
@@ -822,6 +777,9 @@ export function PatientVaultView({
                         </strong>
                       </span>
                     </div>
+                    ) : (
+                      <span className="text-[11px] font-mono text-reb-text-muted">Sin telemetría</span>
+                    )}
 
                     {!isExpiredOrRevoked && (
                       <div className="flex items-center gap-2">

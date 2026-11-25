@@ -84,7 +84,10 @@ export class PinataIpfsStrategy implements StorageStrategy {
 }
 
 /**
- * QoreChain x/rdk Native DA Router strategy for ephemeral bionic telemetry (auto-pruned by EndBlocker).
+ * QoreChain x/rdk Native DA Router strategy (ROADMAP / PREVIEW ONLY).
+ * x/rdk is a target capability and no rollup exists on production networks yet, so `store()` only
+ * BUILDS a protocol-compliant DA blob locally; it does not submit it and the blob is not retrievable.
+ * Never use it as the only copy of a record.
  */
 export class QoreChainDaStrategy implements StorageStrategy {
   public readonly id: StorageProviderId = "qorechain-da";
@@ -113,7 +116,7 @@ export class QoreChainDaStrategy implements StorageStrategy {
       ephemeral: true,
       daBlob,
       daDataHash: daBlob.dataHash,
-      reason: `Routed to QoreChain Native DA (<= ${this.maxDaBlobSize} bytes, auto-pruned ephemeral telemetry).`,
+      reason: `DA blob built locally for preview only (not submitted: x/rdk has no live rollups yet).`,
     };
   }
 }

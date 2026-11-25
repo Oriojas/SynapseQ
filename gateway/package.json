@@ -1,0 +1,24 @@
+{
+  "name": "@synapseq/gateway",
+  "version": "0.1.0",
+  "description": "Zero-Trust Key-Release & Pinata Proxy Gateway for SynapseQ (verifies SIWE signatures + live QoreChain access state)",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "test": "tsx src/test.ts",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "security": "npm audit --audit-level=moderate"
+  },
+  "dependencies": {
+    "viem": "^2.28.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.26.0"
+  }
+}
