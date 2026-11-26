@@ -12,15 +12,15 @@ Los hallazgos de las secciones 3 a 5 se corrigieron en la misma rama, **sin comm
 
 ### Verificación
 
-| Prueba | Antes | Después |
+| Prueba | Antes | Después (26 de noviembre) |
 |---|---|---|
-| Tests de contratos | 14/14 | ✅ **24/24**: incluye regresiones de cada hallazgo y gas con tamaños reales |
-| Tests del gateway | 2 suites | ✅ **3 suites**: compromisos, token de descarga, cadena distinta, cuotas, CORS, error 503 |
+| Tests de contratos | 14/14 | ✅ **36/36**: incluye precompilados nativos `pqcVerify` / `pqcKeyStatus`, regresiones de cada hallazgo y gas con tamaños reales |
+| Tests del gateway | 2 suites | ✅ **4 suites**: compromisos, token de descarga, cadena distinta, cuotas, CORS, error 503 y proxy de ventana EVM acotada |
 | Lint y typecheck de SDK, gateway y frontend | ✅ | ✅ |
-| Build del frontend | bundle de 3.4 MB | ✅ **728 KB** (`@qorechain/rdk` en un chunk que se carga bajo demanda) |
-| Demo end-to-end (`make demo`) | ✅ pero con falsos positivos | ✅ 7 pasos que **fallan si algo revierte**: el sobre no está en el calldata; tras el Kill-Switch el gateway responde 403 |
+| Build del frontend | bundle de 3.4 MB | ✅ **Dual-entry (`index.html` + `landing.html`)** con `@qorechain/rdk` y `three`/`gsap` separados en chunks dedicados |
+| Demo end-to-end (`make demo`) | ✅ pero con falsos positivos | ✅ 7 pasos que **fallan si algo revierte**: sobres `@qorechain/qoreseal` v1 fuera de calldata, `pqcVerify` on-chain y tras el Kill-Switch el gateway responde 403 |
 | Script de ataque re-ejecutado | 11 de 11 vulnerables | ✅ **13 de 13 comprobaciones "FIXED"** |
-| Navegador (wallet simulada contra Anvil) | éxitos falsos | ✅ ver la tabla siguiente |
+| Despliegue real en QoreChain Diana Testnet (`9800`) | Pendiente | ✅ Contrato `0x0f6c2bbbb4137e7809669C05b075616556A2c2d6` y tx `pqcVerify` `0x427672fad7e92681e4debf88386946d598d1c96dc0c8a47f3d520bf7e0a1097f` |
 
 **Pruebas en el navegador después de las correcciones:**
 - Pase con una pieza de ejemplo → error claro *"es de ejemplo y no existe on-chain"*, sin enviar ninguna transacción.
@@ -47,16 +47,17 @@ Los hallazgos de las secciones 3 a 5 se corrigieron en la misma rama, **sin comm
 | Claves del especialista | La clave ML-KEM-1024 se deriva de la firma de la wallet (`deriveKemKeyPairFromSignature`), así que se puede recuperar. El paciente cifra con la clave publicada **on-chain**. |
 | Demo, Makefile, CI | El demo valida cada recibo. `make init` levanta el gateway. `make down` solo detiene sus propios procesos (por PID). Se agregaron `make test-gateway`, los jobs de CI `gateway` y `frontend`, y CI corre también en `feat/**`. |
 
-### Qué queda pendiente (no se resolvió aquí)
+### Estado de puntos posteriores (actualizado 26 de noviembre)
 
-- **QoreSeal y el registro nativo `qorechain.pqc.v1`.** La categoría *Encrypted Apps* los pide, junto con la vinculación con ML-DSA. El proyecto sigue usando `@noble/post-quantum` y su propio directorio en el contrato. Integrarlos es una decisión del equipo.
-- **`registerKemPublicKey` cuesta ~1.16M de gas**, porque guarda la clave de 1568 bytes. El registro nativo de QoreChain lo resolvería.
-- **La EVM no verifica ML-DSA-87.** La firma se guarda como hash, la firma completa va en un evento y la verificación es fuera de la cadena. Si eligen *Post-Quantum dApp*, deberían usar `pqcVerify`.
-- **El gateway es un custodio de confianza:** un solo proceso, almacén en JSON, límites en memoria que se reinician con cada arranque. Sirve para el hackathon, no para producción.
-- **✅ RESUELTO (PR #7): Bandeja On-Chain del Especialista (`getGrantsBySpecialist`).** El Portal Especialista ahora sincroniza automáticamente los pases otorgados a la wallet conectada directamente desde el contrato en QoreChain (`refreshSpecialistGrants` en `App.tsx`).
-- **✅ RESUELTO: Interfaz Minimalista Map-First Tactical HUD (Paleta Rebecca Glass).** Las 3 vistas (*Patient Vault*, *Cyber-Human HBOM* y *Specialist Portal*) fueron rediseñadas desde Stitch MCP con un riel lateral flotante, corredor central de mapa táctico GPS despejado y cajón flotante inferior derecho.
-- **No se probó** con QoreX ni MetaMask reales en Diana Testnet aún: la wallet fue simulada sobre Anvil local (`Chain ID 9800`).
-- **La revocación no recupera** lo que el especialista ya descifró. Está documentado en la interfaz y en el README.
+- **✅ RESUELTO (PR #9): Integración de `@qorechain/qoreseal` v1 y `@qorechain/qoresign`.** `sdk/src/pqc.ts` utiliza ahora el sobre binario oficial `@qorechain/qoreseal` v1 (`ML-KEM-1024` de `1,568 bytes` y modo híbrido `ML-KEM-1024 + X25519` de `1,720 bytes`), mantendo compatibilidad con sobres JSON previos, y `sdk/src/oem.ts` deriva la clave canónica `ML-DSA-87` mediante `deriveCanonicalPqKey` de `@qorechain/qoresign`.
+- **✅ RESUELTO (PR #8): Verificación on-chain de `ML-DSA-87` con precompilados nativos (`pqcVerify`).** `SynapseVaultRegistry.sol` consulta `pqcKeyStatus(msg.sender)` (`0x...0a02`) y verifica on-chain la firma `ML-DSA-87` (`4,627 bytes`) con `pqcVerify` (`0x...0a01`) sobre el mensaje `firmwareAttestationMessage(partId, version, firmwareHash, calibrationHash)`. Cuenta con 36 tests en Foundry y `MockQorePqc.sol` para desarrollo local en Anvil (`make dev-pqc-mock`).
+- **✅ RESUELTO (PR #7): Bandeja On-Chain del Especialista (`getGrantsBySpecialist`).** El Portal Especialista sincroniza automáticamente los pases otorgados a la wallet conectada directamente desde el contrato en QoreChain (`refreshSpecialistGrants` en `App.tsx`).
+- **✅ RESUELTO: Ventana de autorización EVM acotada (`feat/evm-window-bounded`).** Se incorporaron `sdk/src/openEvmWindow.ts`, `sdk/src/evmWindow.ts`, el endpoint proxy `GET /api/qore/evm-window/:address` en el gateway y el componente `EvmWindowBadge.tsx` en la barra superior para verificar antes de cada firma que la cuenta tenga una ventana PQC→EVM abierta y acotada (`allowedTargets`) al contrato `SynapseVaultRegistry`.
+- **✅ RESUELTO: Despliegue y verificación real en QoreChain Diana Testnet (`Chain ID 9800`).** Contrato desplegado en `0x0f6c2bbbb4137e7809669C05b075616556A2c2d6` y registro HBOM con firma `ML-DSA-87` verificado on-chain por el precompilado `pqcVerify` en la transacción `0x427672fad7e92681e4debf88386946d598d1c96dc0c8a47f3d520bf7e0a1097f` (`571,648` gas).
+- **✅ RESUELTO: Interfaz Minimalista Map-First Tactical HUD + Cinematic Landing v2.** Las 3 vistas operativas (*Patient Vault*, *Cyber-Human HBOM* y *Specialist Portal*) utilizan el diseño *Map-First Tactical HUD (Paleta Rebecca Glass)* desde Stitch MCP, complementadas por la experiencia narrativa 3D **Cinematic Landing v2** (`/landing.html`, Three.js/GLSL + GSAP/Lenis + soporte ES/EN).
+- **`registerKemPublicKey` (~1.16M–1.27M de gas):** Guarda en el contrato la clave pública `ML-KEM-1024` (`1,568 bytes`) o híbrida QoreSeal (`1,720 bytes`), lo que permite resolverla directamente desde la EVM con una sola lectura `getKemPublicKey(specialist)`.
+- **El gateway actúa como custodio Zero-Trust de sobres fuera de la cadena:** Almacén aislado, autenticación por firma de wallet ligada a `Chain ID 9800`, cuotas por wallet, rate-limit por IP y consulta en vivo de `isAccessValid(recordId)` antes de liberar cualquier sobre.
+- **La revocación corta nuevas entregas en el gateway e invalida el pase on-chain:** Documentado explícitamente en la interfaz y en el `README.md`.
 
 ---
 
