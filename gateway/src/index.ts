@@ -4,6 +4,7 @@ import { isAddress, zeroAddress, type Address } from "viem";
 import { QoreChainPolicyVerifier } from "./chain.js";
 import { createGatewayServer } from "./server.js";
 import { EnvelopeVaultStore } from "./store.js";
+import { DIANA_REST_URL, fetchEvmWindowStatus } from "../../sdk/src/qoreRest.js";
 
 /** Minimal .env loader (gateway/.env, then repo-root .env). Real env vars always win. */
 function loadDotEnv(file: string): void {
@@ -21,6 +22,11 @@ loadDotEnv(join(process.cwd(), "..", ".env"));
 const PORT = Number(process.env.GATEWAY_PORT ?? 4000);
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const CHAIN_ID = Number(process.env.QORECHAIN_CHAIN_ID ?? 9800);
+// EVM authorisation windows only exist on QoreChain itself. A local Anvil (or an Anvil fork) has
+// none, so the check is off there unless QORECHAIN_REST_URL is set explicitly.
+const IS_LOCAL_RPC = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(RPC_URL);
+const QORECHAIN_REST_URL =
+  process.env.QORECHAIN_REST_URL || (IS_LOCAL_RPC ? "" : DIANA_REST_URL);
 const CONTRACT_ADDRESS = process.env.SYNAPSE_VAULT_ADDRESS ?? "";
 const PINATA_JWT = process.env.PINATA_JWT || undefined;
 const CORS_ORIGINS = (process.env.CORS_ORIGIN ?? "http://localhost:5173,http://127.0.0.1:5173")
@@ -49,6 +55,9 @@ const server = createGatewayServer({
   store,
   pinataJwt: PINATA_JWT,
   corsOrigins: CORS_ORIGINS,
+  evmWindowReader: QORECHAIN_REST_URL
+    ? (address: string) => fetchEvmWindowStatus(QORECHAIN_REST_URL, address)
+    : undefined,
 });
 
 server.listen(PORT, "127.0.0.1", () => {
@@ -57,6 +66,7 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log(`QoreChain RPC:  ${RPC_URL} (Chain ID ${CHAIN_ID})`);
   console.log(`Vault Contract: ${CONTRACT_ADDRESS}`);
   console.log(`CORS origins:   ${CORS_ORIGINS.join(", ")}`);
+  console.log(`EVM window:     ${QORECHAIN_REST_URL ? `checked via ${QORECHAIN_REST_URL}` : "not enforced (local chain)"}`);
   console.log(`Pinata Proxy:   ${PINATA_JWT ? "ENABLED (server-side JWT)" : "LOCAL FALLBACK"}`);
   console.log("=========================================================");
 });

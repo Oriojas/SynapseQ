@@ -27,6 +27,12 @@ import {
 import { ChainUnavailableError, type ChainPolicyVerifier, type OnChainGrantPolicy } from "./chain.js";
 import { createGatewayServer, type GatewayServerOptions } from "./server.js";
 import { EnvelopeVaultStore } from "./store.js";
+import {
+  classifyEvmWindowRejection,
+  parseEvmWindow,
+  windowBlocksTarget,
+} from "../../sdk/src/evmWindow.js";
+import { toQorAddress } from "../../sdk/src/qoreRest.js";
 
 if (!globalThis.crypto) {
   (globalThis as unknown as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
@@ -278,10 +284,79 @@ async function testAbuseLimits(): Promise<void> {
   }
 }
 
+async function testEvmWindow(): Promise<void> {
+  console.log("[Test 4] EVM authorisation window: parsing, bounds, rejection classes, proxy...");
+  const VAULT = "0x0f6c2bbbb4137e7809669c05b075616556a2c2d6";
+
+  // Real Diana REST body (unbounded window opened by the team's deployer)
+  const unbounded = parseEvmWindow({
+    found: true, live: true, opened_height: "10761196", expiry_height: "10766196", max_txs: "50",
+    used_txs: "1", max_value: "10000000", used_value: "145771", remaining_blocks: "4105",
+    remaining_txs: "49", remaining_value: "9854229", native_only: false, allowed_targets: [],
+  });
+  assert.equal(unbounded.live, true);
+  assert.equal(unbounded.remainingTxs, 49n);
+  assert.equal(windowBlocksTarget(unbounded, VAULT), null);
+
+  const bounded = parseEvmWindow({ found: true, live: true, remaining_txs: "5", allowed_targets: [VAULT.toUpperCase().replace("0X", "0x")] });
+  assert.equal(windowBlocksTarget(bounded, VAULT), null);
+  assert.equal(windowBlocksTarget(bounded, "0x000000000000000000000000000000000000dEaD"), "out-of-scope");
+  assert.equal(windowBlocksTarget(parseEvmWindow({ found: false }), VAULT), "no-window");
+  assert.equal(windowBlocksTarget(parseEvmWindow({ found: true, live: false }), VAULT), "exhausted");
+  assert.equal(windowBlocksTarget(parseEvmWindow({ found: true, live: true, remaining_txs: "3", native_only: true }), VAULT), "out-of-scope");
+
+  // Same text/code rules as @qorechain/sdk classifyEvmWindowRejection
+  assert.equal(classifyEvmWindowRejection(new Error("account qor1x has no registered post-quantum key")), "no-pqc-key");
+  assert.equal(classifyEvmWindowRejection({ shortMessage: "x", cause: { message: "no open EVM authorisation window for qor1x" } }), "no-window");
+  assert.equal(classifyEvmWindowRejection({ message: "EVM authorisation window exhausted" }), "exhausted");
+  assert.equal(classifyEvmWindowRejection({ codespace: "pqc", code: 28 }), "invalid");
+  assert.equal(classifyEvmWindowRejection(new Error("execution reverted")), undefined);
+
+  // 0x and qor1 are the same 20 bytes
+  assert.equal(toQorAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8"), "qor1wzvhjux9rqfdcwspp37srdgwp5tac7wglagw2y");
+
+  // Gateway proxy endpoint
+  const verifier: ChainPolicyVerifier = { chainId: CHAIN_ID, async getGrantPolicy() { return null; } };
+  let reads = 0;
+  const { url, server, dir } = await startServer({
+    verifier,
+    evmWindowReader: async () => {
+      reads++;
+      return bounded;
+    },
+  });
+  try {
+    const r1 = (await (await fetch(`${url}/api/qore/evm-window/${PATIENT.address}`)).json()) as Record<string, unknown>;
+    assert.equal(r1.enforced, true);
+    assert.equal(r1.live, true);
+    assert.equal(r1.remainingTxs, "5");
+    assert.deepEqual(r1.allowedTargets, [VAULT]);
+    await fetch(`${url}/api/qore/evm-window/${PATIENT.address}`);
+    assert.equal(reads, 1, "second read within 10 s must come from the cache");
+    const bad = await fetch(`${url}/api/qore/evm-window/not-an-address`);
+    assert.equal(bad.status, 404);
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  // Local chain (no reader): not enforced
+  const local = await startServer({ verifier });
+  try {
+    const r = (await (await fetch(`${local.url}/api/qore/evm-window/${PATIENT.address}`)).json()) as Record<string, unknown>;
+    assert.equal(r.enforced, false);
+  } finally {
+    local.server.close();
+    rmSync(local.dir, { recursive: true, force: true });
+  }
+  console.log("  PASS");
+}
+
 async function main() {
   await testShamirRecovery();
   await testKeyReleaseGateway();
   await testAbuseLimits();
+  await testEvmWindow();
   console.log("\nAll Gateway & Recovery tests passed!");
 }
 

@@ -4,7 +4,14 @@
  * signed with the account's hybrid eth_secp256k1 + ML-DSA-87 key.
  *
  * Usage:
- *   DEPLOYER_MNEMONIC="word1 word2 ..." npm run evm:open-window
+ *   DEPLOYER_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=0x… npm run evm:open-window   # bounded to the vault
+ *   DEPLOYER_MNEMONIC="…" EVM_WINDOW_ALLOWED_TARGETS=any npm run evm:open-window  # only to DEPLOY
+ *   DEPLOYER_MNEMONIC="…" npm run evm:window-status                          # read-only
+ *
+ * "Ventana EVM acotada": by default the window is narrowed (allowedTargets) to the SynapseQ contract,
+ * so a compromised classical (secp256k1) key can only call SynapseVaultRegistry — not drain funds
+ * to arbitrary addresses — and only within the block/tx/value limits. Contract creation is refused
+ * by a targeted window, so deploy with EVM_WINDOW_ALLOWED_TARGETS=any, then reopen it bounded.
  *
  * Optional env vars:
  *   OEM_MNEMONIC            Fallback if DEPLOYER_MNEMONIC is not set
@@ -12,6 +19,9 @@
  *   EVM_WINDOW_BLOCKS       Blocks the window remains open (default: 500)
  *   EVM_WINDOW_MAX_TXS      Max EVM transactions admitted (default: 50)
  *   EVM_WINDOW_MAX_QOR      Max spend in QOR incl. gas fees (default: 10)
+ *   EVM_WINDOW_ALLOWED_TARGETS  Comma-separated 0x contracts (max 16). Default: SYNAPSE_VAULT_ADDRESS.
+ *                           "any" = unbounded (needed only for contract deployment).
+ *   EVM_WINDOW_NATIVE_ONLY  "true" = only plain QOR transfers (no contract calls)
  *   QORECHAIN_COSMOS_RPC    Tendermint RPC (default: https://rpc-testnet.qore.host)
  *   QORECHAIN_REST_URL      Cosmos REST LCD (default: https://api-testnet.qore.host)
  *   QORECHAIN_COSMOS_CHAIN  Chain ID (default: qorechain-diana)
@@ -24,6 +34,29 @@ import {
   fetchEvmWindow,
   openEvmWindowMsg,
 } from "@qorechain/sdk";
+
+function resolveAllowedTargets(): string[] {
+  const raw = (process.env.EVM_WINDOW_ALLOWED_TARGETS ?? process.env.SYNAPSE_VAULT_ADDRESS ?? "").trim();
+  if (raw === "" || raw.toLowerCase() === "any") return [];
+  const targets = raw.split(",").map((t) => t.trim()).filter(Boolean);
+  for (const t of targets) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(t)) throw new Error(`EVM_WINDOW_ALLOWED_TARGETS: ${t} is not a 0x address`);
+  }
+  return targets;
+}
+
+function printWindow(w: Awaited<ReturnType<typeof fetchEvmWindow>>): void {
+  if (!w.found) {
+    console.log("Window: none");
+    return;
+  }
+  console.log(
+    `Window: live=${w.live} · ${w.remainingTxs} txs · ${w.remainingBlocks} blocks · ${w.remainingValue} uqor left · expiry ${w.expiryHeight}`
+  );
+  console.log(
+    `Scope:  ${w.nativeOnly ? "native QOR transfers only" : w.allowedTargets.length ? `ONLY ${w.allowedTargets.join(", ")}` : "ANY target (unbounded)"}`
+  );
+}
 
 if (!globalThis.crypto) {
   (globalThis as unknown as { crypto: Crypto }).crypto = webcrypto as unknown as Crypto;
@@ -80,10 +113,22 @@ async function main() {
   const cosmosAddress = account.cosmos;
   const evmAddress = account.evm;
 
+  if (process.argv.includes("--status")) {
+    console.log(`Cosmos address: ${cosmosAddress}\nEVM address:    ${evmAddress}`);
+    printWindow(await fetchEvmWindow({ rest: restUrl, address: cosmosAddress }));
+    return;
+  }
+
+  const allowedTargets = resolveAllowedTargets();
+  const nativeOnly = process.env.EVM_WINDOW_NATIVE_ONLY === "true";
+
   console.log("=== QoreChain Open EVM Authorisation Window ===");
   console.log(`Cosmos address: ${cosmosAddress}`);
   console.log(`EVM address:    ${evmAddress}`);
   console.log(`Window params:  ${blocks} blocks · ${maxTxs} txs · max ${maxQor} QOR (${maxValueUqor} uqor)`);
+  console.log(
+    `Window scope:   ${nativeOnly ? "native QOR transfers only" : allowedTargets.length ? `ONLY ${allowedTargets.join(", ")}` : "ANY target — UNBOUNDED (use only to deploy)"}`
+  );
 
   const { accountNumber, sequence } = await fetchAccountNumbers(restUrl, cosmosAddress);
   const msg = openEvmWindowMsg({
@@ -91,6 +136,8 @@ async function main() {
     blocks,
     maxTxs,
     maxValue: maxValueUqor,
+    ...(nativeOnly ? { nativeOnly: true } : {}),
+    ...(allowedTargets.length ? { allowedTargets } : {}),
   });
 
   const signer = new EthNativeSigner(account, {
@@ -120,11 +167,13 @@ async function main() {
     client.disconnect();
   }
 
-  const liveWindow = await fetchEvmWindow({ rest: restUrl, address: cosmosAddress });
+  console.log("Verified on-chain:");
+  printWindow(await fetchEvmWindow({ rest: restUrl, address: cosmosAddress }));
   console.log(
-    `Verified on-chain: live=${liveWindow.live} · expiryHeight=${liveWindow.expiryHeight} · maxTxs=${liveWindow.maxTxs}`
+    allowedTargets.length
+      ? "The window only admits calls to the listed contract(s)."
+      : "Unbounded window: deploy now (`make deploy-diana`), then reopen it bounded to the vault."
   );
-  console.log("You can now run `make deploy-diana` to deploy SynapseVaultRegistry.");
 }
 
 main().catch((err) => {

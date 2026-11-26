@@ -171,7 +171,7 @@ OEM_MNEMONIC=… SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial SN-1
   --bearer 0x<portador> --zone 0 --firmware ./fw.bin --calibration "perfil-v1"
 OEM_MNEMONIC=… SYNAPSE_VAULT_ADDRESS=… npm run oem -- update --part 0x<partId> --firmware ./fw-v2.bin
 ```
-La cuenta del fabricante necesita en Diana su clave ML-DSA-87 registrada y una **ventana EVM abierta** (QoreX → Ajustes → Seguridad → Ventana de acceso EVM; idealmente restringida al contrato con `--allowed-targets`).
+La cuenta del fabricante necesita en Diana su clave ML-DSA-87 registrada y una **ventana EVM abierta** (QoreX → Ajustes → Seguridad → Ventana de acceso EVM, o `npm run evm:open-window` acotada al contrato).
 
 #### Pruebas locales y forks
 Anvil (incluido `anvil --fork-url https://evm-testnet.qore.host`) **no ejecuta los precompilados nativos de QoreChain**: en un fork `pqcKeyStatus` devuelve `0x` y el contrato revierte con `PqcUnavailable`. Para desarrollo local, `make init` ejecuta `make dev-pqc-mock`, que coloca `MockQorePqc` (**solo dev**) en `0x…0a01/0a02`; la herramienta OEM verifica la firma ML-DSA-87 fuera de la cadena y aprueba en el mock solo esa terna exacta (clave, firma, mensaje). La verificación real solo ocurre en Diana; se comprobó por `eth_call` que el precompilado de Diana acepta las firmas de `pqSign` y rechaza un mensaje alterado.
@@ -273,14 +273,28 @@ La demo ejecuta automáticamente los 6 pasos reales: generación de llaves `ML-K
 
 ### 5. Despliegue a QoreChain Diana Testnet Real (`Chain ID 9800`)
 ```bash
-# 1. Abrir la ventana de autorización EVM (requerida por QoreChain Diana)
 cd sdk
-DEPLOYER_MNEMONIC="<TU_RECOVERY_PHRASE_DE_TESTNET>" npm run evm:open-window
+# 1. Ventana SIN acotar, solo para desplegar (una ventana con allowedTargets rechaza crear contratos)
+DEPLOYER_MNEMONIC="<TU_RECOVERY_PHRASE_DE_TESTNET>" EVM_WINDOW_ALLOWED_TARGETS=any \
+  EVM_WINDOW_BLOCKS=200 EVM_WINDOW_MAX_TXS=3 npm run evm:open-window
 
 # 2. Desplegar el contrato en Diana Testnet
-cd ..
-make deploy-diana
+cd .. && make deploy-diana && cd sdk
+
+# 3. Ventana ACOTADA al contrato para operar la dApp ("ventana EVM acotada")
+DEPLOYER_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=0x<contrato> npm run evm:open-window
+
+# Consultar la ventana (solo lectura, sin transacción)
+DEPLOYER_MNEMONIC="…" npm run evm:window-status
 ```
+
+#### Ventana EVM acotada en la dApp
+QoreChain solo admite transacciones EVM de cuentas con clave ML-DSA-87 registrada **y** una ventana de autorización abierta (límite de bloques, transacciones y valor). SynapseQ la trata como parte de su modelo de seguridad:
+* **Apertura acotada por defecto:** `npm run evm:open-window` restringe la ventana (`allowedTargets`) al contrato `SYNAPSE_VAULT_ADDRESS`. Si la clave clásica secp256k1 se viera comprometida, solo podría llamar a `SynapseVaultRegistry`, dentro de los límites de la ventana. `EVM_WINDOW_ALLOWED_TARGETS=any` la abre sin acotar y debe usarse solo para desplegar.
+* **Estado visible en la interfaz:** el gateway consulta `GET /qorechain/pqc/v1/evm_window/{qor1…}` (la API REST de QoreChain no tiene CORS) en `GET /api/qore/evm-window/{0x…}`, con caché de 10 s. La cabecera muestra *acotada* (verde), *SIN ACOTAR* (ámbar) o *sin ventana / agotada / fuera de alcance* (rojo).
+* **Bloqueo previo:** antes de pedir la firma, la dApp comprueba que la ventana admite una llamada al contrato y, si no, explica cómo abrirla en lugar de enviar una transacción que el nodo rechazaría.
+* **Rechazos traducidos:** los errores del nodo (*no registered post-quantum key*, *no open EVM authorisation window*, ventana agotada, límites inválidos; códigos `pqc` 26/27/28) se muestran con su solución, con las mismas reglas que `classifyEvmWindowRejection` de `@qorechain/sdk`.
+* En un Anvil local no existen ventanas: el gateway informa `enforced: false` salvo que se defina `QORECHAIN_REST_URL`.
 
 ---
 

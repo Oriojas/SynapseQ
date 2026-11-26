@@ -23,6 +23,7 @@ import {
 } from '@sdk/gatewayClient';
 import { fetchEncryptedBlobFromIpfs } from '@sdk/storage';
 import { TacticalGpsBackground } from '@/components/layout/TacticalGpsBackground';
+import { EvmWindowBadge } from '@/components/layout/EvmWindowBadge';
 import { PatientVaultView, type SealGrantRequest } from '@/components/patient/PatientVaultView';
 import { CyberHbomView } from '@/components/hbom/CyberHbomView';
 import {
@@ -803,6 +804,13 @@ export function App(): React.JSX.Element {
                 {liveMode ? 'ON-CHAIN' : 'DEMO LOCAL'}
               </span>
             </div>
+
+            <EvmWindowBadge
+              window={vault.evmWindow}
+              enforced={vault.evmWindowEnforced}
+              contract={vault.contractAddress}
+              onRefresh={() => void vault.refreshEvmWindow()}
+            />
 
             <button
               type="button"
