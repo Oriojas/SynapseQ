@@ -28,12 +28,10 @@ import {
   computeEnvelopeHash,
   computeShake256,
   encryptAndSealDocument,
-  generateDsaKeyPair,
   generateKemKeyPair,
-  signMLDSA87,
   unsealAndDecryptDocument,
-  verifyMLDSA87,
 } from "./pqc.js";
+import { inspectPqcKey, oemFromDevPrivateKey, oemFromMnemonic, registerPartWithAttestation } from "./oem.js";
 
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://127.0.0.1:4000";
@@ -87,7 +85,6 @@ async function signedNonce(
 async function main() {
   const patient = privateKeyToAccount(PATIENT_PK);
   const specialist = privateKeyToAccount(SPECIALIST_PK);
-  const manufacturer = privateKeyToAccount(MANUFACTURER_PK);
 
   console.log("=== SynapseQ End-to-End Post-Quantum Demo (local chain + Key-Release Gateway) ===");
   console.log("Contract:    ", CONTRACT_ADDRESS);
@@ -106,37 +103,32 @@ async function main() {
     "registerKemPublicKey"
   );
 
-  // 2. Manufacturer signs firmware with ML-DSA-87 and registers the part for the patient
-  console.log("\n[2/7] OEM signs firmware with ML-DSA-87 and registers HBOM part...");
-  const oemDsa = generateDsaKeyPair();
-  const serial = `SN-${Date.now()}`;
+  // 2. Manufacturer signs the firmware attestation with its REGISTERED ML-DSA-87 key and the
+  //    contract verifies it ON-CHAIN (pqcKeyStatus + pqcVerify precompiles)
+  console.log("\n[2/7] OEM signs firmware with ML-DSA-87; contract verifies it on-chain (pqcVerify)...");
+  const oem = process.env.OEM_MNEMONIC
+    ? oemFromMnemonic(process.env.OEM_MNEMONIC.trim(), Number(process.env.OEM_INDEX ?? 0))
+    : oemFromDevPrivateKey(MANUFACTURER_PK);
+  const pqcInfo = await inspectPqcKey(publicClient, oem);
+  console.log(
+    `  - PQC precompiles: ${!pqcInfo.available ? "NOT AVAILABLE" : pqcInfo.isDevMock ? "MockQorePqc (local dev)" : "native QoreChain"} • OEM key ${oem.pqKeySource}`
+  );
   const firmware = new TextEncoder().encode("NeuroLink-X9-Firmware-v1.0.0-stable");
-  const firmwareSig = signMLDSA87(firmware, oemDsa.secretKey);
-  console.log(`  - ML-DSA-87 signature valid: ${verifyMLDSA87(firmware, firmwareSig, oemDsa.publicKey)}`);
-  const registerArgs = [
-    patient.address,
-    0, // AnatomicalZone.NEURAL
-    "NeuroLink-X9 BCI",
-    serial,
-    computeShake256(firmware),
-    computeShake256(new TextEncoder().encode("motor-cortex-cal-v1")),
-    firmwareSig,
-  ] as const;
-  const { result: partId } = await publicClient.simulateContract({
-    account: manufacturer,
-    address: CONTRACT_ADDRESS,
-    abi: SYNAPSE_VAULT_ABI,
-    functionName: "registerBionicPart",
-    args: registerArgs,
-  });
-  await send(
-    await walletFor(manufacturer).writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: SYNAPSE_VAULT_ABI,
-      functionName: "registerBionicPart",
-      args: registerArgs,
-    }),
-    "registerBionicPart"
+  const registered = await registerPartWithAttestation(
+    { publicClient, walletClient: walletFor(oem.account), vault: CONTRACT_ADDRESS },
+    oem,
+    {
+      bearer: patient.address,
+      zone: 0, // AnatomicalZone.NEURAL
+      modelName: "NeuroLink-X9 BCI",
+      serialNumber: `SN-${Date.now()}`,
+      firmwareHash: computeShake256(firmware),
+      calibrationHash: computeShake256(new TextEncoder().encode("motor-cortex-cal-v1")),
+    }
+  );
+  const partId = registered.partId;
+  console.log(
+    `  - registerBionicPart: ok (ML-DSA-87 ${registered.signatureBytes} B verified on-chain, gas ${registered.gasUsed}) tx ${registered.hash}`
   );
 
   // 3. Patient reads the specialist key FROM CHAIN, encrypts locally, pins via gateway
