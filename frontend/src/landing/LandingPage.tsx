@@ -16,9 +16,9 @@ import { Audience, Footer, Manifesto, Modules } from './scenes/Closing';
 import { DAPP_BASE_URL } from './ui';
 
 function detectLocale(): Locale {
-  const saved = window.localStorage.getItem('synapseq.locale');
-  if (saved === 'es' || saved === 'en') return saved;
-  return navigator.language?.toLowerCase().startsWith('es') ? 'es' : 'en';
+  const saved = window.localStorage.getItem('synapseq.locale.v2');
+  if (saved === 'en' || saved === 'es') return saved;
+  return 'en';
 }
 
 /** Thin HUD rail showing how far through the journey the visitor is. */
@@ -55,7 +55,7 @@ export function LandingPage(): React.JSX.Element {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    window.localStorage.setItem('synapseq.locale', locale);
+    window.localStorage.setItem('synapseq.locale.v2', locale);
     // Text length changes the layout: let ScrollTrigger re-measure
     if (prefs.cinematic) loadGsap().then(({ ScrollTrigger }) => requestAnimationFrame(() => ScrollTrigger.refresh()));
   }, [locale, prefs.cinematic]);
@@ -121,7 +121,7 @@ export function LandingPage(): React.JSX.Element {
 
                 <div className="flex items-center gap-3">
                   <div role="group" aria-label="Language" className="relative inline-flex items-center p-0.5 bg-reb-surface border border-reb-border font-mono text-[11px] rounded-full">
-                    {(['es', 'en'] as const).map((code) => (
+                    {(['en', 'es'] as const).map((code) => (
                       <button
                         key={code}
                         type="button"

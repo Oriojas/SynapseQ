@@ -39,10 +39,10 @@ SynapseQ combina cifrado post-cuántico en cliente (100% compatible con navegado
 ```mermaid
 flowchart TB
     subgraph UI["4. Frontend Dual-Entry (Vite + React 19 + Tailwind v4 + Three.js)"]
-        LAND["Cinematic Landing v2 (/landing.html) • Túnel 3D WebGL/GLSL + Blueprint Iris"]
-        HUD["Map-First Tactical HUD (/) • Patient Vault • Cyber-Human HBOM • Specialist Portal"]
+        LAND["Cinematic Landing v2 (/) • Túnel 3D WebGL/GLSL + Blueprint Iris (Default EN)"]
+        HUD["Map-First Tactical HUD (/app.html) • Patient Vault • Cyber-Human HBOM • Specialist Portal"]
         BADGE["Semáforo Ventana EVM Acotada (EvmWindowBadge.tsx)"]
-        LAND -->|"Launch Console"| HUD
+        LAND <-->|"Launch dApp / ← Landing"| HUD
     end
 
     subgraph SDK["1. Cliente & SDK Post-Cuántico (sdk/src/ — Browser-Safe TypeScript)"]
@@ -149,8 +149,8 @@ stateDiagram-v2
 
 El frontend (`frontend/`) ofrece una experiencia dual construida con **Vite + React 19 + Tailwind CSS v4 + Three.js**, inspirada en la paleta cromática *Rebecca (Cyberpunk: Edgerunners)* (`#0B100E` obsidiana verdosa, `#A8F0C6` menta pastel, `#F4729B` rosa coral, `#3B66E8` azul cobalto y `#FACC15` amarillo ácido):
 
-* **Cinematic Landing v2 (`http://localhost:5173/landing.html` — `frontend/src/landing/`):** Experiencia narrativa inmersiva bilingüe (`ES` / `EN`) con túnel sináptico 3D en **Three.js + Shaders GLSL** (`SynapticTunnelCanvas.tsx`), iris de blueprint anatómico (`BlueprintIris.tsx`), coreografía de scroll con **GSAP ScrollTrigger + Lenis** y transición directa hacia la consola operativa.
-* **Mapa Vectorial Táctico GPS en Tiempo Real (`http://localhost:5173/` — `TacticalGpsBackground.tsx`):** Curvas topográficas, cuadrícula urbana por sectores (`SECTOR-09 // WEST LATTICE`), anillos de radar concéntricos (`1.0 km` a `4.0 km`) y ruta vectorial conectando `ENCLAVE NODE [DIANA-9800]` con `PATIENT BEACON [#EQ-9042]`.
+* **Cinematic Landing v2 (`http://localhost:5173/` — `frontend/src/landing/`):** Página de llegada por defecto en **inglés (`EN`)** con selector bilingüe (`EN` / `ES`), túnel sináptico 3D en **Three.js + Shaders GLSL** (`SynapticTunnel.tsx`), iris de blueprint anatómico (`BlueprintIris.tsx`), coreografía de scroll con **GSAP ScrollTrigger + Lenis** y lanzamiento directo a cada módulo de la dApp (`/app.html?tab=...`).
+* **Mapa Vectorial Táctico GPS en Tiempo Real (`http://localhost:5173/app.html` — `TacticalGpsBackground.tsx`):** Consola operativa con botón `← Landing` en la cabecera para regresar a la experiencia narrativa, curvas topográficas, cuadrícula urbana por sectores (`SECTOR-09 // WEST LATTICE`), anillos de radar concéntricos (`1.0 km` a `4.0 km`) y ruta vectorial conectando `ENCLAVE NODE [DIANA-9800]` con `PATIENT BEACON [#EQ-9042]`.
 * **Riel HUD Flotante Izquierdo + Corredor Central Despejado + Drawer Inferior Derecho:** Las 3 vistas (*Patient Vault*, *Cyber-Human HBOM* y *Specialist Portal*) utilizan tarjetas de cristal translúcido (`backdrop-blur-md`) en los bordes para mantener el corredor central del mapa táctico 100% visible.
 * **Semáforo de Ventana EVM Acotada (`EvmWindowBadge.tsx`) y Transparencia On-Chain:** La barra superior verifica en vivo la ventana de autorización PQC→EVM de la wallet conectada (*acotada al contrato*, *sin acotar* o *cerrada/agotada*), distingue explícitamente entre pases/implantes **ON-CHAIN** y **DEMO LOCAL**, simula cada transacción con `simulateContract` antes de firmar y comprueba `receipt.status === "success"`.
 
@@ -196,9 +196,10 @@ SynapseQ/
 │   │   ├── quantumDefenseSim.ts       # Simulación ejecutable de 5 vectores de ataque post-cuántico (Q-Day)
 │   │   ├── abi.ts                     # ABI tipado completo de SynapseVaultRegistry v2
 │   │   └── demo.ts                    # Demo end-to-end de 7 pasos contra nodo local + Key-Release Gateway
-├── frontend/                          # Frontend Dual-Entry: Tactical Bio-HUD + Cinematic Landing v2
-│   ├── index.html                     # Entrypoint principal: Map-First Tactical HUD (/)
-│   ├── landing.html                   # Entrypoint narrativo: Cinematic Landing v2 (/landing.html)
+├── frontend/                          # Frontend Dual-Entry: Cinematic Landing v2 (/) + Tactical Bio-HUD (/app.html)
+│   ├── index.html                     # Entrypoint por defecto (/): Cinematic Landing v2 (EN default / ES switch)
+│   ├── app.html                       # Entrypoint de la dApp (/app.html): Map-First Tactical Bio-HUD
+│   ├── landing.html                   # Alias de compatibilidad hacia Cinematic Landing v2
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── layout/                # TacticalGpsBackground + EvmWindowBadge (estado de ventana EVM acotada)

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bytesToHex, hexToBytes, type Address } from 'viem';
-import { ShieldAlert, Cpu, KeyRound, Activity, Radio, Wallet, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, Cpu, KeyRound, Activity, Radio, Wallet, CheckCircle2, ArrowLeft } from 'lucide-react';
 import {
   computeEnvelopeHash,
   computeShake256,
@@ -127,7 +127,13 @@ export function App(): React.JSX.Element {
   const env = useMemo(() => getFrontendEnvConfig(), []);
   const vault = useSynapseVault();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('patient-vault');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    if (tabParam === 'patient-vault' || tabParam === 'cyber-hbom' || tabParam === 'specialist-portal') {
+      return tabParam;
+    }
+    return 'patient-vault';
+  });
   // Hard-coded examples are flagged so they are never presented as on-chain data
   const [passes, setPasses] = useState<readonly MockEphemeralPass[]>(() =>
     INITIAL_EPHEMERAL_PASSES.map((p) => ({ ...p, isSample: true }))
@@ -721,7 +727,16 @@ export function App(): React.JSX.Element {
       <header className="sticky top-0 z-50 w-full bg-reb-bg/85 backdrop-blur-xl border-b border-reb-border">
         <div className="max-w-[1480px] mx-auto h-16 px-6 lg:px-10 flex items-center justify-between gap-4">
           {/* Brand & 3-Tab Navigation */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-5 lg:gap-7">
+            <a
+              href="/"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-reb-surface/80 border border-reb-border hover:border-reb-mint/60 text-reb-text-muted hover:text-reb-mint font-mono text-[11px] uppercase tracking-wider transition-all"
+              title="Back to Cinematic Landing"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-reb-mint" />
+              <span>Landing</span>
+            </a>
+
             <button
               type="button"
               onClick={() => setActiveTab('specialist-portal')}

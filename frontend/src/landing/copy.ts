@@ -341,7 +341,7 @@ export const LANDING_COPY: Record<Locale, LandingCopy> = {
         { code: 'ESTADO', title: 'ACTIVE · MAINTENANCE · DECOMMISSIONED', body: 'DECOMMISSIONED es terminal: una pieza retirada no vuelve a la vida.' },
       ],
       honestNote:
-        'Límite honesto: la EVM no verifica ML-DSA-87 (no hay precompilado); la firma se valida fuera de la cadena con la clave pública del fabricante.',
+        'Verificación real on-chain: QoreChain Diana Testnet valida la firma ML-DSA-87 (4,627 B) con los precompilados nativos pqcKeyStatus (0x…0a02) y pqcVerify (0x…0a01).',
     },
     audience: {
       hudTag: 'PARA QUIÉN',
@@ -408,10 +408,10 @@ export const LANDING_COPY: Record<Locale, LandingCopy> = {
       ],
       proofTitle: 'Lo que ya funciona',
       proof: [
-        { label: 'CONTRATO', value: 'Foundry · 24 tests' },
+        { label: 'CONTRATO', value: 'Foundry · 36 tests' },
         { label: 'RED', value: 'QoreChain Diana · 9800' },
-        { label: 'PQC', value: 'En navegador' },
-        { label: 'GATEWAY', value: 'Zero-Trust' },
+        { label: 'PQC', value: 'QoreSeal + pqcVerify' },
+        { label: 'GATEWAY', value: 'Zero-Trust · 4 suites' },
         { label: 'RECUPERACIÓN', value: 'Shamir 2-de-3' },
       ],
     },
@@ -622,7 +622,7 @@ export const LANDING_COPY: Record<Locale, LandingCopy> = {
         { code: 'STATUS', title: 'ACTIVE · MAINTENANCE · DECOMMISSIONED', body: 'DECOMMISSIONED is terminal: a retired part never comes back to life.' },
       ],
       honestNote:
-        "Honest limit: the EVM doesn't verify ML-DSA-87 (there's no precompile); the signature is checked off-chain with the manufacturer's public key.",
+        'Real on-chain verification: QoreChain Diana Testnet verifies the 4,627-byte ML-DSA-87 signature via native precompiles pqcKeyStatus (0x…0a02) and pqcVerify (0x…0a01).',
     },
     audience: {
       hudTag: 'WHO IT IS FOR',
@@ -689,10 +689,10 @@ export const LANDING_COPY: Record<Locale, LandingCopy> = {
       ],
       proofTitle: 'What already works',
       proof: [
-        { label: 'CONTRACT', value: 'Foundry · 24 tests' },
+        { label: 'CONTRACT', value: 'Foundry · 36 tests' },
         { label: 'NETWORK', value: 'QoreChain Diana · 9800' },
-        { label: 'PQC', value: 'In-browser' },
-        { label: 'GATEWAY', value: 'Zero-Trust' },
+        { label: 'PQC', value: 'QoreSeal + pqcVerify' },
+        { label: 'GATEWAY', value: 'Zero-Trust · 4 suites' },
         { label: 'RECOVERY', value: 'Shamir 2-of-3' },
       ],
     },

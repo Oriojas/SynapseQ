@@ -101,9 +101,10 @@ init: ## 🚀 Levantar el stack local (Anvil QoreChain 9800 :8545 · Deploy Syna
 	  exit 1; \
 	fi; \
 	echo "✅ Stack SynapseQ arriba:"; \
-	echo "   Frontend Bio-HUD → http://localhost:$$FRONTEND_PORT"; \
-	echo "   Gateway          → http://127.0.0.1:$$GATEWAY_PORT"; \
-	echo "   Anvil EVM (9800) → $$LOCAL_RPC_URL"; \
+	echo "   Cinematic Landing → http://localhost:$$FRONTEND_PORT/"; \
+	echo "   Tactical Bio-HUD  → http://localhost:$$FRONTEND_PORT/app.html"; \
+	echo "   Gateway           → http://127.0.0.1:$$GATEWAY_PORT"; \
+	echo "   Anvil EVM (9800)  → $$LOCAL_RPC_URL"; \
 	echo ""; \
 	echo "   Logs:  tail -f $(ANVIL_LOG)"; \
 	echo "          tail -f $(GATEWAY_LOG)"; \

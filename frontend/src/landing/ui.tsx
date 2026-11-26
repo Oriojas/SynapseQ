@@ -5,7 +5,7 @@ import type { Tone } from './copy';
 import { useInView } from './hooks/useScene';
 
 export const DAPP_BASE_URL =
-  (import.meta.env.VITE_DAPP_URL as string | undefined)?.trim() || '/';
+  (import.meta.env.VITE_DAPP_URL as string | undefined)?.trim() || '/app.html';
 export const GITHUB_REPO_URL =
   (import.meta.env.VITE_GITHUB_URL as string | undefined)?.trim() ||
   'https://github.com/Oriojas/SynapseQ';
