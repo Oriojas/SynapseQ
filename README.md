@@ -5,6 +5,7 @@
 [![PQC](https://img.shields.io/badge/PQC-ML--KEM--1024%20%2B%20ML--DSA--87-FF3860?style=for-the-badge)](https://build.qorechain.io/es/kits)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-F59E0B?style=for-the-badge)](https://book.getfoundry.sh/)
 [![CBOM](https://img.shields.io/badge/CycloneDX-CBOM%20v1.6%20Verified-A8F0C6?style=for-the-badge)](./cbom-report.json)
+[![AI-Native](https://img.shields.io/badge/Track-AI--Native%20(AI__USAGE.md)-A855F7?style=for-the-badge)](./AI_USAGE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 > **"Protegiendo la biología humana del presente y asegurando la trazabilidad biónica de los ciber-humanos del mañana frente a la era cuántica."**
@@ -160,6 +161,7 @@ El frontend (`frontend/`) ofrece una experiencia dual construida con **Vite + Re
 ```text
 SynapseQ/
 ├── Makefile                           # Automatización integral (build, init, down, test, lint, audit, cbom, deploy)
+├── AI_USAGE.md                        # Documentación oficial de ingeniería AI-Native (Multi-Agent Swarm, Stitch MCP y AI Red-Team)
 ├── .env.example                       # Plantilla única de variables de entorno (sin secretos ni datos reales)
 ├── cbom-report.json                   # Reporte CycloneDX v1.6 Cryptography Bill of Materials (NIST Cat 5 PQC)
 ├── contracts/                         # Smart Contracts v2 (Foundry / Solidity 0.8.24)
