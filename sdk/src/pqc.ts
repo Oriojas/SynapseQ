@@ -1,7 +1,33 @@
-import { ml_kem1024 } from "@noble/post-quantum/ml-kem";
 import { ml_dsa87 } from "@noble/post-quantum/ml-dsa";
 import { shake256 } from "@noble/hashes/sha3";
+import {
+  generateSealKeys,
+  open as qoreSealOpen,
+  seal as qoreSealSeal,
+  sealKeysFromSeed,
+  validateMlkemPublicKey,
+  type SealKeyPair,
+  type SealMode,
+} from "@qorechain/qoreseal";
 import { bytesToHex, hexToBytes, keccak256 } from "viem";
+
+export {
+  buildRegisterKemKeyMessage,
+  buildRemoveKemKeyMessage,
+  deriveSealKeys,
+  envelopeFromText,
+  envelopeToText,
+  parseEnvelope,
+  recipientOf,
+  signRecipientCard,
+  validateMlkemPublicKey,
+  verifyRecipientCard,
+  type ParsedEnvelope,
+  type RecipientCard,
+  type SealKeyPair,
+  type SealMode,
+  type SealRecipient,
+} from "@qorechain/qoreseal";
 
 function getCrypto(): Crypto {
   if (!globalThis.crypto?.subtle) {
@@ -11,17 +37,33 @@ function getCrypto(): Crypto {
 }
 
 const AES_KEY_BYTES = 32; // AES-256-GCM (Grover-resistant symmetric cipher)
-const AES_IV_BYTES = 12;  // 96-bit standard GCM nonce
-const ML_KEM_1024_CIPHERTEXT_BYTES = 1568; // NIST FIPS 203 ML-KEM-1024 ciphertext size
+const AES_IV_BYTES = 12; // 96-bit standard GCM nonce
+
+/** Default QoreChain chain ID and QoreSeal application purpose bound into every HKDF key derivation. */
+export const QORESEAL_CHAIN_ID = "qorechain-diana";
+export const QORESEAL_VAULT_PURPOSE = "synapseq-vault-dek";
 
 export interface KemKeyPair {
+  /** 1568-byte NIST FIPS 203 ML-KEM-1024 encapsulation key */
   publicKey: Uint8Array;
+  /** 3168-byte NIST FIPS 203 ML-KEM-1024 decapsulation key */
   secretKey: Uint8Array;
+  /** Full QoreSeal key pair (ML-KEM-1024 + X25519 + 32-byte seed) for hybrid & recipient cards */
+  sealKeys?: SealKeyPair;
 }
 
 export interface DsaKeyPair {
   publicKey: Uint8Array;
   secretKey: Uint8Array;
+}
+
+export interface SealDocumentOptions {
+  /** Optional X25519 public key (from a verified QoreSeal Recipient Card) to enable hybrid ML-KEM-1024 + X25519 mode */
+  recipientX25519PublicKey?: Uint8Array;
+  /** Override QoreSeal chain ID binding (default: "qorechain-diana") */
+  chainId?: string;
+  /** Override QoreSeal purpose binding (default: "synapseq-vault-dek") */
+  purpose?: string;
 }
 
 export interface SealedDocumentResult {
@@ -32,35 +74,47 @@ export interface SealedDocumentResult {
    * avoids a public "guess-and-confirm" oracle for low-entropy medical documents.
    */
   contentHash: `0x${string}`;
-  /** keccak256 of the envelope: the on-chain commitment the gateway release is checked against */
+  /** keccak256 of the QoreSeal envelope: the on-chain commitment the gateway release is checked against */
   envelopeHash: `0x${string}`;
-  /** ML-KEM-1024 sealed envelope (kemCiphertext || wrapIv || wrappedDek+authTag) */
+  /** Official QoreSeal v1 binary envelope (ML-KEM-1024 or hybrid ML-KEM-1024 + X25519) wrapping the 32-byte DEK */
   encryptedKeyEnvelope: `0x${string}`;
+  /** QoreSeal encryption mode used ("hybrid" when X25519 key provided, otherwise "mlkem") */
+  sealMode: SealMode;
 }
 
 /**
- * Generates a NIST FIPS 203 ML-KEM-1024 key pair for post-quantum key encapsulation.
+ * Generates a NIST FIPS 203 ML-KEM-1024 (+ X25519) QoreSeal key pair.
  */
 export function generateKemKeyPair(): KemKeyPair {
-  return ml_kem1024.keygen();
+  const sealKeys = generateSealKeys();
+  return {
+    publicKey: sealKeys.mlkemPublicKey,
+    secretKey: sealKeys.mlkemSecretKey,
+    sealKeys,
+  };
 }
 
 /**
- * Deterministically derives an ML-KEM-1024 key pair from a 64-byte seed.
+ * Deterministically derives a QoreSeal ML-KEM-1024 (+ X25519) key pair from a seed.
  * Used to rebuild a specialist's key from a wallet signature (no secret key stored in the browser).
  */
 export function deriveKemKeyPairFromSeed(seed: Uint8Array): KemKeyPair {
-  const seed64 = seed.length === 64 ? seed : shake256(seed, { dkLen: 64 });
-  return ml_kem1024.keygen(seed64);
+  const seed32 = seed.length === 32 ? seed : shake256(seed, { dkLen: 32 });
+  const sealKeys = sealKeysFromSeed(seed32);
+  return {
+    publicKey: sealKeys.mlkemPublicKey,
+    secretKey: sealKeys.mlkemSecretKey,
+    sealKeys,
+  };
 }
 
 /** Fixed message a wallet signs to derive its ML-KEM-1024 key (ECDSA RFC 6979 is deterministic). */
 export const KEM_DERIVATION_MESSAGE =
   "SynapseQ ML-KEM-1024 key derivation v1\nSigning this does NOT authorize any transaction.";
 
-/** Derives the ML-KEM-1024 key pair from the wallet's signature over KEM_DERIVATION_MESSAGE. */
+/** Derives the QoreSeal key pair from the wallet's signature over KEM_DERIVATION_MESSAGE. */
 export function deriveKemKeyPairFromSignature(signatureHex: `0x${string}`): KemKeyPair {
-  return deriveKemKeyPairFromSeed(shake256(hexToBytes(signatureHex), { dkLen: 64 }));
+  return deriveKemKeyPairFromSeed(shake256(hexToBytes(signatureHex), { dkLen: 32 }));
 }
 
 /** keccak256 commitment of an envelope (matches the contract's `envelopeHash`). */
@@ -146,54 +200,68 @@ async function aesGcmDecrypt(keyBytes: Uint8Array, payload: Uint8Array): Promise
 }
 
 /**
- * Hybrid Post-Quantum Envelope Encryption:
- * 1) Computes SHAKE-256 integrity hash of the resulting ciphertext.
+ * Hybrid Post-Quantum Envelope Encryption powered by official @qorechain/qoreseal:
+ * 1) Validates the recipient's ML-KEM-1024 public key against FIPS 203 modulus checks.
  * 2) Encrypts plaintext with a fresh random AES-256-GCM Data Encryption Key (DEK).
- * 3) Encapsulates a shared secret to the recipient's ML-KEM-1024 public key.
- * 4) Wraps the DEK with the ML-KEM shared secret into an on-chain compatible envelope.
+ * 3) Computes SHAKE-256 integrity hash of the resulting ciphertext.
+ * 4) Seals the 32-byte DEK into an official QoreSeal v1 binary envelope bound to QoreChain Diana.
  */
 export async function encryptAndSealDocument(
   plaintext: Uint8Array,
-  recipientKemPublicKey: Uint8Array
+  recipientKemPublicKey: Uint8Array,
+  options: SealDocumentOptions = {}
 ): Promise<SealedDocumentResult> {
+  validateMlkemPublicKey(recipientKemPublicKey);
+
   // Step 1: Encrypt the document payload with a fresh random 256-bit DEK
   const dek = getCrypto().getRandomValues(new Uint8Array(AES_KEY_BYTES));
   const encryptedBlob = await aesGcmEncrypt(dek, plaintext);
 
-  // Step 2: ML-KEM-1024 encapsulation against the specialist's public key
-  const { cipherText: kemCiphertext, sharedSecret } = ml_kem1024.encapsulate(
-    recipientKemPublicKey
-  );
+  // Step 2: Wrap the DEK in an official QoreSeal v1 envelope (hybrid when X25519 key is supplied)
+  const sealMode: SealMode = options.recipientX25519PublicKey ? "hybrid" : "mlkem";
+  const qoreSealEnvelope = qoreSealSeal({
+    chainId: options.chainId ?? QORESEAL_CHAIN_ID,
+    purpose: options.purpose ?? QORESEAL_VAULT_PURPOSE,
+    mode: sealMode,
+    recipients: [
+      {
+        mlkemPublicKey: recipientKemPublicKey,
+        ...(options.recipientX25519PublicKey
+          ? { x25519PublicKey: options.recipientX25519PublicKey }
+          : {}),
+      },
+    ],
+    plaintext: dek,
+    anonymous: true,
+  });
+  dek.fill(0);
 
-  // Step 3: Wrap the DEK using the 32-byte ML-KEM shared secret
-  const wrappedDek = await aesGcmEncrypt(sharedSecret, dek);
-
-  // Step 4: Pack ML-KEM ciphertext + wrapped DEK into a single envelope
-  const envelopeBytes = new Uint8Array(kemCiphertext.length + wrappedDek.length);
-  envelopeBytes.set(kemCiphertext, 0);
-  envelopeBytes.set(wrappedDek, kemCiphertext.length);
-
-  const encryptedKeyEnvelope = bytesToHex(envelopeBytes);
+  const encryptedKeyEnvelope = bytesToHex(qoreSealEnvelope);
   return {
     encryptedBlob,
     contentHash: computeShake256(encryptedBlob),
     encryptedKeyEnvelope,
     envelopeHash: computeEnvelopeHash(encryptedKeyEnvelope),
+    sealMode,
   };
 }
 
 /**
- * Hybrid Post-Quantum Decryption & Integrity Verification:
+ * Hybrid Post-Quantum Decryption & Integrity Verification powered by official @qorechain/qoreseal:
  * 0) Verifies SHAKE-256(ciphertext) against the on-chain contentHash BEFORE decrypting.
- * 1) Decapsulates the ML-KEM-1024 shared secret using the recipient's private key.
- * 2) Unwraps the AES-256-GCM DEK.
- * 3) Decrypts the encrypted document blob in memory.
+ * 1) Opens the official QoreSeal v1 envelope to recover the 32-byte DEK.
+ * 2) Decrypts the encrypted document blob in memory with AES-256-GCM.
  */
 export async function unsealAndDecryptDocument(
   encryptedBlob: Uint8Array,
   encryptedKeyEnvelopeHex: `0x${string}`,
   recipientKemSecretKey: Uint8Array,
-  expectedContentHash: `0x${string}`
+  expectedContentHash: `0x${string}`,
+  options: {
+    sealKeys?: SealKeyPair;
+    chainId?: string;
+    purpose?: string;
+  } = {}
 ): Promise<Uint8Array> {
   const actualHash = computeShake256(encryptedBlob);
   if (actualHash.toLowerCase() !== expectedContentHash.toLowerCase()) {
@@ -203,17 +271,26 @@ export async function unsealAndDecryptDocument(
   }
 
   const envelopeBytes = hexToBytes(encryptedKeyEnvelopeHex);
-  const kemCiphertext = envelopeBytes.subarray(0, ML_KEM_1024_CIPHERTEXT_BYTES);
-  const wrappedDek = envelopeBytes.subarray(ML_KEM_1024_CIPHERTEXT_BYTES);
+  const openKeys: SealKeyPair = options.sealKeys ?? {
+    seed: new Uint8Array(32),
+    mlkemPublicKey: new Uint8Array(1568),
+    mlkemSecretKey: recipientKemSecretKey,
+    x25519PublicKey: new Uint8Array(32),
+    x25519SecretKey: new Uint8Array(32),
+  };
 
-  // Step 1: Decapsulate ML-KEM-1024 shared secret
-  const sharedSecret = ml_kem1024.decapsulate(kemCiphertext, recipientKemSecretKey);
+  // Step 1: Open official QoreSeal v1 envelope to recover the 32-byte DEK
+  const dek = qoreSealOpen({
+    chainId: options.chainId ?? QORESEAL_CHAIN_ID,
+    purpose: options.purpose ?? QORESEAL_VAULT_PURPOSE,
+    envelope: envelopeBytes,
+    keys: openKeys,
+  });
 
-  // Step 2: Unwrap DEK
-  const dek = await aesGcmDecrypt(sharedSecret, wrappedDek);
-
-  // Step 3: Decrypt document blob in memory (AES-GCM tag authenticates the plaintext)
-  const plaintext = await aesGcmDecrypt(dek, encryptedBlob);
-  dek.fill(0);
-  return plaintext;
+  // Step 2: Decrypt document blob in memory (AES-GCM tag authenticates the plaintext)
+  try {
+    return await aesGcmDecrypt(dek, encryptedBlob);
+  } finally {
+    dek.fill(0);
+  }
 }
