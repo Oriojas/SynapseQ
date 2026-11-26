@@ -159,7 +159,22 @@ SynapseQ/
 * `registerBionicPart(bearer, zone, modelName, serialNumber, firmwareHash, calibrationHash, pqcSignature) → partId`: Lo llama el fabricante (`msg.sender`); `partId = computePartId(fabricante, serial)`. Guarda `keccak256` de la firma `ML-DSA-87` y emite la firma completa en `FirmwareAttestation`.
 * `logFirmwareUpdate(partId, newFirmwareHash, newCalibrationHash, pqcSignature)`: Parches de firmware (solo el fabricante).
 * `updatePartStatus(partId, newStatus)`: Cambia el estado operativo; `DECOMMISSIONED` es terminal.
-* Nota: la EVM no verifica la firma `ML-DSA-87` (no hay precompilado en el contrato); se verifica fuera de la cadena con la clave pública del fabricante.
+* **Verificación on-chain de la firma `ML-DSA-87` (`pqcVerify`):** `registerBionicPart` y `logFirmwareUpdate` obtienen la clave registrada del fabricante con el precompilado `pqcKeyStatus(msg.sender)` (`0x…0a02`) y verifican la firma con `pqcVerify` (`0x…0a01`). El mensaje firmado es `firmwareAttestationMessage(partId, version, firmwareHash, calibrationHash)`, ligado a chain ID, contrato, pieza y versión (no se puede reutilizar). Si el precompilado no responde (Anvil sin mock, mainnet), el contrato **falla cerrado** (`PqcUnavailable`). `requirePossessionProof` (constructor, `REQUIRE_PQC_POSSESSION`) exige además prueba de posesión de la clave.
+
+#### Herramienta OEM (`sdk/src/oemCli.ts`)
+La wallet web no puede firmar con ML-DSA, así que el fabricante firma con su **clave canónica** (la misma que registra QoreX, `deriveCanonicalPqKey`):
+```bash
+cd sdk
+OEM_MNEMONIC="<mnemónico de testnet del fabricante>" QORECHAIN_RPC_URL=https://evm-testnet.qore.host \
+SYNAPSE_VAULT_ADDRESS=<contrato> npm run oem -- status
+OEM_MNEMONIC=… SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial SN-1 --model "NeuroLink-X9" \
+  --bearer 0x<portador> --zone 0 --firmware ./fw.bin --calibration "perfil-v1"
+OEM_MNEMONIC=… SYNAPSE_VAULT_ADDRESS=… npm run oem -- update --part 0x<partId> --firmware ./fw-v2.bin
+```
+La cuenta del fabricante necesita en Diana su clave ML-DSA-87 registrada y una **ventana EVM abierta** (QoreX → Ajustes → Seguridad → Ventana de acceso EVM; idealmente restringida al contrato con `--allowed-targets`).
+
+#### Pruebas locales y forks
+Anvil (incluido `anvil --fork-url https://evm-testnet.qore.host`) **no ejecuta los precompilados nativos de QoreChain**: en un fork `pqcKeyStatus` devuelve `0x` y el contrato revierte con `PqcUnavailable`. Para desarrollo local, `make init` ejecuta `make dev-pqc-mock`, que coloca `MockQorePqc` (**solo dev**) en `0x…0a01/0a02`; la herramienta OEM verifica la firma ML-DSA-87 fuera de la cadena y aprueba en el mock solo esa terna exacta (clave, firma, mensaje). La verificación real solo ocurre en Diana; se comprobó por `eth_call` que el precompilado de Diana acepta las firmas de `pqSign` y rechaza un mensaje alterado.
 * `getBionicPart(partId)` / `getPartsByBearer(bearer)` / `getFirmwareHistory(partId)`: Consultas completas del inventario corporal y su auditoría histórica.
 
 ### Módulo 3: Directorio On-Chain de Claves Públicas `ML-KEM-1024` (QoreChain PKI)
@@ -258,14 +273,25 @@ La demo ejecuta automáticamente los 6 pasos reales: generación de llaves `ML-K
 
 ### 5. Despliegue a QoreChain Diana Testnet Real (`Chain ID 9800`)
 ```bash
-cd ../contracts
-cp .env.example .env
-# Configura DEPLOYER_PRIVATE_KEY con tu wallet fondeada en el faucet de Diana
-source .env
-forge script script/DeploySynapseVault.s.sol:DeploySynapseVault \
-  --rpc-url "$QORECHAIN_RPC_URL" \
-  --broadcast
+# 1. Abrir la ventana de autorización EVM (requerida por QoreChain Diana)
+cd sdk
+DEPLOYER_MNEMONIC="<TU_RECOVERY_PHRASE_DE_TESTNET>" npm run evm:open-window
+
+# 2. Desplegar el contrato en Diana Testnet
+cd ..
+make deploy-diana
 ```
+
+---
+
+## 🌐 Despliegue Verificado en QoreChain Diana Testnet (`Chain ID 9800`)
+
+| Recurso | Valor Verificado On-Chain |
+| :--- | :--- |
+| **Red / RPC** | QoreChain Diana Testnet (`Chain ID 9800`) · `https://evm-testnet.qore.host` |
+| **Contrato `SynapseVaultRegistry`** | `0x0f6c2bbbb4137e7809669C05b075616556A2c2d6` |
+| **Tx de verificación HBOM `pqcVerify` (`ML-DSA-87`, 4,627 B)** | `0x427672fad7e92681e4debf88386946d598d1c96dc0c8a47f3d520bf7e0a1097f` (`571,648` gas) |
+| **Pieza HBOM registrada (`DIANA-BCI-001`)** | `0x9dbc0f0a3521487e0665848ff4bacf1934888f10f479869d6f617858fbb58c8c` |
 
 ---
 

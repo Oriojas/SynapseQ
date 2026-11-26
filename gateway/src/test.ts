@@ -111,7 +111,9 @@ async function testKeyReleaseGateway(): Promise<void> {
     assert.equal(anon.status, 401);
 
     // Envelope that does not match the on-chain commitment is rejected (409)
-    const tampered = (sealed.encryptedKeyEnvelope.slice(0, -2) + "00") as `0x${string}`;
+    const lastByte = sealed.encryptedKeyEnvelope.slice(-2);
+    const tampered = (sealed.encryptedKeyEnvelope.slice(0, -2) +
+      (lastByte === "00" ? "ff" : "00")) as `0x${string}`;
     await assert.rejects(
       async () =>
         storeProtectedEnvelope(url, {

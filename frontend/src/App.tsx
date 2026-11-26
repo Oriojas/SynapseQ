@@ -114,6 +114,14 @@ function passFromChainGrant(
   };
 }
 
+/**
+ * On-chain HBOM writes need the manufacturer's REGISTERED ML-DSA-87 key: the contract verifies
+ * the attestation with QoreChain's pqcVerify precompile. Web wallets (QoreX/MetaMask) do not expose
+ * ML-DSA message signing, so those writes go through the OEM tool, not the browser.
+ */
+const OEM_TOOL_HINT =
+  'En modo on-chain el contrato verifica la firma ML-DSA-87 del fabricante con pqcVerify, y la wallet web no puede firmar con ML-DSA. Usa la herramienta OEM: `cd sdk && OEM_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial … --model … --bearer 0x… --firmware …`';
+
 export function App(): React.JSX.Element {
   const env = useMemo(() => getFrontendEnvConfig(), []);
   const vault = useSynapseVault();
@@ -590,30 +598,11 @@ export function App(): React.JSX.Element {
         notify(`Pieza ${newPart.modelName} registrada SOLO en la interfaz (demo, sin wallet): no existe on-chain.`, 'warn');
         return newPart.partId;
       }
-      try {
-        const tx = await vault.registerBionicPartOnChain({
-          bearer: vault.walletAddress,
-          zone: newPart.zoneIndex,
-          modelName: newPart.modelName,
-          serialNumber: newPart.serialNumber,
-          firmwareHash: newPart.firmwareHash,
-          calibrationHash: newPart.calibrationHash,
-          pqcSignature: signatureHex,
-        });
-        const partId = tx.result;
-        setBionicParts((prev) => [
-          { ...newPart, partId, manufacturerAddress: vault.walletAddress as Address, onChain: true },
-          ...prev,
-        ]);
-        setFirmwareHistory((prev) => [{ ...genesisHistory, signerAddress: vault.walletAddress as Address }, ...prev]);
-        notify(`Pieza ${newPart.modelName} registrada on-chain (partId ${partId.slice(0, 12)}…) • Tx: ${tx.hash.slice(0, 14)}…`);
-        return partId;
-      } catch (err) {
-        notify(`Registro HBOM fallido: ${errorText(err)}`, 'error');
-        throw err;
-      }
+      void signatureHex; // browser-generated key is not the OEM's registered key
+      notify('Registro HBOM on-chain: usa la herramienta OEM (firma ML-DSA-87 verificada por pqcVerify).', 'warn');
+      throw new Error(OEM_TOOL_HINT);
     },
-    [chainMode, notify, vault]
+    [chainMode, notify, vault.walletAddress]
   );
 
   const handlePushFirmwareUpdate = useCallback(
@@ -634,17 +623,10 @@ export function App(): React.JSX.Element {
         notify(`Parche ${entry.semver} aplicado solo en la interfaz (pieza de ejemplo/demo).`, 'warn');
         return;
       }
-      if (!chainMode) throw new Error('Conecta la wallet del fabricante para registrar el parche on-chain.');
-      const tx = await vault.logFirmwareUpdateOnChain({
-        partId,
-        newFirmwareHash: entry.firmwareHash,
-        newCalibrationHash: entry.calibrationHash,
-        pqcSignature: signatureHex,
-      });
-      applyLocal();
-      notify(`Parche ${entry.semver} registrado on-chain • Tx: ${tx.hash.slice(0, 14)}…`);
+      void signatureHex;
+      throw new Error(OEM_TOOL_HINT.replace('register --serial … --model … --bearer 0x…', `update --part ${partId}`));
     },
-    [bionicParts, chainMode, notify, vault]
+    [bionicParts, notify]
   );
 
   const handleUpdatePartStatus = useCallback(

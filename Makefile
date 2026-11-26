@@ -12,13 +12,13 @@ FOUNDRY_PATH := $(HOME)/.foundry/bin
 export PATH := $(FOUNDRY_PATH):$(PATH)
 
 .DEFAULT_GOAL := help
-.PHONY: help build init down lint audit test test-contracts test-sdk test-gateway test-front demo deploy-local deploy-diana clean
+.PHONY: help build init down lint audit test test-contracts test-sdk test-gateway test-front demo oem-status deploy-local dev-pqc-mock deploy-diana clean
 
 # Dirección del último despliegue local (leída del broadcast de Foundry)
 VAULT_ADDR_CMD = grep -m1 -o '"contractAddress": *"0x[0-9a-fA-F]*"' contracts/broadcast/DeploySynapseVault.s.sol/$${QORECHAIN_CHAIN_ID:-9800}/run-latest.json | grep -o '0x[0-9a-fA-F]*'
 
 # Carga segura y desacoplada de .env desde la raíz del proyecto
-ENV_EXPORTS = set -a && [ -f .env ] && source .env && set +a && \
+ENV_EXPORTS = set -a && { [ ! -f .env ] || source .env; } && set +a && \
               export ANVIL_PORT="$${ANVIL_PORT:-8545}" && \
               export FRONTEND_PORT="$${FRONTEND_PORT:-5173}" && \
               export GATEWAY_PORT="$${GATEWAY_PORT:-4000}" && \
@@ -61,7 +61,8 @@ init: ## 🚀 Levantar el stack local (Anvil QoreChain 9800 :8545 · Deploy Syna
 	    if [ "$$code" = "200" ]; then echo "   ✅ Anvil EVM (Chain ID $${QORECHAIN_CHAIN_ID:-9800}) → $$LOCAL_RPC_URL"; break; fi; \
 	    sleep 1; \
 	  done
-	@echo "→ 2/4 Desplegando SynapseVaultRegistry.sol en el nodo local..."
+	@echo "→ 2/4 Desplegando SynapseVaultRegistry.sol en el nodo local (+ MockQorePqc en 0x…0a01/0a02)..."
+	@$(MAKE) --no-print-directory dev-pqc-mock
 	@$(MAKE) --no-print-directory deploy-local
 	@echo "→ 3/4 Levantando Key-Release Gateway..."
 	@$(ENV_EXPORTS) && \
@@ -193,6 +194,18 @@ deploy-local: ## 📦 Desplegar SynapseVaultRegistry.sol en el nodo Anvil local 
 	  fi; \
 	  cd contracts && DEPLOYER_PRIVATE_KEY="$$anvil_key" forge script script/DeploySynapseVault.s.sol:DeploySynapseVault \
 	    --rpc-url "$$LOCAL_RPC_URL" --broadcast
+
+dev-pqc-mock: ## 🧪 SOLO Anvil local o fork: coloca MockQorePqc en los precompilados PQC (Anvil no los ejecuta)
+	@$(ENV_EXPORTS) && \
+	  code=$$(cd contracts && forge inspect MockQorePqc deployedBytecode) && \
+	  cast rpc --rpc-url "$$LOCAL_RPC_URL" anvil_setCode 0x0000000000000000000000000000000000000a01 "$$code" >/dev/null && \
+	  cast rpc --rpc-url "$$LOCAL_RPC_URL" anvil_setCode 0x0000000000000000000000000000000000000a02 "$$code" >/dev/null && \
+	  echo "   ✅ MockQorePqc (DEV ONLY) en 0x…0a01 (pqcVerify) y 0x…0a02 (pqcKeyStatus)"
+
+oem-status: ## 🏭 Herramienta OEM: estado de la clave ML-DSA-87 del fabricante (OEM_MNEMONIC u OEM_PRIVATE_KEY)
+	@$(ENV_EXPORTS) && \
+	  vault=$$($(VAULT_ADDR_CMD)); \
+	  cd sdk && QORECHAIN_RPC_URL="$${OEM_RPC_URL:-$$LOCAL_RPC_URL}" SYNAPSE_VAULT_ADDRESS="$${SYNAPSE_VAULT_ADDRESS_OVERRIDE:-$$vault}" npm run -s oem -- status
 
 deploy-diana: ## 🌐 Desplegar SynapseVaultRegistry.sol en QoreChain Diana Testnet real (Chain ID 9800) usando .env
 	@test -f .env || { echo "❌ Falta .env — copia .env.example → .env y configura DEPLOYER_PRIVATE_KEY y QORECHAIN_RPC_URL."; exit 1; }

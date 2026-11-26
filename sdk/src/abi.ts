@@ -2,8 +2,66 @@
 // Regenerate after any contract change.
 export const SYNAPSE_VAULT_ABI = [
   {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "requirePossessionProof_",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "FIRMWARE_ATTESTATION_DOMAIN",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "function",
     "name": "MAX_ACCESS_DURATION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ML_DSA_87_ALGORITHM_ID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ML_DSA_87_PUBLIC_KEY_BYTES",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ML_DSA_87_SIGNATURE_BYTES",
     "inputs": [],
     "outputs": [
       {
@@ -21,6 +79,30 @@ export const SYNAPSE_VAULT_ABI = [
       {
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PQC_KEY_STATUS_PRECOMPILE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PQC_VERIFY_PRECOMPILE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view"
@@ -94,6 +176,35 @@ export const SYNAPSE_VAULT_ABI = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "firmwareAttestationMessage",
+    "inputs": [
+      {
+        "name": "partId",
+        "type": "bytes32"
+      },
+      {
+        "name": "version",
+        "type": "uint32"
+      },
+      {
+        "name": "firmwareHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "calibrationHash",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -503,6 +614,18 @@ export const SYNAPSE_VAULT_ABI = [
   },
   {
     "type": "function",
+    "name": "requirePossessionProof",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "revokeAccess",
     "inputs": [
       {
@@ -819,6 +942,16 @@ export const SYNAPSE_VAULT_ABI = [
   },
   {
     "type": "error",
+    "name": "InvalidSignatureLength",
+    "inputs": [
+      {
+        "name": "length",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "PartAlreadyRegistered",
     "inputs": []
   },
@@ -831,6 +964,46 @@ export const SYNAPSE_VAULT_ABI = [
     "type": "error",
     "name": "PartNotFound",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PqcKeyNotRegistered",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PqcPossessionNotProven",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PqcSignatureInvalid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PqcUnavailable",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PqcUnsupportedAlgorithm",
+    "inputs": [
+      {
+        "name": "algorithmId",
+        "type": "uint8"
+      }
+    ]
   },
   {
     "type": "error",
