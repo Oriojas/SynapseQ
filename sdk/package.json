@@ -8,7 +8,8 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "security": "npm audit --audit-level=moderate",
-    "oem": "tsx src/oemCli.ts"
+    "oem": "tsx src/oemCli.ts",
+    "evm:open-window": "tsx src/openEvmWindow.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",
