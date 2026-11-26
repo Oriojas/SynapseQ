@@ -4,6 +4,7 @@ import { AuthError, GatewayAuthService } from "./auth.js";
 import { ChainUnavailableError, type ChainPolicyVerifier } from "./chain.js";
 import { EnvelopeVaultStore } from "./store.js";
 import { unpinFromPinata, uploadEncryptedBlobToPinata } from "../../sdk/src/storage.js";
+import type { EvmWindowStatus } from "../../sdk/src/evmWindow.js";
 
 const MAX_BODY_BYTES = 25 * 1024 * 1024; // 25 MiB cap for encrypted clinical/DICOM blobs
 const MAX_JSON_BYTES = 64 * 1024; // envelopes are ~1.6 KB; JSON bodies never need more
@@ -28,6 +29,12 @@ export interface GatewayServerOptions {
   readonly pinQuota?: PinQuota;
   /** Max requests per client IP per minute (all endpoints). */
   readonly ipRequestsPerMinute?: number;
+  /**
+   * Reads an account's QoreChain EVM authorisation window (server-side: the public REST API sends
+   * no CORS headers). Omit on chains without windows (local Anvil): the endpoint then reports
+   * `enforced: false`.
+   */
+  readonly evmWindowReader?: (address: string) => Promise<EvmWindowStatus>;
 }
 
 const DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
@@ -96,6 +103,8 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
   const pinCounter = new WindowCounter(pinQuota.windowMs);
   const ipCounter = new WindowCounter(60_000);
   const ipLimit = options.ipRequestsPerMinute ?? 300;
+  const windowCache = new Map<string, { at: number; body: unknown }>();
+  const WINDOW_CACHE_MS = 10_000;
 
   return createServer(async (req, res) => {
     const origin = req.headers.origin;
@@ -136,6 +145,44 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
           chainId: options.verifier.chainId,
           pinataConfigured: Boolean(options.pinataJwt),
         });
+        return;
+      }
+
+      // 1b. EVM authorisation window status (proxied: QoreChain REST has no CORS)
+      const windowMatch = /^\/api\/qore\/evm-window\/(0x[a-fA-F0-9]{40})$/.exec(pathname);
+      if (req.method === "GET" && windowMatch) {
+        if (!options.evmWindowReader) {
+          sendJson(200, { enforced: false });
+          return;
+        }
+        const key = windowMatch[1].toLowerCase();
+        const cached = windowCache.get(key);
+        if (cached && Date.now() - cached.at < WINDOW_CACHE_MS) {
+          sendJson(200, cached.body);
+          return;
+        }
+        let win: EvmWindowStatus;
+        try {
+          win = await options.evmWindowReader(key);
+        } catch (err) {
+          throw new ChainUnavailableError(
+            `Could not read the EVM window: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+        const body = {
+          enforced: true,
+          found: win.found,
+          live: win.live,
+          expiryHeight: win.expiryHeight.toString(),
+          remainingBlocks: win.remainingBlocks.toString(),
+          remainingTxs: win.remainingTxs.toString(),
+          remainingValue: win.remainingValue.toString(),
+          nativeOnly: win.nativeOnly,
+          allowedTargets: win.allowedTargets,
+        };
+        if (windowCache.size > 5_000) windowCache.clear();
+        windowCache.set(key, { at: Date.now(), body });
+        sendJson(200, body);
         return;
       }
 

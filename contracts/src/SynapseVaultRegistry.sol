@@ -14,7 +14,27 @@ pragma solidity ^0.8.24;
  *      - Envelopes are held by the off-chain Key-Release Gateway, which releases them only to a
  *        wallet that proves key possession (signature) while `isAccessValid(recordId)` is true.
  *      - Revocation stops *future* releases. It cannot recall a key that was already delivered.
+ *      - HBOM firmware attestations are ML-DSA-87 signatures verified ON-CHAIN through QoreChain's
+ *        PQC precompiles (pqcKeyStatus 0x…0a02 + pqcVerify 0x…0a01). They are active on Diana
+ *        testnet only; anywhere else the call fails closed (PqcUnavailable), never open.
  */
+
+/// @notice QoreChain PQC Verify precompile (0x0000000000000000000000000000000000000a01).
+interface IQorePqcVerify {
+    function pqcVerify(bytes calldata pubkey, bytes calldata signature, bytes calldata message)
+        external
+        view
+        returns (bool valid);
+}
+
+/// @notice QoreChain PQC Key Status precompile (0x0000000000000000000000000000000000000a02).
+interface IQorePqcKeyStatus {
+    function pqcKeyStatus(address account)
+        external
+        view
+        returns (bool registered, uint8 algorithmId, bytes memory pubkey, bool possessionProven);
+}
+
 contract SynapseVaultRegistry {
     // =========================================================================
     // Custom Errors
@@ -33,6 +53,12 @@ contract SynapseVaultRegistry {
     error PartDecommissioned();
     error InvalidKemPublicKey();
     error EmptySignature();
+    error PqcUnavailable();
+    error PqcKeyNotRegistered(address account);
+    error PqcPossessionNotProven(address account);
+    error PqcUnsupportedAlgorithm(uint8 algorithmId);
+    error PqcSignatureInvalid();
+    error InvalidSignatureLength(uint256 length);
 
     // =========================================================================
     // Enums & Structs
@@ -126,6 +152,22 @@ contract SynapseVaultRegistry {
     /// @notice NIST FIPS 203 ML-KEM-1024 public key size in bytes.
     uint256 public constant ML_KEM_1024_PUBLIC_KEY_BYTES = 1568;
 
+    /// @notice QoreChain PQC precompiles (active on Diana testnet, chain ID 9800).
+    address public constant PQC_VERIFY_PRECOMPILE = address(0x0a01);
+    address public constant PQC_KEY_STATUS_PRECOMPILE = address(0x0a02);
+
+    /// @notice ML-DSA-87 (FIPS 204) sizes and the algorithm id reported by pqcKeyStatus.
+    uint256 public constant ML_DSA_87_PUBLIC_KEY_BYTES = 2592;
+    uint256 public constant ML_DSA_87_SIGNATURE_BYTES = 4627;
+    uint8 public constant ML_DSA_87_ALGORITHM_ID = 1;
+
+    /// @notice Domain tag of the message a manufacturer signs for each firmware version.
+    string public constant FIRMWARE_ATTESTATION_DOMAIN = "SynapseQ:firmware-attestation:v1";
+
+    /// @notice When true, the manufacturer's registered ML-DSA key must have proven possession
+    ///         (recommended by QoreChain: "registered" alone does not prove control of the key).
+    bool public immutable requirePossessionProof;
+
     // =========================================================================
     // Storage
     // =========================================================================
@@ -209,6 +251,10 @@ contract SynapseVaultRegistry {
         if (bearer == address(0)) revert PartNotFound();
         if (bearer != msg.sender) revert Unauthorized();
         _;
+    }
+
+    constructor(bool requirePossessionProof_) {
+        requirePossessionProof = requirePossessionProof_;
     }
 
     // =========================================================================
@@ -409,10 +455,9 @@ contract SynapseVaultRegistry {
     ) external returns (bytes32 partId) {
         if (bearer == address(0)) revert ZeroAddress();
         if (firmwareHash == bytes32(0)) revert InvalidHash();
-        if (pqcSignature.length == 0) revert EmptySignature();
-
         partId = computePartId(msg.sender, serialNumber);
         if (_bionicParts[partId].bearer != address(0)) revert PartAlreadyRegistered();
+        _requireFirmwareAttestation(partId, 1, firmwareHash, calibrationHash, pqcSignature);
 
         // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
@@ -464,11 +509,14 @@ contract SynapseVaultRegistry {
         if (msg.sender != part.manufacturer) revert Unauthorized();
         if (part.status == PartStatus.DECOMMISSIONED) revert PartDecommissioned();
         if (newFirmwareHash == bytes32(0)) revert InvalidHash();
-        if (pqcSignature.length == 0) revert EmptySignature();
+
+        uint32 nextVersion = part.firmwareVersion + 1;
+        _requireFirmwareAttestation(
+            partId, nextVersion, newFirmwareHash, newCalibrationHash, pqcSignature
+        );
 
         // forge-lint: disable-next-line(unsafe-typecast)
         uint64 nowTs = uint64(block.timestamp);
-        uint32 nextVersion = part.firmwareVersion + 1;
         bytes32 sigHash = keccak256(pqcSignature);
 
         part.firmwareHash = newFirmwareHash;
@@ -490,6 +538,74 @@ contract SynapseVaultRegistry {
 
         emit FirmwareUpdated(partId, nextVersion, newFirmwareHash, msg.sender, nowTs);
         emit FirmwareAttestation(partId, nextVersion, sigHash, pqcSignature);
+    }
+
+    /**
+     * @notice Exact bytes the manufacturer must sign with ML-DSA-87 for a firmware version.
+     *         Bound to chain, this contract, the part, the version and both hashes, so a signature
+     *         can never be replayed for another part, version, contract or network.
+     */
+    function firmwareAttestationMessage(
+        bytes32 partId,
+        uint32 version,
+        bytes32 firmwareHash,
+        bytes32 calibrationHash
+    ) public view returns (bytes memory) {
+        return abi.encode(
+            FIRMWARE_ATTESTATION_DOMAIN,
+            block.chainid,
+            address(this),
+            partId,
+            version,
+            firmwareHash,
+            calibrationHash
+        );
+    }
+
+    /**
+     * @dev Verifies msg.sender's ML-DSA-87 signature ON-CHAIN:
+     *      1) pqcKeyStatus(msg.sender) -> the key registered for this account on QoreChain;
+     *      2) pqcVerify(pubkey, signature, firmwareAttestationMessage(...)).
+     *      Low-level staticcalls fail closed: an inactive precompile returns empty data -> revert.
+     */
+    function _requireFirmwareAttestation(
+        bytes32 partId,
+        uint32 version,
+        bytes32 firmwareHash,
+        bytes32 calibrationHash,
+        bytes calldata signature
+    ) internal view {
+        if (signature.length == 0) revert EmptySignature();
+        if (signature.length != ML_DSA_87_SIGNATURE_BYTES) {
+            revert InvalidSignatureLength(signature.length);
+        }
+
+        bytes memory pubkey = _registeredMlDsaKey(msg.sender);
+        bytes memory message =
+            firmwareAttestationMessage(partId, version, firmwareHash, calibrationHash);
+
+        (bool ok, bytes memory ret) = PQC_VERIFY_PRECOMPILE.staticcall(
+            abi.encodeCall(IQorePqcVerify.pqcVerify, (pubkey, signature, message))
+        );
+        if (!ok || ret.length < 32) revert PqcUnavailable();
+        if (!abi.decode(ret, (bool))) revert PqcSignatureInvalid();
+    }
+
+    function _registeredMlDsaKey(address account) internal view returns (bytes memory pubkey) {
+        (bool ok, bytes memory ret) = PQC_KEY_STATUS_PRECOMPILE.staticcall(
+            abi.encodeCall(IQorePqcKeyStatus.pqcKeyStatus, (account))
+        );
+        if (!ok || ret.length < 128) revert PqcUnavailable();
+        bool registered;
+        uint8 algorithmId;
+        bool possessionProven;
+        (registered, algorithmId, pubkey, possessionProven) =
+            abi.decode(ret, (bool, uint8, bytes, bool));
+        if (!registered) revert PqcKeyNotRegistered(account);
+        if (algorithmId != ML_DSA_87_ALGORITHM_ID || pubkey.length != ML_DSA_87_PUBLIC_KEY_BYTES) {
+            revert PqcUnsupportedAlgorithm(algorithmId);
+        }
+        if (requirePossessionProof && !possessionProven) revert PqcPossessionNotProven(account);
     }
 
     /**

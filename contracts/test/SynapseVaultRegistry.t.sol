@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {SynapseVaultRegistry} from "../src/SynapseVaultRegistry.sol";
+import {MockQorePqc} from "../src/dev/MockQorePqc.sol";
 
 contract SynapseVaultRegistryTest is Test {
     SynapseVaultRegistry public vault;
@@ -22,10 +23,17 @@ contract SynapseVaultRegistryTest is Test {
     bytes32 public constant CALIBRATION_HASH = keccak256("calibration-profile-v1");
     string public constant SERIAL = "SN-0042";
 
-    bytes public constant MLDSA_SIG = hex"deadbeefcafebabe1122334455667788";
+    // QoreChain PQC precompiles, emulated with MockQorePqc (runtime code etched at both addresses)
+    MockQorePqc internal constant PQC_VERIFY = MockQorePqc(address(0x0a01));
+    MockQorePqc internal constant PQC_KEY_STATUS = MockQorePqc(address(0x0a02));
 
     function setUp() public {
-        vault = new SynapseVaultRegistry();
+        vault = new SynapseVaultRegistry(true);
+        MockQorePqc impl = new MockQorePqc();
+        vm.etch(address(0x0a01), address(impl).code);
+        vm.etch(address(0x0a02), address(impl).code);
+        _registerPqKey(manufacturer, true);
+        _registerPqKey(attacker, true);
     }
 
     // -------------------------------------------------------------------------
@@ -45,7 +53,60 @@ contract SynapseVaultRegistryTest is Test {
         );
     }
 
+    /// @dev Deterministic 2592-byte "ML-DSA-87 public key" unique per account.
+    function _pubkey(address account) internal pure returns (bytes memory key) {
+        key = new bytes(2592);
+        bytes20 a = bytes20(account);
+        for (uint256 i = 0; i < 20; i++) {
+            key[i] = a[i];
+        }
+    }
+
+    /// @dev 4627-byte "ML-DSA-87 signature" with a tag so different signatures differ.
+    function _sig(uint8 tag) internal pure returns (bytes memory sig) {
+        sig = new bytes(4627);
+        sig[0] = bytes1(tag);
+        sig[4626] = bytes1(tag);
+    }
+
+    function _registerPqKey(address account, bool possessionProven) internal {
+        PQC_KEY_STATUS.setKeyStatus(account, _pubkey(account), possessionProven);
+    }
+
+    /// @dev Emulates "the manufacturer signed this exact attestation message" (off-chain ML-DSA).
+    function _attest(
+        address signer,
+        bytes32 partId,
+        uint32 version,
+        bytes32 fw,
+        bytes32 cal,
+        uint8 tag
+    ) internal returns (bytes memory sig) {
+        sig = _sig(tag);
+        PQC_VERIFY.approveSignature(
+            _pubkey(signer), sig, vault.firmwareAttestationMessage(partId, version, fw, cal)
+        );
+    }
+
+    function _register(address oem, string memory serial, bytes memory sig)
+        internal
+        returns (bytes32)
+    {
+        vm.prank(oem);
+        return vault.registerBionicPart(
+            patient,
+            SynapseVaultRegistry.AnatomicalZone.NEURAL,
+            "NeuroLink-X9 BCI",
+            serial,
+            FW_V1,
+            CALIBRATION_HASH,
+            sig
+        );
+    }
+
     function _registerPart(address bearer) internal returns (bytes32) {
+        bytes32 partId = vault.computePartId(manufacturer, SERIAL);
+        bytes memory sig = _attest(manufacturer, partId, 1, FW_V1, CALIBRATION_HASH, 1);
         vm.prank(manufacturer);
         return vault.registerBionicPart(
             bearer,
@@ -54,7 +115,7 @@ contract SynapseVaultRegistryTest is Test {
             SERIAL,
             FW_V1,
             CALIBRATION_HASH,
-            MLDSA_SIG
+            sig
         );
     }
 
@@ -249,10 +310,11 @@ contract SynapseVaultRegistryTest is Test {
         assertEq(bearer, patient);
         assertEq(manuf, manufacturer);
         assertEq(fwVersion, 1);
-        assertEq(sigHash, keccak256(MLDSA_SIG));
+        assertEq(sigHash, keccak256(_sig(1)));
 
+        bytes memory sigV2 = _attest(manufacturer, partId, 2, FW_V2, CALIBRATION_HASH, 2);
         vm.prank(manufacturer);
-        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, sigV2);
 
         SynapseVaultRegistry.FirmwareRecord[] memory history = vault.getFirmwareHistory(partId);
         assertEq(history.length, 2);
@@ -262,16 +324,9 @@ contract SynapseVaultRegistryTest is Test {
 
     /// Regression (A2): an attacker registering the "same serial" lands in its own namespace.
     function test_PartIdCannotBeSquatted() public {
-        vm.prank(attacker);
-        bytes32 fake = vault.registerBionicPart(
-            attacker,
-            SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "Fake",
-            SERIAL,
-            FW_V1,
-            CALIBRATION_HASH,
-            MLDSA_SIG
-        );
+        bytes32 fakeId = vault.computePartId(attacker, SERIAL);
+        bytes memory atkSig = _attest(attacker, fakeId, 1, FW_V1, CALIBRATION_HASH, 9);
+        bytes32 fake = _register(attacker, SERIAL, atkSig);
         bytes32 real = _registerPart(patient);
         assertTrue(fake != real);
         (, address realManufacturer,,) = this.partSummary(real);
@@ -279,17 +334,114 @@ contract SynapseVaultRegistryTest is Test {
     }
 
     function test_RejectsEmptySignature() public {
-        vm.prank(manufacturer);
         vm.expectRevert(SynapseVaultRegistry.EmptySignature.selector);
-        vault.registerBionicPart(
-            patient,
-            SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "X",
-            SERIAL,
-            FW_V1,
-            CALIBRATION_HASH,
-            ""
+        _register(manufacturer, SERIAL, "");
+    }
+
+    // ------------------------------------------------------------------------
+    // On-chain ML-DSA-87 verification (pqcKeyStatus + pqcVerify precompiles)
+    // ------------------------------------------------------------------------
+
+    function test_PqcRejectsUnapprovedSignature() public {
+        vm.expectRevert(SynapseVaultRegistry.PqcSignatureInvalid.selector);
+        _register(manufacturer, SERIAL, _sig(7));
+    }
+
+    /// A signature over firmware A cannot register firmware B (message binding).
+    function test_PqcSignatureBoundToFirmwareHash() public {
+        bytes32 partId = vault.computePartId(manufacturer, SERIAL);
+        bytes memory sigForV2Hash = _attest(manufacturer, partId, 1, FW_V2, CALIBRATION_HASH, 3);
+        vm.expectRevert(SynapseVaultRegistry.PqcSignatureInvalid.selector);
+        _register(manufacturer, SERIAL, sigForV2Hash); // registers FW_V1
+    }
+
+    /// The v1 signature cannot be replayed to push v2 (version is part of the message).
+    function test_PqcFirmwareSignatureNotReplayable() public {
+        bytes32 partId = _registerPart(patient);
+        vm.prank(manufacturer);
+        vm.expectRevert(SynapseVaultRegistry.PqcSignatureInvalid.selector);
+        vault.logFirmwareUpdate(partId, FW_V1, CALIBRATION_HASH, _sig(1));
+    }
+
+    /// Another account's approved signature does not work for msg.sender (key comes from chain).
+    function test_PqcKeyComesFromSenderRegistration() public {
+        bytes32 partId = vault.computePartId(manufacturer, SERIAL);
+        // signed by attacker's key, but submitted by manufacturer
+        bytes memory sig = _sig(4);
+        PQC_VERIFY.approveSignature(
+            _pubkey(attacker),
+            sig,
+            vault.firmwareAttestationMessage(partId, 1, FW_V1, CALIBRATION_HASH)
         );
+        vm.expectRevert(SynapseVaultRegistry.PqcSignatureInvalid.selector);
+        _register(manufacturer, SERIAL, sig);
+    }
+
+    function test_PqcRejectsUnregisteredManufacturer() public {
+        address stranger = makeAddr("stranger");
+        vm.expectRevert(
+            abi.encodeWithSelector(SynapseVaultRegistry.PqcKeyNotRegistered.selector, stranger)
+        );
+        _register(stranger, SERIAL, _sig(1));
+    }
+
+    function test_PqcRequiresPossessionProof() public {
+        _registerPqKey(manufacturer, false);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SynapseVaultRegistry.PqcPossessionNotProven.selector, manufacturer
+            )
+        );
+        _register(manufacturer, SERIAL, _sig(1));
+    }
+
+    function test_PqcPossessionOptionalWhenDisabled() public {
+        vault = new SynapseVaultRegistry(false);
+        _registerPqKey(manufacturer, false);
+        bytes32 partId = _registerPart(patient);
+        assertEq(partId, vault.computePartId(manufacturer, SERIAL));
+    }
+
+    function test_PqcRejectsNonMlDsaKey() public {
+        PQC_KEY_STATUS.setRawKeyStatus(manufacturer, true, 2, _pubkey(manufacturer), true);
+        vm.expectRevert(
+            abi.encodeWithSelector(SynapseVaultRegistry.PqcUnsupportedAlgorithm.selector, 2)
+        );
+        _register(manufacturer, SERIAL, _sig(1));
+    }
+
+    function test_PqcRejectsWrongSignatureLength() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(SynapseVaultRegistry.InvalidSignatureLength.selector, 16)
+        );
+        _register(manufacturer, SERIAL, hex"deadbeefcafebabe1122334455667788");
+    }
+
+    /// Off Diana (local chain without the precompile, or mainnet where it is inactive) the call
+    /// returns empty data: the contract must FAIL CLOSED, never accept the signature.
+    function test_PqcFailsClosedWhenPrecompileMissing() public {
+        vm.etch(address(0x0a01), "");
+        vm.expectRevert(SynapseVaultRegistry.PqcUnavailable.selector);
+        _register(manufacturer, SERIAL, _sig(1));
+    }
+
+    function test_PqcFailsClosedWhenKeyStatusMissing() public {
+        vm.etch(address(0x0a02), "");
+        vm.expectRevert(SynapseVaultRegistry.PqcUnavailable.selector);
+        _register(manufacturer, SERIAL, _sig(1));
+    }
+
+    function test_AttestationMessageIsBoundToChainAndContract() public {
+        bytes memory m1 =
+            vault.firmwareAttestationMessage(bytes32(uint256(1)), 1, FW_V1, CALIBRATION_HASH);
+        SynapseVaultRegistry other = new SynapseVaultRegistry(true);
+        bytes memory m2 =
+            other.firmwareAttestationMessage(bytes32(uint256(1)), 1, FW_V1, CALIBRATION_HASH);
+        assertTrue(keccak256(m1) != keccak256(m2));
+        vm.chainId(1);
+        bytes memory m3 =
+            vault.firmwareAttestationMessage(bytes32(uint256(1)), 1, FW_V1, CALIBRATION_HASH);
+        assertTrue(keccak256(m1) != keccak256(m3));
     }
 
     /// Regression (A2): the bearer can no longer push firmware without the manufacturer.
@@ -298,11 +450,11 @@ contract SynapseVaultRegistryTest is Test {
 
         vm.prank(attacker);
         vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
-        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, _sig(2));
 
         vm.prank(patient);
         vm.expectRevert(SynapseVaultRegistry.Unauthorized.selector);
-        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, _sig(2));
     }
 
     function test_DecommissionedPartBlocksFirmwareUpdates() public {
@@ -312,10 +464,9 @@ contract SynapseVaultRegistryTest is Test {
 
         vm.prank(manufacturer);
         vm.expectRevert(SynapseVaultRegistry.PartDecommissioned.selector);
-        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, MLDSA_SIG);
+        vault.logFirmwareUpdate(partId, FW_V2, CALIBRATION_HASH, _sig(2));
     }
 
-    /// Regression (A2): DECOMMISSIONED is terminal.
     function test_DecommissionedIsTerminal() public {
         bytes32 partId = _registerPart(patient);
         vm.startPrank(patient);
@@ -359,26 +510,15 @@ contract SynapseVaultRegistryTest is Test {
     // Gas with realistic post-quantum sizes (A4)
     // =========================================================================
 
-    /// A real ML-DSA-87 signature is 4627 bytes. Registration must stay far below the
-    /// ~6.9M gas the v1 contract used when it stored the signature twice.
+    /// A real ML-DSA-87 signature is 4627 bytes. Registration (incl. the on-chain verification
+    /// calls) must stay far below the ~6.9M gas the v1 contract used. Note: the mock does not
+    /// charge the real precompile gas (~85-90k for pqcVerify on Diana).
     function test_RealisticMlDsaSignatureGas() public {
-        bytes memory realSig = new bytes(4627);
+        bytes32 partId = vault.computePartId(manufacturer, SERIAL);
+        bytes memory sig = _attest(manufacturer, partId, 1, FW_V1, CALIBRATION_HASH, 5);
         uint256 gasBefore = gasleft();
-        _registerWithSig(realSig);
-        assertLt(gasBefore - gasleft(), 700_000);
-    }
-
-    function _registerWithSig(bytes memory sig) internal {
-        vm.prank(manufacturer);
-        vault.registerBionicPart(
-            patient,
-            SynapseVaultRegistry.AnatomicalZone.NEURAL,
-            "NeuroLink-X9 BCI",
-            SERIAL,
-            FW_V1,
-            CALIBRATION_HASH,
-            sig
-        );
+        _register(manufacturer, SERIAL, sig);
+        assertLt(gasBefore - gasleft(), 900_000);
     }
 
     function test_GrantGasIsSmall() public {

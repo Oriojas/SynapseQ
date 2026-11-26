@@ -171,9 +171,25 @@ SynapseQ/
 * `isAccessValid(recordId)` / `getGrantMetadata(recordId)` / `getGrantsBySpecialist(specialist)`: Consultadas por el Key-Release Gateway y por la bandeja on-chain del especialista.
 
 ### Módulo 2: Registro HBOM & Firmware Biónico
-* `registerBionicPart(bearer, zone, modelName, serialNumber, firmwareHash, calibrationHash, pqcSignature) → partId`: Ejecutado por el fabricante OEM (`msg.sender`); calcula `partId = computePartId(fabricante, serial)`, almacena el `keccak256` de la firma `ML-DSA-87` en storage y emite la firma completa en el evento `FirmwareAttestation` (~442k gas).
-* `logFirmwareUpdate(partId, newFirmwareHash, newCalibrationHash, pqcSignature)`: Registra parches monotónicos de firmware (exclusivo del fabricante OEM).
-* `updatePartStatus(partId, newStatus)`: Cambia el estado operativo (`ACTIVE`, `MAINTENANCE`, `DECOMMISSIONED`); `DECOMMISSIONED` es un estado terminal irreversible.
+* `registerBionicPart(bearer, zone, modelName, serialNumber, firmwareHash, calibrationHash, pqcSignature) → partId`: Lo llama el fabricante (`msg.sender`); `partId = computePartId(fabricante, serial)`. Guarda `keccak256` de la firma `ML-DSA-87` y emite la firma completa en `FirmwareAttestation`.
+* `logFirmwareUpdate(partId, newFirmwareHash, newCalibrationHash, pqcSignature)`: Parches de firmware (solo el fabricante).
+* `updatePartStatus(partId, newStatus)`: Cambia el estado operativo; `DECOMMISSIONED` es terminal.
+* **Verificación on-chain de la firma `ML-DSA-87` (`pqcVerify`):** `registerBionicPart` y `logFirmwareUpdate` obtienen la clave registrada del fabricante con el precompilado `pqcKeyStatus(msg.sender)` (`0x…0a02`) y verifican la firma con `pqcVerify` (`0x…0a01`). El mensaje firmado es `firmwareAttestationMessage(partId, version, firmwareHash, calibrationHash)`, ligado a chain ID, contrato, pieza y versión (no se puede reutilizar). Si el precompilado no responde (Anvil sin mock, mainnet), el contrato **falla cerrado** (`PqcUnavailable`). `requirePossessionProof` (constructor, `REQUIRE_PQC_POSSESSION`) exige además prueba de posesión de la clave.
+
+#### Herramienta OEM (`sdk/src/oemCli.ts`)
+La wallet web no puede firmar con ML-DSA, así que el fabricante firma con su **clave canónica** (la misma que registra QoreX, `deriveCanonicalPqKey`):
+```bash
+cd sdk
+OEM_MNEMONIC="<mnemónico de testnet del fabricante>" QORECHAIN_RPC_URL=https://evm-testnet.qore.host \
+SYNAPSE_VAULT_ADDRESS=<contrato> npm run oem -- status
+OEM_MNEMONIC=… SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial SN-1 --model "NeuroLink-X9" \
+  --bearer 0x<portador> --zone 0 --firmware ./fw.bin --calibration "perfil-v1"
+OEM_MNEMONIC=… SYNAPSE_VAULT_ADDRESS=… npm run oem -- update --part 0x<partId> --firmware ./fw-v2.bin
+```
+La cuenta del fabricante necesita en Diana su clave ML-DSA-87 registrada y una **ventana EVM abierta** (QoreX → Ajustes → Seguridad → Ventana de acceso EVM, o `npm run evm:open-window` acotada al contrato).
+
+#### Pruebas locales y forks
+Anvil (incluido `anvil --fork-url https://evm-testnet.qore.host`) **no ejecuta los precompilados nativos de QoreChain**: en un fork `pqcKeyStatus` devuelve `0x` y el contrato revierte con `PqcUnavailable`. Para desarrollo local, `make init` ejecuta `make dev-pqc-mock`, que coloca `MockQorePqc` (**solo dev**) en `0x…0a01/0a02`; la herramienta OEM verifica la firma ML-DSA-87 fuera de la cadena y aprueba en el mock solo esa terna exacta (clave, firma, mensaje). La verificación real solo ocurre en Diana; se comprobó por `eth_call` que el precompilado de Diana acepta las firmas de `pqSign` y rechaza un mensaje alterado.
 * `getBionicPart(partId)` / `getPartsByBearer(bearer)` / `getFirmwareHistory(partId)`: Consultas completas del inventario corporal y su auditoría histórica.
 
 ### Módulo 3: Directorio On-Chain de Claves Públicas `ML-KEM-1024` (QoreChain PKI)
@@ -231,6 +247,84 @@ make cbom
 # 6. Detener los servicios de SynapseQ
 make down
 ```
+
+---
+
+## 🔧 Ejecución Manual Paso a Paso y Despliegue en Diana Testnet
+
+### 1. Clonar e instalar dependencias de Smart Contracts (Foundry)
+```bash
+git clone https://github.com/Oriojas/SynapseQ.git
+cd SynapseQ/contracts
+
+# Instalar forge-std (si es la primera vez tras clonar)
+forge install foundry-rs/forge-std --no-git
+
+# Ejecutar los 11 tests (timelocks con vm.warp, Kill-Switch, HBOM y fuzzing)
+forge test -vvv
+```
+
+### 2. Levantar un Fork Local de QoreChain Diana Testnet (`Chain ID 9800`)
+En una terminal:
+```bash
+anvil --fork-url https://evm-testnet.qore.host --port 8545 --host 127.0.0.1
+```
+
+### 3. Desplegar el contrato en el Fork Local
+En otra terminal:
+```bash
+cd SynapseQ/contracts
+DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  forge script script/DeploySynapseVault.s.sol:DeploySynapseVault \
+  --rpc-url http://127.0.0.1:8545 \
+  --broadcast
+```
+
+### 4. Ejecutar la Demo End-to-End Post-Cuántica (Cifrado Real + QoreChain)
+```bash
+cd ../sdk
+npm install
+
+# Opcional: pasar la dirección impresa en el paso anterior si cambia
+SYNAPSE_VAULT_ADDRESS="<DIRECCION_DESPLEGADA>" npm run demo
+```
+La demo ejecuta automáticamente los 6 pasos reales: generación de llaves `ML-KEM-1024` y `ML-DSA-87` → firma y registro de implante BCI en HBOM → cifrado `AES-256-GCM` + sellado `ML-KEM-1024` → pase efímero on-chain → descifrado en memoria y verificación `SHAKE-256` → **Kill-Switch** y rechazo on-chain.
+
+### 5. Despliegue a QoreChain Diana Testnet Real (`Chain ID 9800`)
+```bash
+cd sdk
+# 1. Ventana SIN acotar, solo para desplegar (una ventana con allowedTargets rechaza crear contratos)
+DEPLOYER_MNEMONIC="<TU_RECOVERY_PHRASE_DE_TESTNET>" EVM_WINDOW_ALLOWED_TARGETS=any \
+  EVM_WINDOW_BLOCKS=200 EVM_WINDOW_MAX_TXS=3 npm run evm:open-window
+
+# 2. Desplegar el contrato en Diana Testnet
+cd .. && make deploy-diana && cd sdk
+
+# 3. Ventana ACOTADA al contrato para operar la dApp ("ventana EVM acotada")
+DEPLOYER_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=0x<contrato> npm run evm:open-window
+
+# Consultar la ventana (solo lectura, sin transacción)
+DEPLOYER_MNEMONIC="…" npm run evm:window-status
+```
+
+#### Ventana EVM acotada en la dApp
+QoreChain solo admite transacciones EVM de cuentas con clave ML-DSA-87 registrada **y** una ventana de autorización abierta (límite de bloques, transacciones y valor). SynapseQ la trata como parte de su modelo de seguridad:
+* **Apertura acotada por defecto:** `npm run evm:open-window` restringe la ventana (`allowedTargets`) al contrato `SYNAPSE_VAULT_ADDRESS`. Si la clave clásica secp256k1 se viera comprometida, solo podría llamar a `SynapseVaultRegistry`, dentro de los límites de la ventana. `EVM_WINDOW_ALLOWED_TARGETS=any` la abre sin acotar y debe usarse solo para desplegar.
+* **Estado visible en la interfaz:** el gateway consulta `GET /qorechain/pqc/v1/evm_window/{qor1…}` (la API REST de QoreChain no tiene CORS) en `GET /api/qore/evm-window/{0x…}`, con caché de 10 s. La cabecera muestra *acotada* (verde), *SIN ACOTAR* (ámbar) o *sin ventana / agotada / fuera de alcance* (rojo).
+* **Bloqueo previo:** antes de pedir la firma, la dApp comprueba que la ventana admite una llamada al contrato y, si no, explica cómo abrirla en lugar de enviar una transacción que el nodo rechazaría.
+* **Rechazos traducidos:** los errores del nodo (*no registered post-quantum key*, *no open EVM authorisation window*, ventana agotada, límites inválidos; códigos `pqc` 26/27/28) se muestran con su solución, con las mismas reglas que `classifyEvmWindowRejection` de `@qorechain/sdk`.
+* En un Anvil local no existen ventanas: el gateway informa `enforced: false` salvo que se defina `QORECHAIN_REST_URL`.
+
+---
+
+## 🌐 Despliegue Verificado en QoreChain Diana Testnet (`Chain ID 9800`)
+
+| Recurso | Valor Verificado On-Chain |
+| :--- | :--- |
+| **Red / RPC** | QoreChain Diana Testnet (`Chain ID 9800`) · `https://evm-testnet.qore.host` |
+| **Contrato `SynapseVaultRegistry`** | `0x0f6c2bbbb4137e7809669C05b075616556A2c2d6` |
+| **Tx de verificación HBOM `pqcVerify` (`ML-DSA-87`, 4,627 B)** | `0x427672fad7e92681e4debf88386946d598d1c96dc0c8a47f3d520bf7e0a1097f` (`571,648` gas) |
+| **Pieza HBOM registrada (`DIANA-BCI-001`)** | `0x9dbc0f0a3521487e0665848ff4bacf1934888f10f479869d6f617858fbb58c8c` |
 
 ---
 

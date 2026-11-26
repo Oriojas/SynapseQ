@@ -11,6 +11,13 @@ import {
   type Hash,
 } from 'viem';
 import { SYNAPSE_VAULT_ABI } from '@sdk/abi';
+import {
+  classifyEvmWindowRejection,
+  describeEvmWindowProblem,
+  parseEvmWindow,
+  windowBlocksTarget,
+  type EvmWindowStatus,
+} from '@sdk/evmWindow';
 import { getFrontendEnvConfig } from '@/config/env';
 
 interface EthereumProvider {
@@ -73,7 +80,10 @@ type WritableFunction =
   | 'updatePartStatus';
 
 /** Turns viem errors into a short, user-readable message (custom error name when available). */
-export function describeTxError(err: unknown): string {
+export function describeTxError(err: unknown, contract?: string): string {
+  // QoreChain EVM-lane refusals (no ML-DSA key / no window / exhausted / bad bounds) come first
+  const windowProblem = classifyEvmWindowRejection(err);
+  if (windowProblem) return describeEvmWindowProblem(windowProblem, contract);
   if (err instanceof BaseError) {
     const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
     if (revert instanceof ContractFunctionRevertedError) {
@@ -92,6 +102,9 @@ export function useSynapseVault() {
   const [walletAddress, setWalletAddress] = useState<Address | null>(null);
   const [isTxPending, setIsTxPending] = useState<boolean>(false);
   const [txHistory, setTxHistory] = useState<readonly OnChainTxReceiptInfo[]>([]);
+  /** QoreChain EVM authorisation window of the connected wallet (null = unknown / not enforced). */
+  const [evmWindow, setEvmWindow] = useState<EvmWindowStatus | null>(null);
+  const [evmWindowEnforced, setEvmWindowEnforced] = useState<boolean>(false);
 
   const chain = useMemo(
     () =>
@@ -156,6 +169,49 @@ export function useSynapseVault() {
     };
   }, [chain, connectWallet, walletAddress]);
 
+  /** Reads the window through the gateway (QoreChain REST has no CORS). Local chains: not enforced. */
+  const refreshEvmWindow = useCallback(async (): Promise<EvmWindowStatus | null> => {
+    if (!walletAddress || !env.gatewayUrl) {
+      setEvmWindow(null);
+      setEvmWindowEnforced(false);
+      return null;
+    }
+    try {
+      const res = await fetch(
+        `${env.gatewayUrl.replace(/\/+$/, '')}/api/qore/evm-window/${walletAddress}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = (await res.json()) as Record<string, unknown>;
+      if (body.enforced !== true) {
+        setEvmWindowEnforced(false);
+        setEvmWindow(null);
+        return null;
+      }
+      const parsed = parseEvmWindow({
+        ...body,
+        remaining_txs: body.remainingTxs,
+        remaining_blocks: body.remainingBlocks,
+        remaining_value: body.remainingValue,
+        expiry_height: body.expiryHeight,
+        native_only: body.nativeOnly,
+        allowed_targets: body.allowedTargets,
+      });
+      setEvmWindowEnforced(true);
+      setEvmWindow(parsed);
+      return parsed;
+    } catch {
+      // Unknown state: do not block the user on a transient read error; the node still enforces it
+      setEvmWindow(null);
+      return null;
+    }
+  }, [env.gatewayUrl, walletAddress]);
+
+  useEffect(() => {
+    void refreshEvmWindow();
+    const timer = window.setInterval(() => void refreshEvmWindow(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [refreshEvmWindow]);
+
   /**
    * Simulates first (surfaces the revert reason BEFORE prompting the wallet), sends, waits for the
    * receipt and throws unless `receipt.status === "success"`. Never reports a failed tx as success.
@@ -169,6 +225,12 @@ export function useSynapseVault() {
       if (!contractAddress) throw new Error('VITE_SYNAPSE_VAULT_ADDRESS no está configurada.');
       if (!publicClient) throw new Error('No hay RPC configurado (VITE_QORECHAIN_RPC_URL).');
       const wallet = await getWalletClient();
+      // Bounded EVM window: refuse early (no wallet prompt) if the window cannot admit this call
+      const win = evmWindowEnforced ? await refreshEvmWindow() : null;
+      if (win) {
+        const problem = windowBlocksTarget(win, contractAddress);
+        if (problem) throw new Error(describeEvmWindowProblem(problem, contractAddress));
+      }
       setIsTxPending(true);
       try {
         let simulated: { result: unknown; request: unknown };
@@ -181,9 +243,14 @@ export function useSynapseVault() {
             args,
           } as never)) as { result: unknown; request: unknown };
         } catch (err) {
-          throw new Error(describeTxError(err));
+          throw new Error(describeTxError(err, contractAddress));
         }
-        const hash = await wallet.client.writeContract(simulated.request as never);
+        let hash: Hash;
+        try {
+          hash = await wallet.client.writeContract(simulated.request as never);
+        } catch (err) {
+          throw new Error(describeTxError(err, contractAddress));
+        }
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         if (receipt.status !== 'success') {
           throw new Error(`La transacción ${label} revirtió on-chain (tx ${hash.slice(0, 12)}…)`);
@@ -192,12 +259,13 @@ export function useSynapseVault() {
           { txHash: hash, action: label, blockNumber: receipt.blockNumber, gasUsed: receipt.gasUsed, timestamp: Date.now() },
           ...prev.slice(0, 14),
         ]);
+        void refreshEvmWindow(); // one tx of the window was consumed
         return { hash, result: simulated.result as T };
       } finally {
         setIsTxPending(false);
       }
     },
-    [contractAddress, getWalletClient, publicClient]
+    [contractAddress, evmWindowEnforced, getWalletClient, publicClient, refreshEvmWindow]
   );
 
   const signMessage = useCallback(
@@ -281,6 +349,9 @@ export function useSynapseVault() {
   return {
     isConnected: Boolean(walletAddress),
     isChainConfigured: Boolean(contractAddress && publicClient),
+    evmWindow,
+    evmWindowEnforced,
+    refreshEvmWindow,
     walletAddress,
     chainId: targetChainId,
     contractAddress,
