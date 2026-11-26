@@ -273,14 +273,25 @@ La demo ejecuta automáticamente los 6 pasos reales: generación de llaves `ML-K
 
 ### 5. Despliegue a QoreChain Diana Testnet Real (`Chain ID 9800`)
 ```bash
-cd ../contracts
-cp .env.example .env
-# Configura DEPLOYER_PRIVATE_KEY con tu wallet fondeada en el faucet de Diana
-source .env
-forge script script/DeploySynapseVault.s.sol:DeploySynapseVault \
-  --rpc-url "$QORECHAIN_RPC_URL" \
-  --broadcast
+# 1. Abrir la ventana de autorización EVM (requerida por QoreChain Diana)
+cd sdk
+DEPLOYER_MNEMONIC="<TU_RECOVERY_PHRASE_DE_TESTNET>" npm run evm:open-window
+
+# 2. Desplegar el contrato en Diana Testnet
+cd ..
+make deploy-diana
 ```
+
+---
+
+## 🌐 Despliegue Verificado en QoreChain Diana Testnet (`Chain ID 9800`)
+
+| Recurso | Valor Verificado On-Chain |
+| :--- | :--- |
+| **Red / RPC** | QoreChain Diana Testnet (`Chain ID 9800`) · `https://evm-testnet.qore.host` |
+| **Contrato `SynapseVaultRegistry`** | `0x0f6c2bbbb4137e7809669C05b075616556A2c2d6` |
+| **Tx de verificación HBOM `pqcVerify` (`ML-DSA-87`, 4,627 B)** | `0x427672fad7e92681e4debf88386946d598d1c96dc0c8a47f3d520bf7e0a1097f` (`571,648` gas) |
+| **Pieza HBOM registrada (`DIANA-BCI-001`)** | `0x9dbc0f0a3521487e0665848ff4bacf1934888f10f479869d6f617858fbb58c8c` |
 
 ---
 
