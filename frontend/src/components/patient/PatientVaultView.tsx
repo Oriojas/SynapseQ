@@ -20,8 +20,10 @@ import {
   Zap,
 } from 'lucide-react';
 import type { DataDomain, RetentionPolicy, StorageMode } from '@sdk/storageStrategy';
+import { useI18n } from '@/i18n/context';
 import {
   STORAGE_MODE_OPTIONS,
+  type AnatomicalZoneLabel,
   type MockBionicPart,
   type MockEphemeralPass,
 } from '../../data/mockData';
@@ -89,16 +91,99 @@ const DEFAULT_CLINICAL_DICOM_JSON = JSON.stringify(
 );
 
 const DURATION_PRESETS: readonly {
-  readonly label: string;
+  readonly labelEn: string;
+  readonly labelEs: string;
   readonly shortLabel: string;
   readonly seconds: number;
-  readonly tag: string;
+  readonly tagEn: string;
+  readonly tagEs: string;
 }[] = [
-  { label: '1h Emergency', shortLabel: '1h', seconds: 3600, tag: 'FAST' },
-  { label: '2h Consult', shortLabel: '2h', seconds: 7200, tag: 'STD' },
-  { label: '24h Diagnostic', shortLabel: '24h', seconds: 86400, tag: 'EXT' },
-  { label: '7d Monitor', shortLabel: '7d', seconds: 604800, tag: 'CONT' },
+  { labelEn: '1h Emergency', labelEs: '1h Emergencia', shortLabel: '1h', seconds: 3600, tagEn: 'FAST', tagEs: 'RÁPIDO' },
+  { labelEn: '2h Consult', labelEs: '2h Consulta', shortLabel: '2h', seconds: 7200, tagEn: 'STD', tagEs: 'EST' },
+  { labelEn: '24h Diagnostic', labelEs: '24h Diagnóstico', shortLabel: '24h', seconds: 86400, tagEn: 'EXT', tagEs: 'EXT' },
+  { labelEn: '7d Monitor', labelEs: '7d Monitoreo', shortLabel: '7d', seconds: 604800, tagEn: 'CONT', tagEs: 'CONT' },
 ];
+
+type TranslateFn = (en: string, es: string) => string;
+
+function translateStorageModeOption(mode: StorageMode, fallbackLabel: string, tr: TranslateFn): string {
+  switch (mode) {
+    case 'auto':
+      return tr(
+        'AUTO SMART ROUTER (SynapseStorageRouter)',
+        'ENRUTADOR INTELIGENTE AUTO (SynapseStorageRouter)'
+      );
+    case 'qorechain-da':
+      return tr(
+        'QORECHAIN NATIVE DA (x/rdk Sovereign Rollup)',
+        'DA NATIVO QORECHAIN (Rollup Soberano x/rdk)'
+      );
+    case 'pinata-ipfs':
+      return tr(
+        'PINATA IPFS (50-70yr Long-Term Archive)',
+        'PINATA IPFS (Archivo a Largo Plazo 50-70 años)'
+      );
+    case 'memory-fallback':
+      return tr(
+        'BROWSER ENCLAVE FALLBACK (Zero-Disk RAM)',
+        'RESPALDO ENCLAVE NAVEGADOR (RAM Cero-Disco)'
+      );
+    default:
+      return fallbackLabel;
+  }
+}
+
+function translateDomainBadge(domain: DataDomain, tr: TranslateFn): string {
+  return domain === 'BIONIC_TELEMETRY'
+    ? tr('BIONIC_TELEMETRY', 'TELEMETRÍA_BIÓNICA')
+    : tr('CLINICAL', 'CLÍNICO');
+}
+
+function translateZoneLabel(zone: AnatomicalZoneLabel, tr: TranslateFn): string {
+  switch (zone) {
+    case 'NEURAL':
+      return tr('NEURAL', 'NEURAL');
+    case 'OCULAR':
+      return tr('OCULAR', 'OCULAR');
+    case 'CARDIOVASCULAR':
+      return tr('CARDIOVASCULAR', 'CARDIOVASCULAR');
+    case 'LOCOMOTOR':
+      return tr('LOCOMOTOR', 'LOCOMOTOR');
+    case 'ORGAN':
+      return tr('ORGAN', 'ÓRGANO');
+    case 'SUBDERMAL':
+      return tr('SUBDERMAL', 'SUBDÉRMICO');
+  }
+}
+
+function translateStorageProviderBadge(
+  provider: MockEphemeralPass['storageProvider'],
+  tr: TranslateFn
+): string {
+  switch (provider) {
+    case 'pinata-ipfs':
+      return tr('pinata-ipfs', 'pinata-ipfs');
+    case 'qorechain-da':
+      return tr('qorechain-da', 'qorechain-da');
+    case 'memory-fallback':
+      return tr('local-memory (demo)', 'memoria-local (demo)');
+    case 'gateway-local':
+      return tr('gateway-local', 'gateway-local');
+    case 'gateway-custody':
+      return tr('gateway-custody', 'custodia-gateway');
+  }
+}
+
+function translateGpsSector(gpsSector: string, tr: TranslateFn): string {
+  return gpsSector.replace('DECOUPLED', tr('DECOUPLED', 'DESACOPLADO'));
+}
+
+function translateLinkedPartLabel(linkedPartName: string, tr: TranslateFn): string {
+  if (linkedPartName === 'Sin pieza vinculada (clínico)' || linkedPartName === 'No linked part (clinical)') {
+    return tr('No linked part (clinical)', 'Sin pieza vinculada (clínico)');
+  }
+  return linkedPartName;
+}
 
 function formatCountdown(totalSeconds: number): string {
   if (totalSeconds <= 0) return '00:00:00';
@@ -118,6 +203,7 @@ export function PatientVaultView({
   onRevokePass,
   onEmergencyKillSwitch,
 }: Readonly<PatientVaultViewProps>): React.ReactElement {
+  const { tr } = useI18n();
   const [payloadText, setPayloadText] = useState<string>(DEFAULT_TELEMETRY_JSON);
   const [uploadedFileName, setUploadedFileName] = useState<string>('neurolink-x9-telemetry.json');
   const [recordTitle, setRecordTitle] = useState<string>('NeuroLink-X9 Motor Cortex Shard');
@@ -173,21 +259,29 @@ export function PatientVaultView({
     if (liveMode) {
       return {
         providerId: 'pinata-ipfs' as const,
-        label: 'Key-Release Gateway',
+        label: tr('Key-Release Gateway', 'Gateway de Liberación de Claves'),
         reason: wantsDa
-          ? 'x/rdk DA es roadmap (aún no hay rollups en producción): el blob cifrado se guarda vía Key-Release Gateway (Pinata server-side o disco del gateway).'
-          : 'El blob cifrado se guarda vía Key-Release Gateway (Pinata server-side o disco del gateway). El JWT nunca llega al navegador.',
+          ? tr(
+              'x/rdk DA is on the roadmap (no production rollups yet): the encrypted blob is stored via the Key-Release Gateway (server-side Pinata or gateway disk).',
+              'x/rdk DA es roadmap (aún no hay rollups en producción): el blob cifrado se guarda vía Key-Release Gateway (Pinata server-side o disco del gateway).'
+            )
+          : tr(
+              'The encrypted blob is stored via the Key-Release Gateway (server-side Pinata or gateway disk). The JWT never reaches the browser.',
+              'El blob cifrado se guarda vía Key-Release Gateway (Pinata server-side o disco del gateway). El JWT nunca llega al navegador.'
+            ),
         error: false,
       };
     }
     return {
       providerId: 'memory-fallback' as const,
-      label: 'Memoria local (demo)',
-      reason:
-        'Modo demo local: sin wallet, contrato o gateway configurados el blob queda solo en la memoria de esta pestaña y NO se registra on-chain.',
+      label: tr('Local memory (demo)', 'Memoria local (demo)'),
+      reason: tr(
+        'Local demo mode: without a configured wallet, contract, or gateway, the blob stays only in this tab memory and is NOT recorded on-chain.',
+        'Modo demo local: sin wallet, contrato o gateway configurados el blob queda solo en la memoria de esta pestaña y NO se registra on-chain.'
+      ),
       error: true,
     };
-  }, [liveMode, preferredMode, domain, retention]);
+  }, [liveMode, preferredMode, domain, retention, tr]);
 
   const handleDomainSwitch = (nextDomain: DataDomain): void => {
     setDomain(nextDomain);
@@ -195,12 +289,16 @@ export function PatientVaultView({
       setRetention('ephemeral');
       setPayloadText(DEFAULT_TELEMETRY_JSON);
       setUploadedFileName('neurolink-x9-telemetry.json');
-      setRecordTitle('NeuroLink-X9 Motor Cortex Shard');
+      setRecordTitle(
+        tr('NeuroLink-X9 Motor Cortex Shard', 'Fragmento de Corteza Motora NeuroLink-X9')
+      );
     } else {
       setRetention('long-term');
       setPayloadText(DEFAULT_CLINICAL_DICOM_JSON);
       setUploadedFileName('cranial-ct-voxel-shard.json');
-      setRecordTitle('Cranial CT & Synaptic Mesh Audit');
+      setRecordTitle(
+        tr('Cranial CT & Synaptic Mesh Audit', 'Auditoría de TC Craneal y Malla Sináptica')
+      );
     }
   };
 
@@ -231,8 +329,12 @@ export function PatientVaultView({
           : bionicParts.find((part) => part.partId === selectedPartId) ?? null;
       await onSealAndGrant({
         payloadBytes,
-        title: recordTitle.trim() || 'Encrypted Bionic Shard',
-        specialistName: specialistName.trim() || 'Authorized Specialist Node',
+        title:
+          recordTitle.trim() ||
+          tr('Encrypted Bionic Shard', 'Fragmento Biónico Cifrado'),
+        specialistName:
+          specialistName.trim() ||
+          tr('Authorized Specialist Node', 'Nodo Especialista Autorizado'),
         specialistAddress,
         domain,
         retention,
@@ -256,11 +358,14 @@ export function PatientVaultView({
             <div className="flex items-center gap-2 min-w-0">
               <Shield className="w-4 h-4 text-reb-mint shrink-0" />
               <h2 className="text-xs font-display font-bold tracking-wider text-reb-text-light truncate">
-                PQC ENCRYPTION &amp; GRANT STUDIO
+                {tr(
+                  'PQC ENCRYPTION & GRANT STUDIO',
+                  'ESTUDIO DE CIFRADO PQC Y CONCESIÓN'
+                )}
               </h2>
             </div>
             <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-reb-mint/15 text-reb-mint border border-reb-mint/30 shrink-0">
-              ZERO-PLAINTEXT
+              {tr('ZERO-PLAINTEXT', 'CERO-TEXTO-PLANO')}
             </span>
           </div>
 
@@ -268,7 +373,7 @@ export function PatientVaultView({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-                DOMAIN
+                {tr('DOMAIN', 'DOMINIO')}
               </label>
               <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-reb-surface-code/90 border border-reb-border">
                 <button
@@ -280,7 +385,7 @@ export function PatientVaultView({
                       : 'text-reb-text-muted hover:text-reb-text-light'
                   }`}
                 >
-                  BIONIC_TELEMETRY
+                  {tr('BIONIC_TELEMETRY', 'TELEMETRÍA_BIÓNICA')}
                 </button>
                 <button
                   type="button"
@@ -291,14 +396,14 @@ export function PatientVaultView({
                       : 'text-reb-text-muted hover:text-reb-text-light'
                   }`}
                 >
-                  CLINICAL
+                  {tr('CLINICAL', 'CLÍNICO')}
                 </button>
               </div>
             </div>
 
             <div>
               <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-                RETENTION
+                {tr('RETENTION', 'RETENCIÓN')}
               </label>
               <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-reb-surface-code/90 border border-reb-border">
                 <button
@@ -310,7 +415,7 @@ export function PatientVaultView({
                       : 'text-reb-text-muted hover:text-reb-text-light'
                   }`}
                 >
-                  ephemeral
+                  {tr('ephemeral', 'efímero')}
                 </button>
                 <button
                   type="button"
@@ -321,7 +426,7 @@ export function PatientVaultView({
                       : 'text-reb-text-muted hover:text-reb-text-light'
                   }`}
                 >
-                  long-term
+                  {tr('long-term', 'largo-plazo')}
                 </button>
               </div>
             </div>
@@ -332,11 +437,13 @@ export function PatientVaultView({
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-mono uppercase text-reb-text-muted flex items-center gap-1">
                 <FileCode className="w-3 h-3 text-reb-mint" />
-                <span>SHARD PAYLOAD ({payloadBytes.length.toLocaleString()} B)</span>
+                <span>
+                  {tr('SHARD PAYLOAD', 'CARGA DEL FRAGMENTO')} ({payloadBytes.length.toLocaleString()} B)
+                </span>
               </label>
               <label className="inline-flex items-center gap-1 text-[10px] font-mono text-reb-mint hover:underline cursor-pointer">
                 <Upload className="w-3 h-3" />
-                <span>Upload File</span>
+                <span>{tr('Upload File', 'Subir Archivo')}</span>
                 <input
                   type="file"
                   onChange={handleFileUpload}
@@ -349,7 +456,10 @@ export function PatientVaultView({
               type="text"
               value={recordTitle}
               onChange={(e) => setRecordTitle(e.target.value)}
-              placeholder="Shard Title (e.g., NeuroLink-X9 Motor Cortex Shard)"
+              placeholder={tr(
+                'Shard Title (e.g., NeuroLink-X9 Motor Cortex Shard)',
+                'Título del fragmento (ej., Fragmento de Corteza Motora NeuroLink-X9)'
+              )}
               className="w-full px-2.5 py-1.5 rounded-lg bg-reb-surface-code/90 border border-reb-border text-xs font-mono text-reb-text-light focus:outline-none focus:border-reb-mint"
             />
 
@@ -360,7 +470,7 @@ export function PatientVaultView({
               className="w-full p-2 rounded-lg bg-reb-surface-code/90 border border-reb-border text-[11px] font-mono text-reb-mint focus:outline-none focus:border-reb-mint resize-y leading-snug"
             />
             <div className="text-[10px] font-mono text-reb-text-muted truncate">
-              File: {uploadedFileName}
+              {tr('File:', 'Archivo:')} {uploadedFileName}
             </div>
           </div>
 
@@ -369,7 +479,7 @@ export function PatientVaultView({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-                  STORAGE ROUTER
+                  {tr('STORAGE ROUTER', 'ENRUTADOR DE ALMACENAMIENTO')}
                 </label>
                 <select
                   value={preferredMode}
@@ -378,7 +488,7 @@ export function PatientVaultView({
                 >
                   {STORAGE_MODE_OPTIONS.map((opt) => (
                     <option key={opt.id} value={opt.id}>
-                      {opt.label}
+                      {translateStorageModeOption(opt.id, opt.label, tr)}
                     </option>
                   ))}
                 </select>
@@ -386,17 +496,19 @@ export function PatientVaultView({
 
               <div>
                 <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-                  LINKED HBOM PART
+                  {tr('LINKED HBOM PART', 'PIEZA HBOM VINCULADA')}
                 </label>
                 <select
                   value={selectedPartId}
                   onChange={(e) => setSelectedPartId(e.target.value as `0x${string}`)}
                   className="w-full px-2 py-1.5 rounded-lg bg-reb-surface-code/90 border border-reb-border text-[11px] font-mono text-reb-text-light focus:outline-none focus:border-reb-mint"
                 >
-                  <option value={ZERO_PART_ID}>Sin pieza vinculada (clínico)</option>
+                  <option value={ZERO_PART_ID}>
+                    {tr('No linked part (clinical)', 'Sin pieza vinculada (clínico)')}
+                  </option>
                   {bionicParts.map((part) => (
                     <option key={part.partId} value={part.partId}>
-                      {part.modelName} ({part.serialNumber}) [{part.zone}]
+                      {part.modelName} ({part.serialNumber}) [{translateZoneLabel(part.zone, tr)}]
                     </option>
                   ))}
                 </select>
@@ -414,7 +526,7 @@ export function PatientVaultView({
             >
               <span className="flex items-center gap-1.5 text-reb-text-muted truncate">
                 <HardDrive className="w-3 h-3 text-reb-mint shrink-0" />
-                <span className="truncate">Router Target:</span>
+                <span className="truncate">{tr('Router Target:', 'Destino del Enrutador:')}</span>
               </span>
               <span
                 className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
@@ -433,7 +545,7 @@ export function PatientVaultView({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-                  SPECIALIST LABEL
+                  {tr('SPECIALIST LABEL', 'ETIQUETA DEL ESPECIALISTA')}
                 </label>
                 <input
                   type="text"
@@ -444,7 +556,7 @@ export function PatientVaultView({
               </div>
               <div>
                 <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-                  EVM WALLET
+                  {tr('EVM WALLET', 'BILLETERA EVM')}
                 </label>
                 <input
                   type="text"
@@ -462,12 +574,14 @@ export function PatientVaultView({
                 <Sparkles className="w-3.5 h-3.5 text-reb-mint shrink-0" />
                 <span className="text-[10px] font-mono text-reb-mint truncate">
                   {liveMode
-                    ? 'getKemPublicKey() on-chain'
+                    ? tr('getKemPublicKey() on-chain', 'getKemPublicKey() en cadena')
                     : `${specialistKemPublicKeyHex.slice(0, 22)}...`}
                 </span>
               </div>
               <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-reb-mint/15 text-reb-mint border border-reb-mint/30 shrink-0">
-                {liveMode ? 'ML-KEM-1024 On-Chain' : 'ML-KEM-1024 Demo'}
+                {liveMode
+                  ? tr('ML-KEM-1024 On-Chain', 'ML-KEM-1024 En Cadena')
+                  : tr('ML-KEM-1024 Demo', 'ML-KEM-1024 Demo')}
               </span>
             </div>
           </div>
@@ -475,15 +589,16 @@ export function PatientVaultView({
           {/* 4 Compact TTL Preset Buttons (1h, 2h, 24h, 7d) */}
           <div>
             <label className="block text-[9px] font-mono uppercase text-reb-text-muted mb-1">
-              EPHEMERAL GRANT TTL WINDOW
+              {tr('EPHEMERAL GRANT TTL WINDOW', 'VENTANA TTL DE CONCESIÓN EFÍMERA')}
             </label>
             <div className="grid grid-cols-4 gap-1.5">
               {DURATION_PRESETS.map((preset) => {
                 const active = durationSeconds === preset.seconds;
                 return (
                   <button
-                    key={preset.label}
+                    key={preset.labelEn}
                     type="button"
+                    title={tr(preset.labelEn, preset.labelEs)}
                     onClick={() => setDurationSeconds(preset.seconds)}
                     className={`py-1.5 px-2 rounded-lg font-mono text-[11px] border transition cursor-pointer flex items-center justify-center gap-1 ${
                       active
@@ -497,7 +612,7 @@ export function PatientVaultView({
                         active ? 'text-reb-bg/80' : 'text-reb-text-muted'
                       }`}
                     >
-                      {preset.tag}
+                      {tr(preset.tagEn, preset.tagEs)}
                     </span>
                   </button>
                 );
@@ -522,12 +637,22 @@ export function PatientVaultView({
             {isSealing ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>ENCAPSULATING ML-KEM-1024 LATTICE...</span>
+                <span>
+                  {tr(
+                    'ENCAPSULATING ML-KEM-1024 LATTICE...',
+                    'ENCAPSULANDO RETÍCULA ML-KEM-1024...'
+                  )}
+                </span>
               </>
             ) : (
               <>
                 <Zap className="w-3.5 h-3.5" />
-                <span>SEAL &amp; GRANT TIMED ACCESS (ML-KEM-1024)</span>
+                <span>
+                  {tr(
+                    'SEAL & GRANT TIMED ACCESS (ML-KEM-1024)',
+                    'SELLAR Y OTORGAR ACCESO TEMPORAL (ML-KEM-1024)'
+                  )}
+                </span>
               </>
             )}
           </button>
@@ -545,20 +670,22 @@ export function PatientVaultView({
 
           <div className="px-3 py-1 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-blue/40 font-mono text-[11px] text-reb-text-light flex items-center gap-1.5 shadow-lg">
             <Database className="w-3 h-3 text-reb-periwinkle" />
-            <span>Router: {strategyPreview.label}</span>
+            <span>
+              {tr('Router:', 'Enrutador:')} {strategyPreview.label}
+            </span>
           </div>
 
           <div className="px-3 py-1 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-yellow/40 font-mono text-[11px] text-reb-yellow flex items-center gap-1.5 shadow-lg">
             <Clock className="w-3 h-3 text-reb-yellow" />
             <span>
-              Active Grants: {activeGrantsCount}/{passes.length}
+              {tr('Active Grants:', 'Concesiones Activas:')} {activeGrantsCount}/{passes.length}
             </span>
           </div>
 
           <div className="px-3 py-1 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-mint/25 font-mono text-[11px] text-reb-text-muted flex items-center gap-1.5 shadow-lg">
             <Cpu className="w-3 h-3 text-reb-mint" />
             <span>
-              Rollup: {sovereignRollup?.rollupId ?? 'synapseq-hbom-v1'}
+              {tr('Rollup:', 'Rollup:')} {sovereignRollup?.rollupId ?? 'synapseq-hbom-v1'}
             </span>
           </div>
         </div>
@@ -576,7 +703,7 @@ export function PatientVaultView({
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-reb-mint" />
               <h2 className="text-xs font-display font-bold tracking-wider text-reb-text-light">
-                ACTIVE EPHEMERAL PASSES
+                {tr('ACTIVE EPHEMERAL PASSES', 'PASES EFÍMEROS ACTIVOS')}
               </h2>
             </div>
 
@@ -586,7 +713,12 @@ export function PatientVaultView({
               className="px-2.5 py-1.5 rounded-lg bg-reb-pink/20 hover:bg-reb-pink/30 text-reb-pink border border-reb-pink/60 font-mono font-bold text-[10px] tracking-wide transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md"
             >
               <ShieldAlert className="w-3.5 h-3.5" />
-              <span>EMERGENCY KILL-SWITCH (REVOKE ALL)</span>
+              <span>
+                {tr(
+                  'EMERGENCY KILL-SWITCH (REVOKE ALL)',
+                  'CORTE DE EMERGENCIA (REVOCAR TODO)'
+                )}
+              </span>
             </button>
           </div>
 
@@ -617,16 +749,16 @@ export function PatientVaultView({
                             : 'bg-reb-mint/20 text-reb-mint border-reb-mint/40'
                         }`}
                       >
-                        {pass.domain}
+                        {translateDomainBadge(pass.domain, tr)}
                       </span>
 
                       <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-reb-surface-code text-reb-text-light border border-reb-border">
-                        {pass.storageProvider}
+                        {translateStorageProviderBadge(pass.storageProvider, tr)}
                       </span>
 
                       <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-reb-surface-code text-reb-text-muted border border-reb-border flex items-center gap-1">
                         <MapPin className="w-2.5 h-2.5 text-reb-mint" />
-                        {pass.gpsSector}
+                        {translateGpsSector(pass.gpsSector, tr)}
                       </span>
                     </div>
 
@@ -634,7 +766,7 @@ export function PatientVaultView({
                       {isExpiredOrRevoked ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-reb-pink/20 text-reb-pink border border-reb-pink/50 font-mono font-bold text-[10px]">
                           <ShieldAlert className="w-3 h-3" />
-                          REVOKED / ZEROIZED
+                          {tr('REVOKED / ZEROIZED', 'REVOCADO / ZEROIZADO')}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-reb-yellow/15 text-reb-yellow border border-reb-yellow/40 font-mono font-bold text-[10px]">
@@ -652,12 +784,12 @@ export function PatientVaultView({
                         {pass.title}
                       </h3>
                       <p className="text-[10px] font-mono text-reb-text-muted truncate">
-                        Grantee: {pass.specialistName} ({pass.specialistAddress.slice(0, 8)}...
+                        {tr('Grantee:', 'Autorizado:')} {pass.specialistName} ({pass.specialistAddress.slice(0, 8)}...
                         {pass.specialistAddress.slice(-4)})
                       </p>
                     </div>
                     <span className="text-[10px] font-mono text-reb-mint shrink-0">
-                      {pass.linkedPartName}
+                      {translateLinkedPartLabel(pass.linkedPartName, tr)}
                     </span>
                   </div>
 
@@ -665,6 +797,7 @@ export function PatientVaultView({
                   <div className="mt-2 grid grid-cols-2 gap-1.5">
                     <button
                       type="button"
+                      title={tr('Copy SHAKE-256 content hash', 'Copiar hash de contenido SHAKE-256')}
                       onClick={() =>
                         handleCopyText(`hash-${pass.id}`, pass.contentHash)
                       }
@@ -683,6 +816,7 @@ export function PatientVaultView({
 
                     <button
                       type="button"
+                      title={tr('Copy storage reference / CID', 'Copiar referencia de almacenamiento / CID')}
                       onClick={() => handleCopyText(`cid-${pass.id}`, pass.ipfsCid)}
                       className="flex items-center justify-between gap-1.5 px-2 py-1 rounded bg-reb-surface-code/90 border border-reb-border hover:border-reb-mint/40 text-left text-[10px] font-mono transition cursor-pointer"
                     >
@@ -703,19 +837,19 @@ export function PatientVaultView({
                     {pass.metrics ? (
                       <div className="flex items-center gap-2.5 text-[10px] font-mono text-reb-text-muted">
                         <span>
-                          Lat:{' '}
+                          {tr('Lat:', 'Lat:')}{' '}
                           <strong className="text-reb-mint">
                             {pass.metrics.neuralLatencyMs}ms
                           </strong>
                         </span>
                         <span>
-                          Imp:{' '}
+                          {tr('Imp:', 'Imp:')}{' '}
                           <strong className="text-reb-mint">
                             {pass.metrics.impedanceKOhm}kΩ
                           </strong>
                         </span>
                         <span>
-                          Coh:{' '}
+                          {tr('Coh:', 'Coh:')}{' '}
                           <strong className="text-reb-mint">
                             {pass.metrics.coherencePct}%
                           </strong>
@@ -723,7 +857,7 @@ export function PatientVaultView({
                       </div>
                     ) : (
                       <span className="text-[10px] font-mono text-reb-text-muted">
-                        Sin telemetría
+                        {tr('No telemetry', 'Sin telemetría')}
                       </span>
                     )}
 
@@ -735,14 +869,14 @@ export function PatientVaultView({
                           className="px-2 py-0.5 rounded bg-reb-mint/15 hover:bg-reb-mint/25 text-reb-mint border border-reb-mint/40 font-mono text-[10px] font-semibold transition flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
-                          <span>Extend +1h</span>
+                          <span>{tr('Extend +1h', 'Extender +1h')}</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => onRevokePass(pass.id)}
                           className="px-2 py-0.5 rounded bg-reb-pink/15 hover:bg-reb-pink/25 text-reb-pink border border-reb-pink/40 font-mono text-[10px] font-semibold transition cursor-pointer"
                         >
-                          Revoke
+                          {tr('Revoke', 'Revocar')}
                         </button>
                       </div>
                     )}

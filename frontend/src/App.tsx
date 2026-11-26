@@ -32,6 +32,7 @@ import {
   type UnsealResult,
 } from '@/components/specialist/SpecialistPortalView';
 import { getFrontendEnvConfig } from '@/config/env';
+import { useI18n } from '@/i18n/context';
 import { useSynapseVault, type OnChainGrant } from '@/hooks/useSynapseVault';
 import {
   INITIAL_BIONIC_PARTS,
@@ -80,7 +81,8 @@ function remainingFromChain(grant: OnChainGrant): number {
  */
 function passFromChainGrant(
   grant: OnChainGrant,
-  parts: readonly MockBionicPart[]
+  parts: readonly MockBionicPart[],
+  tr: (en: string, es: string) => string
 ): MockEphemeralPass {
   const linkedPart =
     grant.linkedPartId === ZERO_BYTES32
@@ -89,8 +91,8 @@ function passFromChainGrant(
   return {
     id: `OC-${grant.recordId.slice(2, 10).toUpperCase()}`,
     recordIdHex: grant.recordId,
-    title: 'Pase on-chain',
-    specialistName: 'Tu wallet (especialista)',
+    title: tr('On-chain Pass', 'Pase on-chain'),
+    specialistName: tr('Your wallet (specialist)', 'Tu wallet (especialista)'),
     specialistAddress: grant.specialist,
     patientPseudonym: shortAddress(grant.patient),
     domain: grant.domain === 1 ? 'BIONIC_TELEMETRY' : 'CLINICAL',
@@ -101,13 +103,13 @@ function passFromChainGrant(
     fromChainScan: true,
     linkedPartName:
       grant.linkedPartId === ZERO_BYTES32
-        ? 'Unlinked Clinical Shard'
+        ? tr('Unlinked Clinical Shard', 'Fragmento clínico sin pieza')
         : linkedPart
           ? `${linkedPart.modelName} (${linkedPart.serialNumber})`
-          : `Pieza ${grant.linkedPartId.slice(0, 10)}…`,
+          : `${tr('Part', 'Pieza')} ${grant.linkedPartId.slice(0, 10)}…`,
     linkedPartId: grant.linkedPartId,
     contentHash: grant.contentHash,
-    ipfsCid: '(se obtiene del gateway)',
+    ipfsCid: tr('(fetched from gateway)', '(se obtiene del gateway)'),
     remainingSeconds: remainingFromChain(grant),
     revoked: grant.revoked,
     gpsSector: '—',
@@ -120,10 +122,15 @@ function passFromChainGrant(
  * the attestation with QoreChain's pqcVerify precompile. Web wallets (QoreX/MetaMask) do not expose
  * ML-DSA message signing, so those writes go through the OEM tool, not the browser.
  */
-const OEM_TOOL_HINT =
-  'En modo on-chain el contrato verifica la firma ML-DSA-87 del fabricante con pqcVerify, y la wallet web no puede firmar con ML-DSA. Usa la herramienta OEM: `cd sdk && OEM_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial … --model … --bearer 0x… --firmware …`';
+function getOemToolHint(tr: (en: string, es: string) => string): string {
+  return tr(
+    'In on-chain mode the contract verifies the manufacturer ML-DSA-87 signature with pqcVerify, and web wallets cannot sign with ML-DSA. Use the OEM CLI: `cd sdk && OEM_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial … --model … --bearer 0x… --firmware …`',
+    'En modo on-chain el contrato verifica la firma ML-DSA-87 del fabricante con pqcVerify, y la wallet web no puede firmar con ML-DSA. Usa la herramienta OEM: `cd sdk && OEM_MNEMONIC="…" SYNAPSE_VAULT_ADDRESS=… npm run oem -- register --serial … --model … --bearer 0x… --firmware …`'
+  );
+}
 
 export function App(): React.JSX.Element {
+  const { locale, setLocale, tr } = useI18n();
   const env = useMemo(() => getFrontendEnvConfig(), []);
   const vault = useSynapseVault();
 
@@ -245,7 +252,7 @@ export function App(): React.JSX.Element {
         const discovered = grants
           .filter((g) => !known.has(g.recordId.toLowerCase()))
           .sort((a, b) => Number(b.createdAt - a.createdAt))
-          .map((g) => passFromChainGrant(g, bionicPartsRef.current));
+          .map((g) => passFromChainGrant(g, bionicPartsRef.current, tr));
         return [...discovered, ...kept];
       });
       setChainSync({ status: 'ok', count: grants.length, skipped: failedIds.length, syncedAt: Date.now() });
@@ -253,7 +260,7 @@ export function App(): React.JSX.Element {
       if (seq !== chainSyncSeqRef.current) return;
       setChainSync((prev) => ({ ...prev, status: 'error', error: errorText(err) }));
     }
-  }, [chainMode, getGrantsForSpecialist, walletAddress]);
+  }, [chainMode, getGrantsForSpecialist, tr, walletAddress]);
 
   useEffect(() => {
     void refreshSpecialistGrants();
@@ -263,25 +270,52 @@ export function App(): React.JSX.Element {
     try {
       const addr = await vault.connectWallet();
       if (!addr) {
-        notify('No se detectó wallet. La app queda en MODO DEMO LOCAL (nada se registra on-chain).', 'warn');
+        notify(
+          tr(
+            'No Web3 wallet detected. Running in LOCAL DEMO MODE (nothing is recorded on-chain).',
+            'No se detectó wallet. La app queda en MODO DEMO LOCAL (nada se registra on-chain).'
+          ),
+          'warn'
+        );
         return;
       }
       if (!vault.isChainConfigured) {
-        notify(`Wallet ${addr} conectada, pero falta VITE_QORECHAIN_RPC_URL o VITE_SYNAPSE_VAULT_ADDRESS.`, 'warn');
+        notify(
+          tr(
+            `Wallet ${addr} connected, but VITE_QORECHAIN_RPC_URL or VITE_SYNAPSE_VAULT_ADDRESS is missing.`,
+            `Wallet ${addr} conectada, pero falta VITE_QORECHAIN_RPC_URL o VITE_SYNAPSE_VAULT_ADDRESS.`
+          ),
+          'warn'
+        );
       } else if (!env.gatewayUrl) {
-        notify(`Wallet ${addr} conectada. Falta VITE_GATEWAY_URL: los pases no pueden custodiarse.`, 'warn');
+        notify(
+          tr(
+            `Wallet ${addr} connected. Missing VITE_GATEWAY_URL: envelopes cannot be escrowed.`,
+            `Wallet ${addr} conectada. Falta VITE_GATEWAY_URL: los pases no pueden custodiarse.`
+          ),
+          'warn'
+        );
       } else {
-        notify(`Wallet ${addr} conectada a QoreChain (${vault.chainId}). Modo ON-CHAIN activo.`);
+        notify(
+          tr(
+            `Wallet ${addr} connected to QoreChain (${vault.chainId}). ON-CHAIN mode active.`,
+            `Wallet ${addr} conectada a QoreChain (${vault.chainId}). Modo ON-CHAIN activo.`
+          )
+        );
       }
     } catch (err) {
-      notify(`Error al conectar wallet: ${errorText(err)}`, 'error');
+      notify(
+        tr(`Failed to connect wallet: ${errorText(err)}`, `Error al conectar wallet: ${errorText(err)}`),
+        'error'
+      );
     }
-  }, [env.gatewayUrl, notify, vault]);
+  }, [env.gatewayUrl, notify, tr, vault]);
 
   /** Signs a gateway challenge with the connected wallet. */
   const gatewayAuth = useCallback(
     async (action: GatewayAuthAction, recordId?: `0x${string}`) => {
-      if (!env.gatewayUrl || !vault.walletAddress) throw new Error('Gateway o wallet no disponibles.');
+      if (!env.gatewayUrl || !vault.walletAddress)
+        throw new Error(tr('Gateway or wallet unavailable.', 'Gateway o wallet no disponibles.'));
       const address = vault.walletAddress;
       const { nonce, chainId } = await requestGatewayNonce(env.gatewayUrl, address);
       const signature = await vault.signMessage(
@@ -289,7 +323,7 @@ export function App(): React.JSX.Element {
       );
       return { nonce, signature };
     },
-    [env.gatewayUrl, vault]
+    [env.gatewayUrl, tr, vault]
   );
 
   const deriveWalletKemKey = useCallback(async () => {
@@ -347,7 +381,10 @@ export function App(): React.JSX.Element {
           ...prev,
         ]);
         notify(
-          `Pase #${passId} sellado SOLO en modo demo local (sin wallet/contrato/gateway): no existe on-chain.`,
+          tr(
+            `Pass #${passId} sealed in LOCAL DEMO mode only (no wallet/contract/gateway): not recorded on-chain.`,
+            `Pase #${passId} sellado SOLO en modo demo local (sin wallet/contrato/gateway): no existe on-chain.`
+          ),
           'warn'
         );
         return;
@@ -357,7 +394,10 @@ export function App(): React.JSX.Element {
       const gatewayUrl = env.gatewayUrl as string;
       if (req.linkedPart && !req.linkedPart.onChain) {
         throw new Error(
-          `La pieza ${req.linkedPart.modelName} es de ejemplo y no existe on-chain. Regístrala en HBOM o elige "Sin pieza vinculada".`
+          tr(
+            `Part ${req.linkedPart.modelName} is a sample and does not exist on-chain. Register it in HBOM or select "Unlinked Clinical Shard".`,
+            `La pieza ${req.linkedPart.modelName} es de ejemplo y no existe on-chain. Regístrala en HBOM o elige "Sin pieza vinculada".`
+          )
         );
       }
 
@@ -365,7 +405,10 @@ export function App(): React.JSX.Element {
       const specialistKey = await vault.queryKemPublicKeyOnChain(req.specialistAddress);
       if (!specialistKey) {
         throw new Error(
-          `El especialista ${req.specialistAddress} no ha publicado su clave ML-KEM-1024 on-chain (Portal Especialista → Publish key).`
+          tr(
+            `Specialist ${req.specialistAddress} has not published their ML-KEM-1024 key on-chain (Specialist Portal → Publish Key).`,
+            `El especialista ${req.specialistAddress} no ha publicado su clave ML-KEM-1024 on-chain (Portal Especialista → Publish key).`
+          )
         );
       }
       // 2. Encrypt locally
@@ -401,7 +444,10 @@ export function App(): React.JSX.Element {
         });
       } catch (err) {
         throw new Error(
-          `El pase quedó on-chain (tx ${tx.hash.slice(0, 12)}…) pero el gateway no guardó el sobre: ${errorText(err)}. Revoca el pase y vuelve a intentarlo.`
+          tr(
+            `Pass recorded on-chain (tx ${tx.hash.slice(0, 12)}…) but the gateway failed to store the envelope: ${errorText(err)}. Revoke the pass and try again.`,
+            `El pase quedó on-chain (tx ${tx.hash.slice(0, 12)}…) pero el gateway no guardó el sobre: ${errorText(err)}. Revoca el pase y vuelve a intentarlo.`
+          )
         );
       }
 
@@ -416,9 +462,14 @@ export function App(): React.JSX.Element {
         },
         ...prev,
       ]);
-      notify(`Pase #${passId} registrado on-chain (solo hashes) y sobre custodiado por el gateway • Tx: ${tx.hash.slice(0, 14)}…`);
+      notify(
+        tr(
+          `Pass #${passId} anchored on-chain (hashes only) & envelope escrowed by gateway • Tx: ${tx.hash.slice(0, 14)}…`,
+          `Pase #${passId} registrado on-chain (solo hashes) y sobre custodiado por el gateway • Tx: ${tx.hash.slice(0, 14)}…`
+        )
+      );
     },
-    [env.gatewayUrl, gatewayAuth, liveMode, notify, specialistKemKeyPair.publicKey, vault]
+    [env.gatewayUrl, gatewayAuth, liveMode, notify, specialistKemKeyPair.publicKey, tr, vault]
   );
 
   /** Runs an on-chain action for real passes; local-only for samples/demo, and says so. */
@@ -427,27 +478,52 @@ export function App(): React.JSX.Element {
       pass: MockEphemeralPass | undefined,
       onChainAction: () => Promise<{ hash: `0x${string}` }>,
       applyLocal: () => void,
-      label: string
+      labelEn: string,
+      labelEs: string
     ) => {
       if (!pass) return;
+      const label = tr(labelEn, labelEs);
       if (pass.onChain) {
         if (!chainMode) {
-          notify(`Conecta la wallet del paciente para ${label} el pase #${pass.id} on-chain.`, 'error');
+          notify(
+            tr(
+              `Connect the patient wallet to ${labelEn} pass #${pass.id} on-chain.`,
+              `Conecta la wallet del paciente para ${labelEs} el pase #${pass.id} on-chain.`
+            ),
+            'error'
+          );
           return;
         }
         try {
           const tx = await onChainAction();
           applyLocal();
-          notify(`Pase #${pass.id}: ${label} confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`);
+          notify(
+            tr(
+              `Pass #${pass.id}: ${label} confirmed on-chain • Tx: ${tx.hash.slice(0, 14)}…`,
+              `Pase #${pass.id}: ${label} confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`
+            )
+          );
         } catch (err) {
-          notify(`No se pudo ${label} el pase #${pass.id}: ${errorText(err)}`, 'error');
+          notify(
+            tr(
+              `Could not ${labelEn} pass #${pass.id}: ${errorText(err)}`,
+              `No se pudo ${labelEs} el pase #${pass.id}: ${errorText(err)}`
+            ),
+            'error'
+          );
         }
         return;
       }
       applyLocal();
-      notify(`Pase #${pass.id}: ${label} aplicado solo en la interfaz (pase de ejemplo/demo, sin cadena).`, 'warn');
+      notify(
+        tr(
+          `Pass #${pass.id}: ${label} applied in UI only (sample/demo pass, off-chain).`,
+          `Pase #${pass.id}: ${label} aplicado solo en la interfaz (pase de ejemplo/demo, sin cadena).`
+        ),
+        'warn'
+      );
     },
-    [chainMode, notify]
+    [chainMode, notify, tr]
   );
 
   const handleExtendPass = useCallback(
@@ -462,6 +538,7 @@ export function App(): React.JSX.Element {
               p.id === id && !p.revoked ? { ...p, remainingSeconds: p.remainingSeconds + extraSeconds } : p
             )
           ),
+        'extend',
         'extender'
       );
     },
@@ -478,6 +555,7 @@ export function App(): React.JSX.Element {
           setPasses((prev) =>
             prev.map((p) => (p.id === id ? { ...p, revoked: true, remainingSeconds: 0 } : p))
           ),
+        'revoke',
         'revocar'
       );
     },
@@ -494,18 +572,35 @@ export function App(): React.JSX.Element {
     };
     if (!chainMode) {
       revokeAllLocal();
-      notify('Kill-Switch aplicado solo en la interfaz (modo demo: no hay transacción on-chain).', 'warn');
+      notify(
+        tr(
+          'Kill-Switch applied in UI only (demo mode: no on-chain transaction).',
+          'Kill-Switch aplicado solo en la interfaz (modo demo: no hay transacción on-chain).'
+        ),
+        'warn'
+      );
       return;
     }
     try {
       const tx = await vault.emergencyRevokeAllOnChain();
       revokeAllLocal();
       void refreshSpecialistGrants();
-      notify(`EMERGENCY KILL-SWITCH confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`);
+      notify(
+        tr(
+          `EMERGENCY KILL-SWITCH confirmed on-chain • Tx: ${tx.hash.slice(0, 14)}…`,
+          `EMERGENCY KILL-SWITCH confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`
+        )
+      );
     } catch (err) {
-      notify(`El Kill-Switch NO se ejecutó: ${errorText(err)}`, 'error');
+      notify(
+        tr(
+          `Kill-Switch was NOT executed: ${errorText(err)}`,
+          `El Kill-Switch NO se ejecutó: ${errorText(err)}`
+        ),
+        'error'
+      );
     }
-  }, [chainMode, notify, refreshSpecialistGrants, vault]);
+  }, [chainMode, notify, refreshSpecialistGrants, tr, vault]);
 
   // ---------------------------------------------------------------------------
   // Specialist: real decryption (gateway + chain), or the local demo cache
@@ -513,15 +608,30 @@ export function App(): React.JSX.Element {
   const handleUnsealPass = useCallback(
     async (pass: MockEphemeralPass): Promise<UnsealResult> => {
       if (pass.isSample) {
-        throw new Error('Pase de ejemplo: no tiene datos cifrados reales. Crea un pase desde Patient Vault.');
+        throw new Error(
+          tr(
+            'Sample pass: contains no real ciphertext. Seal a pass from Patient Vault first.',
+            'Pase de ejemplo: no tiene datos cifrados reales. Crea un pase desde Patient Vault.'
+          )
+        );
       }
 
       if (pass.onChain) {
         if (!liveMode || !vault.walletAddress) {
-          throw new Error('Conecta la wallet del especialista (y configura el gateway) para descifrar este pase.');
+          throw new Error(
+            tr(
+              'Connect the specialist wallet (and configure the gateway) to decrypt this pass.',
+              'Conecta la wallet del especialista (y configura el gateway) para descifrar este pase.'
+            )
+          );
         }
         if (vault.walletAddress.toLowerCase() !== pass.specialistAddress.toLowerCase()) {
-          throw new Error(`Este pase es para ${pass.specialistAddress}. Cambia a esa cuenta en tu wallet.`);
+          throw new Error(
+            tr(
+              `This pass is addressed to ${pass.specialistAddress}. Switch to that account in your wallet.`,
+              `Este pase es para ${pass.specialistAddress}. Cambia a esa cuenta en tu wallet.`
+            )
+          );
         }
         const keyPair = keySource === 'wallet' ? specialistKemKeyPair : await deriveWalletKemKey();
         const gatewayUrl = env.gatewayUrl as string;
@@ -545,7 +655,12 @@ export function App(): React.JSX.Element {
         // Do not trust the gateway blindly: check its envelope against the on-chain commitment
         const meta = await vault.getGrantMetadata(pass.recordIdHex);
         if (computeEnvelopeHash(released.encryptedKeyEnvelope) !== meta.envelopeHash) {
-          throw new Error('El sobre entregado por el gateway NO coincide con el envelopeHash on-chain.');
+          throw new Error(
+            tr(
+              'The envelope returned by the gateway does NOT match the on-chain envelopeHash.',
+              'El sobre entregado por el gateway NO coincide con el envelopeHash on-chain.'
+            )
+          );
         }
         const blob = released.blobToken
           ? await downloadBlobViaGateway(gatewayUrl, released.ipfsCID, released.blobToken)
@@ -568,7 +683,13 @@ export function App(): React.JSX.Element {
       }
 
       const cached = localCacheRef.current.get(pass.recordIdHex);
-      if (!cached) throw new Error('No hay datos cifrados para este pase en esta pestaña (demo local).');
+      if (!cached)
+        throw new Error(
+          tr(
+            'No ciphertext found for this pass in the current tab (local demo).',
+            'No hay datos cifrados para este pase en esta pestaña (demo local).'
+          )
+        );
       try {
         const plaintext = await unsealAndDecryptDocument(
           cached.encryptedBlob,
@@ -584,10 +705,15 @@ export function App(): React.JSX.Element {
           provenance: 'local-demo',
         };
       } catch {
-        throw new Error('La clave del especialista cambió desde que se selló este pase (demo local): no se puede descifrar.');
+        throw new Error(
+          tr(
+            'The specialist key changed since this pass was sealed (local demo): cannot decrypt.',
+            'La clave del especialista cambió desde que se selló este pase (demo local): no se puede descifrar.'
+          )
+        );
       }
     },
-    [deriveWalletKemKey, env.gatewayUrl, env.ipfsGatewayUrl, gatewayAuth, keySource, liveMode, refreshSpecialistGrants, specialistKemKeyPair, vault]
+    [deriveWalletKemKey, env.gatewayUrl, env.ipfsGatewayUrl, gatewayAuth, keySource, liveMode, refreshSpecialistGrants, specialistKemKeyPair, tr, vault]
   );
 
   // ---------------------------------------------------------------------------
@@ -602,14 +728,26 @@ export function App(): React.JSX.Element {
       if (!chainMode || !vault.walletAddress) {
         setBionicParts((prev) => [{ ...newPart, onChain: false }, ...prev]);
         setFirmwareHistory((prev) => [genesisHistory, ...prev]);
-        notify(`Pieza ${newPart.modelName} registrada SOLO en la interfaz (demo, sin wallet): no existe on-chain.`, 'warn');
+        notify(
+          tr(
+            `Part ${newPart.modelName} registered in UI only (demo mode, no wallet): does not exist on-chain.`,
+            `Pieza ${newPart.modelName} registrada SOLO en la interfaz (demo, sin wallet): no existe on-chain.`
+          ),
+          'warn'
+        );
         return newPart.partId;
       }
       void signatureHex; // browser-generated key is not the OEM's registered key
-      notify('Registro HBOM on-chain: usa la herramienta OEM (firma ML-DSA-87 verificada por pqcVerify).', 'warn');
-      throw new Error(OEM_TOOL_HINT);
+      notify(
+        tr(
+          'On-chain HBOM registration: use the OEM CLI tool (ML-DSA-87 signature verified by pqcVerify).',
+          'Registro HBOM on-chain: usa la herramienta OEM (firma ML-DSA-87 verificada por pqcVerify).'
+        ),
+        'warn'
+      );
+      throw new Error(getOemToolHint(tr));
     },
-    [chainMode, notify, vault.walletAddress]
+    [chainMode, notify, tr, vault.walletAddress]
   );
 
   const handlePushFirmwareUpdate = useCallback(
@@ -627,20 +765,31 @@ export function App(): React.JSX.Element {
       };
       if (!part?.onChain) {
         applyLocal();
-        notify(`Parche ${entry.semver} aplicado solo en la interfaz (pieza de ejemplo/demo).`, 'warn');
+        notify(
+          tr(
+            `Patch ${entry.semver} applied in UI only (sample/demo part).`,
+            `Parche ${entry.semver} aplicado solo en la interfaz (pieza de ejemplo/demo).`
+          ),
+          'warn'
+        );
         return;
       }
       void signatureHex;
-      throw new Error(OEM_TOOL_HINT.replace('register --serial … --model … --bearer 0x…', `update --part ${partId}`));
+      throw new Error(getOemToolHint(tr).replace('register --serial … --model … --bearer 0x…', `update --part ${partId}`));
     },
-    [bionicParts, notify]
+    [bionicParts, notify, tr]
   );
 
   const handleUpdatePartStatus = useCallback(
     async (partId: `0x${string}`, newStatus: PartStatusLabel) => {
       const part = bionicParts.find((p) => p.partId === partId);
       if (part?.status === 'DECOMMISSIONED') {
-        throw new Error('DECOMMISSIONED es un estado terminal: la pieza no puede reactivarse.');
+        throw new Error(
+          tr(
+            'DECOMMISSIONED is a terminal state: the part cannot be reactivated.',
+            'DECOMMISSIONED es un estado terminal: la pieza no puede reactivarse.'
+          )
+        );
       }
       const statusIdx = newStatus === 'ACTIVE' ? 0 : newStatus === 'MAINTENANCE' ? 1 : 2;
       const applyLocal = () =>
@@ -649,28 +798,56 @@ export function App(): React.JSX.Element {
         );
       if (!part?.onChain) {
         applyLocal();
-        notify(`Estado ${newStatus} aplicado solo en la interfaz (pieza de ejemplo/demo).`, 'warn');
+        notify(
+          tr(
+            `Status ${newStatus} applied in UI only (sample/demo part).`,
+            `Estado ${newStatus} aplicado solo en la interfaz (pieza de ejemplo/demo).`
+          ),
+          'warn'
+        );
         return;
       }
-      if (!chainMode) throw new Error('Conecta la wallet del portador para cambiar el estado on-chain.');
+      if (!chainMode)
+        throw new Error(
+          tr(
+            'Connect the bearer wallet to update the status on-chain.',
+            'Conecta la wallet del portador para cambiar el estado on-chain.'
+          )
+        );
       try {
         const tx = await vault.updatePartStatusOnChain(partId, statusIdx);
         applyLocal();
-        notify(`Estado ${newStatus} confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`);
+        notify(
+          tr(
+            `Status ${newStatus} confirmed on-chain • Tx: ${tx.hash.slice(0, 14)}…`,
+            `Estado ${newStatus} confirmado on-chain • Tx: ${tx.hash.slice(0, 14)}…`
+          )
+        );
       } catch (err) {
-        notify(`No se pudo cambiar el estado: ${errorText(err)}`, 'error');
+        notify(
+          tr(
+            `Could not update status: ${errorText(err)}`,
+            `No se pudo cambiar el estado: ${errorText(err)}`
+          ),
+          'error'
+        );
         throw err;
       }
     },
-    [bionicParts, chainMode, notify, vault]
+    [bionicParts, chainMode, notify, tr, vault]
   );
 
   const handleGrantTelemetryPassForPart = useCallback(
     (part: MockBionicPart) => {
       setActiveTab('patient-vault');
-      notify(`Listo para sellar un pase ligado a ${part.modelName} (${part.serialNumber})`);
+      notify(
+        tr(
+          `Ready to seal a pass linked to ${part.modelName} (${part.serialNumber})`,
+          `Listo para sellar un pase ligado a ${part.modelName} (${part.serialNumber})`
+        )
+      );
     },
-    [notify]
+    [notify, tr]
   );
 
   // ---------------------------------------------------------------------------
@@ -680,20 +857,43 @@ export function App(): React.JSX.Element {
     if (vault.isConnected) {
       try {
         await deriveWalletKemKey();
-        notify('Clave ML-KEM-1024 derivada de la firma de tu wallet (recuperable con la misma wallet).');
+        notify(
+          tr(
+            'ML-KEM-1024 key derived from your wallet signature (recoverable with the same wallet).',
+            'Clave ML-KEM-1024 derivada de la firma de tu wallet (recuperable con la misma wallet).'
+          )
+        );
       } catch (err) {
-        notify(`No se pudo derivar la clave: ${errorText(err)}`, 'error');
+        notify(
+          tr(
+            `Could not derive key: ${errorText(err)}`,
+            `No se pudo derivar la clave: ${errorText(err)}`
+          ),
+          'error'
+        );
       }
       return;
     }
     setSpecialistKemKeyPair(generateKemKeyPair());
     setKeySource('ephemeral');
-    notify('Nueva clave ML-KEM-1024 EFÍMERA (sin wallet: se pierde al recargar).', 'warn');
-  }, [deriveWalletKemKey, notify, vault.isConnected]);
+    notify(
+      tr(
+        'New EPHEMERAL ML-KEM-1024 key generated (no wallet: lost on reload).',
+        'Nueva clave ML-KEM-1024 EFÍMERA (sin wallet: se pierde al recargar).'
+      ),
+      'warn'
+    );
+  }, [deriveWalletKemKey, notify, tr, vault.isConnected]);
 
   const handlePublishKemKeyOnChain = useCallback(async () => {
     if (!chainMode) {
-      notify('Conecta una wallet y configura el contrato para publicar la clave on-chain.', 'error');
+      notify(
+        tr(
+          'Connect a wallet and configure the contract to publish the key on-chain.',
+          'Conecta una wallet y configura el contrato para publicar la clave on-chain.'
+        ),
+        'error'
+      );
       return;
     }
     try {
@@ -701,11 +901,22 @@ export function App(): React.JSX.Element {
       const pair = keySource === 'wallet' ? specialistKemKeyPair : await deriveWalletKemKey();
       const tx = await vault.publishKemPublicKeyOnChain(bytesToHex(pair.publicKey));
       setIsKeyPublishedOnChain(true);
-      notify(`Clave pública ML-KEM-1024 registrada on-chain • Tx: ${tx.hash.slice(0, 14)}…`);
+      notify(
+        tr(
+          `ML-KEM-1024 public key registered on-chain • Tx: ${tx.hash.slice(0, 14)}…`,
+          `Clave pública ML-KEM-1024 registrada on-chain • Tx: ${tx.hash.slice(0, 14)}…`
+        )
+      );
     } catch (err) {
-      notify(`No se pudo publicar la clave: ${errorText(err)}`, 'error');
+      notify(
+        tr(
+          `Could not publish key: ${errorText(err)}`,
+          `No se pudo publicar la clave: ${errorText(err)}`
+        ),
+        'error'
+      );
     }
-  }, [chainMode, deriveWalletKemKey, keySource, notify, specialistKemKeyPair, vault]);
+  }, [chainMode, deriveWalletKemKey, keySource, notify, specialistKemKeyPair, tr, vault]);
 
   // Passes granted TO this wallet (specialist inbox) are not the patient's to manage
   const patientPasses = useMemo(() => passes.filter((p) => !p.fromChainScan), [passes]);
@@ -717,7 +928,7 @@ export function App(): React.JSX.Element {
 
   const displayAddress = vault.walletAddress
     ? `${vault.walletAddress.slice(0, 6)}...${vault.walletAddress.slice(-4)}`
-    : 'Conectar wallet';
+    : tr('Connect Wallet', 'Conectar wallet');
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative bg-reb-bg text-reb-text-light selection:bg-reb-mint selection:text-reb-bg">
@@ -769,7 +980,7 @@ export function App(): React.JSX.Element {
                     : 'text-reb-text-muted hover:text-reb-text-light hover:bg-reb-surface/60'
                 }`}
               >
-                Patient Vault ({activePassCount})
+                {tr('Patient Vault', 'Bóveda Paciente')} ({activePassCount})
                 {activeTab === 'patient-vault' && (
                   <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-reb-mint rounded-full shadow-[0_0_6px_#A8F0C6]" />
                 )}
@@ -784,7 +995,7 @@ export function App(): React.JSX.Element {
                     : 'text-reb-text-muted hover:text-reb-text-light hover:bg-reb-surface/60'
                 }`}
               >
-                Cyber-Human HBOM ({bionicParts.length})
+                {tr('Cyber-Human HBOM', 'Catálogo HBOM')} ({bionicParts.length})
                 {activeTab === 'cyber-hbom' && (
                   <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-reb-mint rounded-full shadow-[0_0_6px_#A8F0C6]" />
                 )}
@@ -799,7 +1010,7 @@ export function App(): React.JSX.Element {
                     : 'text-reb-text-muted hover:text-reb-text-light hover:bg-reb-surface/60'
                 }`}
               >
-                Specialist Portal
+                {tr('Specialist Portal', 'Portal Especialista')}
                 {activeTab === 'specialist-portal' && (
                   <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-reb-mint rounded-full shadow-[0_0_6px_#A8F0C6]" />
                 )}
@@ -807,8 +1018,30 @@ export function App(): React.JSX.Element {
             </nav>
           </div>
 
-          {/* Right Status, Web3 Wallet & Emergency Kill-Switch */}
-          <div className="flex items-center gap-3">
+          {/* Right Status, Language Switch, Web3 Wallet & Emergency Kill-Switch */}
+          <div className="flex items-center gap-2.5">
+            <div
+              role="group"
+              aria-label="Language"
+              className="inline-flex items-center p-0.5 bg-reb-surface/90 border border-reb-border font-mono text-[10px] rounded-full"
+            >
+              {(['en', 'es'] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLocale(code)}
+                  aria-pressed={locale === code}
+                  className={`px-2 py-0.5 rounded-full cursor-pointer transition-colors ${
+                    locale === code
+                      ? 'bg-reb-mint text-reb-bg font-bold shadow-[0_0_10px_rgba(168,240,198,0.3)]'
+                      : 'text-reb-text-muted hover:text-reb-text-light'
+                  }`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
             <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface/80 border border-reb-border text-reb-text-muted font-mono text-xs">
               <Radio className="w-3.5 h-3.5 text-reb-mint animate-pulse" />
               <span className="text-reb-text-light">Diana</span>
@@ -816,7 +1049,7 @@ export function App(): React.JSX.Element {
               <span
                 className={`text-[10px] border-l border-reb-border pl-2 ${liveMode ? 'text-reb-mint' : 'text-reb-yellow'}`}
               >
-                {liveMode ? 'ON-CHAIN' : 'DEMO LOCAL'}
+                {liveMode ? 'ON-CHAIN' : tr('LOCAL DEMO', 'DEMO LOCAL')}
               </span>
             </div>
 
@@ -831,7 +1064,10 @@ export function App(): React.JSX.Element {
               type="button"
               onClick={() => void handleConnectWallet()}
               className="flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface/80 border border-reb-border hover:border-reb-mint/50 font-mono text-xs transition-all cursor-pointer"
-              title="Conectar QoreX Wallet / MetaMask a QoreChain Diana (9800)"
+              title={tr(
+                'Connect QoreX Wallet / MetaMask to QoreChain Diana (9800)',
+                'Conectar QoreX Wallet / MetaMask a QoreChain Diana (9800)'
+              )}
             >
               {vault.isConnected ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-reb-mint" />
@@ -848,7 +1084,10 @@ export function App(): React.JSX.Element {
               type="button"
               onClick={() => void handleEmergencyKillSwitch()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-reb-pink/15 border border-reb-pink/60 text-reb-pink hover:bg-reb-pink hover:text-reb-bg font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_16px_rgba(244,114,155,0.2)]"
-              title="Revocar todos los pases efímeros activos en una sola transacción"
+              title={tr(
+                'Revoke all active ephemeral passes in a single O(1) transaction',
+                'Revocar todos los pases efímeros activos en una sola transacción O(1)'
+              )}
             >
               <ShieldAlert className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Kill-Switch</span>
@@ -879,7 +1118,7 @@ export function App(): React.JSX.Element {
               onClick={() => setStatusBanner(null)}
               className="font-mono text-[10px] uppercase text-reb-text-muted hover:text-reb-text-light cursor-pointer"
             >
-              [Cerrar]
+              [{tr('Dismiss', 'Cerrar')}]
             </button>
           </div>
         </div>
@@ -958,7 +1197,7 @@ export function App(): React.JSX.Element {
               QoreChain Diana Testnet ({vault.chainId}) •{' '}
               {vault.contractAddress
                 ? `Vault: ${vault.contractAddress.slice(0, 8)}...`
-                : 'sin contrato configurado'}
+                : tr('no contract configured', 'sin contrato configurado')}
             </span>
           </div>
         </div>

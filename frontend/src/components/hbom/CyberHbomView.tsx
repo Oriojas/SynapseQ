@@ -21,6 +21,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { computeShake256, signMLDSA87, verifyMLDSA87 } from '@sdk/pqc';
+import { useI18n } from '@/i18n/context';
 import type {
   AnatomicalZoneLabel,
   MockBionicPart,
@@ -57,18 +58,88 @@ export interface CyberHbomViewProps {
 
 const ANATOMICAL_ZONES: readonly {
   readonly id: 'ALL' | AnatomicalZoneLabel;
-  readonly label: string;
-  readonly subtitle: string;
+  readonly labelEn: string;
+  readonly labelEs: string;
+  readonly subtitleEn: string;
+  readonly subtitleEs: string;
   readonly zoneIndex: number;
 }[] = [
-  { id: 'ALL', label: 'ALL', subtitle: 'Full Cyber-Human Substrate', zoneIndex: -1 },
-  { id: 'NEURAL', label: 'NEURAL', subtitle: 'L1 BCI Synaptic Mesh', zoneIndex: 0 },
-  { id: 'OCULAR', label: 'OCULAR', subtitle: 'Photonic Retina & HUD', zoneIndex: 1 },
-  { id: 'CARDIOVASCULAR', label: 'CARDIOVASCULAR', subtitle: 'Hemodynamic Nano-Valves', zoneIndex: 2 },
-  { id: 'LOCOMOTOR', label: 'LOCOMOTOR', subtitle: 'Titan-7 Myo-Prosthetics', zoneIndex: 3 },
-  { id: 'ORGAN', label: 'ORGAN', subtitle: 'Hepatic / Renal Scaffolds', zoneIndex: 4 },
-  { id: 'SUBDERMAL', label: 'SUBDERMAL', subtitle: 'Lattice NFC & Sensory Skin', zoneIndex: 5 },
+  {
+    id: 'ALL',
+    labelEn: 'ALL',
+    labelEs: 'TODAS',
+    subtitleEn: 'Full Cyber-Human Substrate',
+    subtitleEs: 'Sustrato Ciberhumano Completo',
+    zoneIndex: -1,
+  },
+  {
+    id: 'NEURAL',
+    labelEn: 'NEURAL',
+    labelEs: 'NEURAL',
+    subtitleEn: 'L1 BCI Synaptic Mesh',
+    subtitleEs: 'Malla Sináptica BCI L1',
+    zoneIndex: 0,
+  },
+  {
+    id: 'OCULAR',
+    labelEn: 'OCULAR',
+    labelEs: 'OCULAR',
+    subtitleEn: 'Photonic Retina & HUD',
+    subtitleEs: 'Retina Fotónica y HUD',
+    zoneIndex: 1,
+  },
+  {
+    id: 'CARDIOVASCULAR',
+    labelEn: 'CARDIOVASCULAR',
+    labelEs: 'CARDIOVASCULAR',
+    subtitleEn: 'Hemodynamic Nano-Valves',
+    subtitleEs: 'Nanoválvulas Hemodinámicas',
+    zoneIndex: 2,
+  },
+  {
+    id: 'LOCOMOTOR',
+    labelEn: 'LOCOMOTOR',
+    labelEs: 'LOCOMOTOR',
+    subtitleEn: 'Titan-7 Myo-Prosthetics',
+    subtitleEs: 'Mioprótesis Titan-7',
+    zoneIndex: 3,
+  },
+  {
+    id: 'ORGAN',
+    labelEn: 'ORGAN',
+    labelEs: 'ÓRGANOS',
+    subtitleEn: 'Hepatic / Renal Scaffolds',
+    subtitleEs: 'Andamios Hepáticos / Renales',
+    zoneIndex: 4,
+  },
+  {
+    id: 'SUBDERMAL',
+    labelEn: 'SUBDERMAL',
+    labelEs: 'SUBDÉRMICO',
+    subtitleEn: 'Lattice NFC & Sensory Skin',
+    subtitleEs: 'NFC Reticular y Piel Sensorial',
+    zoneIndex: 5,
+  },
 ];
+
+function formatZoneLabel(
+  zone: 'ALL' | AnatomicalZoneLabel,
+  tr: (en: string, es: string) => string
+): string {
+  const found = ANATOMICAL_ZONES.find((z) => z.id === zone);
+  return found ? tr(found.labelEn, found.labelEs) : zone;
+}
+
+function formatStatusLabel(
+  status: 'ALL' | PartStatusLabel,
+  tr: (en: string, es: string) => string,
+  short = false
+): string {
+  if (status === 'ALL') return tr('ALL', 'TODOS');
+  if (status === 'ACTIVE') return tr('ACTIVE', 'ACTIVO');
+  if (status === 'MAINTENANCE') return short ? tr('MAINT', 'MANT') : tr('MAINTENANCE', 'MANTENIMIENTO');
+  return short ? tr('DECOM', 'BAJA') : tr('DECOMMISSIONED', 'DADO DE BAJA');
+}
 
 const STATUS_TABS: readonly ('ALL' | PartStatusLabel)[] = [
   'ALL',
@@ -98,6 +169,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
   onGrantTelemetryPassForPart,
   liveWallet,
 }) => {
+  const { tr } = useI18n();
   const [regError, setRegError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
   // Filter & selection states
@@ -187,7 +259,8 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
     setRegError(null);
     const encoder = new TextEncoder();
     const cleanSerial = regSerialNumber.trim() || `SN-${Math.floor(1000 + Math.random() * 9000)}`;
-    const cleanModel = regModelName.trim() || 'Cyber-Synapse Implant';
+    const cleanModel =
+      regModelName.trim() || tr('Cyber-Synapse Implant', 'Implante Ciber-Sinapsis');
     const cleanSemver = regFirmwareSemver.trim() || 'v1.0.0';
 
     const fwBytes = encoder.encode(
@@ -218,7 +291,8 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
       zoneIndex: getZoneIndex(regZone),
       status: 'ACTIVE',
       statusIndex: 0,
-      manufacturerName: regManufacturerName.trim() || 'BioNeural OEM Enclave',
+      manufacturerName:
+        regManufacturerName.trim() || tr('BioNeural OEM Enclave', 'Enclave OEM BioNeural'),
       manufacturerAddress: liveWallet ?? regManufacturerAddress,
       firmwareVersion: 1,
       firmwareSemver: cleanSemver,
@@ -231,13 +305,19 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
     const genesisHistory: MockFirmwareHistoryEntry = {
       version: 1,
       semver: cleanSemver,
-      badge: `${cleanSemver} [GENESIS IMPLANT - ML-DSA-87]`,
+      badge: tr(
+        `${cleanSemver} [GENESIS IMPLANT - ML-DSA-87]`,
+        `${cleanSemver} [IMPLANTE GÉNESIS - ML-DSA-87]`
+      ),
       timestampUtc: nowUtc,
       blockNumber: currentBlock,
       firmwareHash,
       calibrationHash,
       signerAddress: liveWallet ?? regManufacturerAddress,
-      description: `Genesis HBOM surgical registration for ${cleanModel} (${cleanSerial}). Attested via NIST FIPS 204 ML-DSA-87 (${signatureBytesLen.toLocaleString()} bytes).`,
+      description: tr(
+        `Genesis HBOM surgical registration for ${cleanModel} (${cleanSerial}). Attested via NIST FIPS 204 ML-DSA-87 (${signatureBytesLen.toLocaleString()} bytes).`,
+        `Registro quirúrgico HBOM génesis para ${cleanModel} (${cleanSerial}). Atestiguado vía NIST FIPS 204 ML-DSA-87 (${signatureBytesLen.toLocaleString()} bytes).`
+      ),
     };
 
     setRegSignatureResult({
@@ -268,14 +348,20 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
     if (part.status === 'DECOMMISSIONED') {
       setPatchingPartId(part.partId);
       setPatchErrorMsg(
-        'SynapseVaultRegistry__PartAlreadyDecommissioned: Cannot push firmware updates to a DECOMMISSIONED bionic implant with zeroized enclave tombstone hashes.'
+        tr(
+          'SynapseVaultRegistry__PartAlreadyDecommissioned: Cannot push firmware updates to a DECOMMISSIONED bionic implant with zeroized enclave tombstone hashes.',
+          'SynapseVaultRegistry__PartAlreadyDecommissioned: No se pueden aplicar actualizaciones de firmware a un implante biónico DADO DE BAJA con hashes de lápida de enclave puestos a cero.'
+        )
       );
       return;
     }
     const nextMinor = part.firmwareVersion + 1;
     setPatchSemver(`v${nextMinor}.0.0`);
     setPatchDescription(
-      `Monotonic revision #${nextMinor} lattice telemetry firmware upgrade for ${part.modelName}.`
+      tr(
+        `Monotonic revision #${nextMinor} lattice telemetry firmware upgrade for ${part.modelName}.`,
+        `Actualización de firmware de telemetría reticular revisión monotónica #${nextMinor} para ${part.modelName}.`
+      )
     );
     setPatchingPartId(part.partId);
   };
@@ -284,7 +370,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
   const handleExecuteFirmwarePatch = async (part: MockBionicPart) => {
     if (part.status === 'DECOMMISSIONED') {
       setPatchErrorMsg(
-        'REVERTED: SynapseVaultRegistry__PartAlreadyDecommissioned() — Decommissioned implants reject all firmware mutations on QoreChain L1.'
+        tr(
+          'REVERTED: SynapseVaultRegistry__PartAlreadyDecommissioned() — Decommissioned implants reject all firmware mutations on QoreChain L1.',
+          'REVERTIDO: SynapseVaultRegistry__PartAlreadyDecommissioned() — Los implantes dados de baja rechazan todas las mutaciones de firmware en QoreChain L1.'
+        )
       );
       return;
     }
@@ -312,13 +401,19 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
     const entry: MockFirmwareHistoryEntry = {
       version: nextVersion,
       semver: cleanSemver,
-      badge: `${cleanSemver} [LATEST - MONOTONIC #${nextVersion}]`,
+      badge: tr(
+        `${cleanSemver} [LATEST - MONOTONIC #${nextVersion}]`,
+        `${cleanSemver} [ÚLTIMA - MONOTÓNICA #${nextVersion}]`
+      ),
       timestampUtc: nowUtc,
       blockNumber: nextBlock,
       firmwareHash,
       calibrationHash,
       signerAddress: part.manufacturerAddress,
-      description: `${patchDescription} (ML-DSA-87 verified: ${sigBytes.toLocaleString()}B sig).`,
+      description: tr(
+        `${patchDescription} (ML-DSA-87 verified: ${sigBytes.toLocaleString()}B sig).`,
+        `${patchDescription} (ML-DSA-87 verificado: firma de ${sigBytes.toLocaleString()}B).`
+      ),
     };
 
     try {
@@ -413,11 +508,11 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
             <div className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-reb-mint" />
               <span className="font-display text-xs font-bold uppercase tracking-wider text-reb-text-light">
-                ANATOMICAL ZONE FILTER
+                {tr('ANATOMICAL ZONE FILTER', 'FILTRO POR ZONA ANATÓMICA')}
               </span>
             </div>
             <span className="px-1.5 py-0.5 rounded bg-reb-mint/15 text-reb-mint font-mono text-[9px] font-bold">
-              {selectedZone}
+              {formatZoneLabel(selectedZone, tr)}
             </span>
           </div>
 
@@ -435,14 +530,14 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                   key={zone.id}
                   type="button"
                   onClick={() => setSelectedZone(zone.id)}
-                  title={zone.subtitle}
+                  title={tr(zone.subtitleEn, zone.subtitleEs)}
                   className={`px-2 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer border ${
                     isSelected
                       ? 'bg-reb-mint text-reb-bg border-reb-mint shadow-[0_0_12px_rgba(168,240,198,0.25)]'
                       : 'bg-reb-surface-code/70 border-reb-border/70 text-reb-text-muted hover:text-reb-text-light hover:border-reb-mint/50'
                   }`}
                 >
-                  <span>{zone.label}</span>
+                  <span>{tr(zone.labelEn, zone.labelEs)}</span>
                   <span
                     className={`px-1 py-0.2 rounded text-[9px] ${
                       isSelected
@@ -463,7 +558,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="flex items-center gap-1.5">
                 <PlusCircle className="w-3.5 h-3.5 text-reb-mint" />
                 <h2 className="font-display text-xs font-bold uppercase tracking-wider text-reb-text-light">
-                  REGISTER NEW BIONIC PART (ML-DSA-87)
+                  {tr('REGISTER NEW BIONIC PART (ML-DSA-87)', 'REGISTRAR NUEVA PARTE BIÓNICA (ML-DSA-87)')}
                 </h2>
               </div>
               <span className="font-mono text-[9px] text-reb-mint">FIPS 204</span>
@@ -473,7 +568,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    Model Name
+                    {tr('Model Name', 'Nombre del Modelo')}
                   </label>
                   <input
                     type="text"
@@ -486,7 +581,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    Serial Number
+                    {tr('Serial Number', 'Número de Serie')}
                   </label>
                   <input
                     type="text"
@@ -502,24 +597,24 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="grid grid-cols-3 gap-2">
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    Zone
+                    {tr('Zone', 'Zona')}
                   </label>
                   <select
                     value={regZone}
                     onChange={(e) => setRegZone(e.target.value as AnatomicalZoneLabel)}
                     className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-1.5 py-1 font-mono text-[10px] text-reb-text-light focus:outline-none focus:border-reb-mint"
                   >
-                    <option value="NEURAL">NEURAL</option>
-                    <option value="OCULAR">OCULAR</option>
-                    <option value="CARDIOVASCULAR">CARDIOVASCULAR</option>
-                    <option value="LOCOMOTOR">LOCOMOTOR</option>
-                    <option value="ORGAN">ORGAN</option>
-                    <option value="SUBDERMAL">SUBDERMAL</option>
+                    <option value="NEURAL">{tr('NEURAL', 'NEURAL')}</option>
+                    <option value="OCULAR">{tr('OCULAR', 'OCULAR')}</option>
+                    <option value="CARDIOVASCULAR">{tr('CARDIOVASCULAR', 'CARDIOVASCULAR')}</option>
+                    <option value="LOCOMOTOR">{tr('LOCOMOTOR', 'LOCOMOTOR')}</option>
+                    <option value="ORGAN">{tr('ORGAN', 'ÓRGANOS')}</option>
+                    <option value="SUBDERMAL">{tr('SUBDERMAL', 'SUBDÉRMICO')}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    OEM Name
+                    {tr('OEM Name', 'Nombre OEM')}
                   </label>
                   <input
                     type="text"
@@ -531,7 +626,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    Semver
+                    {tr('Semver', 'Semver')}
                   </label>
                   <input
                     type="text"
@@ -547,7 +642,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    OEM Address (QoreChain)
+                    {tr('OEM Address (QoreChain)', 'Dirección OEM (QoreChain)')}
                   </label>
                   <input
                     type="text"
@@ -556,7 +651,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     disabled={Boolean(liveWallet)}
                     title={
                       liveWallet
-                        ? 'En modo on-chain el fabricante es la wallet conectada (el contrato lo exige)'
+                        ? tr(
+                            'In on-chain mode, the manufacturer is the connected wallet (enforced by contract)',
+                            'En modo on-chain el fabricante es la wallet conectada (el contrato lo exige)'
+                          )
                         : undefined
                     }
                     onChange={(e) =>
@@ -567,7 +665,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
-                    Firmware Payload Image
+                    {tr('Firmware Payload Image', 'Imagen de Payload de Firmware')}
                   </label>
                   <input
                     type="text"
@@ -592,10 +690,16 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 <Fingerprint className="w-3.5 h-3.5" />
                 <span>
                   {isRegistering
-                    ? 'Registrando…'
+                    ? tr('Registering…', 'Registrando…')
                     : liveWallet
-                      ? 'Sign with ML-DSA-87 & Register (on-chain)'
-                      : 'Sign with ML-DSA-87 & Register'}
+                      ? tr(
+                          'Sign with ML-DSA-87 & Register (on-chain)',
+                          'Firmar con ML-DSA-87 y Registrar (on-chain)'
+                        )
+                      : tr(
+                          'Sign with ML-DSA-87 & Register',
+                          'Firmar con ML-DSA-87 y Registrar'
+                        )}
                 </span>
               </button>
             </form>
@@ -606,7 +710,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-reb-mint font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" />
-                    ML-DSA-87 VERIFIED: {regSignatureResult.verified ? 'TRUE' : 'FALSE'}
+                    {tr('ML-DSA-87 VERIFIED:', 'ML-DSA-87 VERIFICADO:')}{' '}
+                    {regSignatureResult.verified
+                      ? tr('TRUE', 'VERDADERO')
+                      : tr('FALSE', 'FALSO')}
                   </span>
                   <span className="px-1.5 py-0.2 rounded bg-reb-mint/20 text-reb-mint text-[9px] font-bold">
                     {regSignatureResult.signatureBytesLen.toLocaleString()} B
@@ -630,13 +737,13 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
             <div className="flex items-center gap-1.5">
               <Cpu className="w-3.5 h-3.5 text-reb-mint" />
               <span className="font-display text-xs font-bold uppercase tracking-wider text-reb-text-light">
-                REGISTERED BIONIC IMPLANTS ({filteredParts.length})
+                {tr('REGISTERED BIONIC IMPLANTS', 'IMPLANTES BIÓNICOS REGISTRADOS')} ({filteredParts.length})
               </span>
             </div>
             <div className="flex items-center gap-1.5 font-mono text-[9px]">
-              <span className="text-reb-mint">{activeCount} ACT</span>
-              <span className="text-reb-yellow">{maintenanceCount} MNT</span>
-              <span className="text-reb-pink">{decommissionedCount} DEC</span>
+              <span className="text-reb-mint">{activeCount} {tr('ACT', 'ACT')}</span>
+              <span className="text-reb-yellow">{maintenanceCount} {tr('MNT', 'MNT')}</span>
+              <span className="text-reb-pink">{decommissionedCount} {tr('DEC', 'BAJ')}</span>
             </div>
           </div>
 
@@ -647,7 +754,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search model, serial, OEM, or zone..."
+              placeholder={tr(
+                'Search model, serial, OEM, or zone...',
+                'Buscar modelo, serie, OEM o zona...'
+              )}
               className="w-full bg-transparent font-mono text-[11px] text-reb-text-light placeholder:text-reb-text-dim focus:outline-none"
             />
           </div>
@@ -680,12 +790,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                   onClick={() => setSelectedStatus(tab)}
                   className={`px-2 py-0.5 rounded border font-mono text-[9px] uppercase tracking-wider transition-all cursor-pointer ${tabColorClass}`}
                 >
-                  {tab === 'DECOMMISSIONED'
-                    ? 'DECOM'
-                    : tab === 'MAINTENANCE'
-                      ? 'MAINT'
-                      : tab}{' '}
-                  ({count})
+                  {formatStatusLabel(tab, tr, true)} ({count})
                 </button>
               );
             })}
@@ -698,7 +803,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 <CheckCircle2 className="w-3.5 h-3.5 text-reb-mint shrink-0" />
                 <div>
                   <span className="text-reb-mint font-bold">
-                    FW {patchSuccessBanner.semver} COMMITTED
+                    {tr(
+                      `FW ${patchSuccessBanner.semver} COMMITTED`,
+                      `FW ${patchSuccessBanner.semver} CONFIRMADO`
+                    )}
                   </span>
                   <p className="text-[9px] text-reb-text-muted">
                     ML-DSA-87 ({patchSuccessBanner.sigBytes.toLocaleString()}B) •{' '}
@@ -752,7 +860,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                           className="px-1.5 py-0.2 rounded font-mono text-[8px] font-bold uppercase tracking-wider text-white"
                           style={{ backgroundColor: '#3B66E8' }}
                         >
-                          {part.zone}
+                          {formatZoneLabel(part.zone, tr)}
                         </span>
                       </div>
                       <p className="font-mono text-[10px] text-reb-text-muted truncate">
@@ -763,19 +871,19 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     {part.status === 'ACTIVE' && (
                       <span className="px-1.5 py-0.5 rounded bg-reb-mint/20 border border-reb-mint/50 text-reb-mint font-mono text-[9px] font-bold uppercase flex items-center gap-1 shrink-0">
                         <span className="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse" />
-                        ACTIVE
+                        {tr('ACTIVE', 'ACTIVO')}
                       </span>
                     )}
                     {part.status === 'MAINTENANCE' && (
                       <span className="px-1.5 py-0.5 rounded bg-reb-yellow/20 border border-reb-yellow/50 text-reb-yellow font-mono text-[9px] font-bold uppercase flex items-center gap-1 shrink-0">
                         <AlertTriangle className="w-2.5 h-2.5" />
-                        MAINT
+                        {tr('MAINT', 'MANT')}
                       </span>
                     )}
                     {part.status === 'DECOMMISSIONED' && (
                       <span className="px-1.5 py-0.5 rounded bg-reb-pink/20 border border-reb-pink/50 text-reb-pink font-mono text-[9px] font-bold uppercase flex items-center gap-1 shrink-0">
                         <XCircle className="w-2.5 h-2.5" />
-                        DECOM
+                        {tr('DECOM', 'BAJA')}
                       </span>
                     )}
                   </div>
@@ -804,7 +912,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                           handleCopyHash(part.firmwareHash);
                         }}
                         className="text-reb-text-muted hover:text-reb-mint cursor-pointer"
-                        title="Copy SHAKE-256 Firmware Hash"
+                        title={tr('Copy SHAKE-256 Firmware Hash', 'Copiar Hash de Firmware SHAKE-256')}
                       >
                         <Copy className="w-3 h-3" />
                       </button>
@@ -845,13 +953,12 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                                 );
                               }}
                               className={`px-1.5 py-0.5 rounded font-mono text-[8px] uppercase transition-all cursor-pointer ${activeStyle}`}
-                              title={`Set lifecycle status to ${statusOption} (Index ${getStatusIndex(statusOption)})`}
+                              title={tr(
+                                `Set lifecycle status to ${statusOption} (Index ${getStatusIndex(statusOption)})`,
+                                `Cambiar estado del ciclo de vida a ${formatStatusLabel(statusOption, tr)} (Índice ${getStatusIndex(statusOption)})`
+                              )}
                             >
-                              {statusOption === 'DECOMMISSIONED'
-                                ? 'DECOM'
-                                : statusOption === 'MAINTENANCE'
-                                  ? 'MAINT'
-                                  : 'ACTIVE'}
+                              {formatStatusLabel(statusOption, tr, true)}
                             </button>
                           );
                         }
@@ -869,7 +976,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                         }`}
                       >
                         <RefreshCw className="w-2.5 h-2.5" />
-                        <span>Patch FW</span>
+                        <span>{tr('Patch FW', 'Parchear FW')}</span>
                       </button>
 
                       <button
@@ -878,7 +985,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                         className="px-2 py-1 rounded bg-reb-blue/25 border border-reb-blue/60 text-reb-periwinkle hover:bg-reb-blue hover:text-white font-mono text-[9px] font-bold uppercase flex items-center gap-1 transition-all cursor-pointer"
                       >
                         <Key className="w-2.5 h-2.5" />
-                        <span>2h Pass</span>
+                        <span>{tr('2h Pass', 'Pase 2h')}</span>
                       </button>
                     </div>
                   </div>
@@ -898,14 +1005,18 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-mint/30 font-mono text-[11px] text-reb-text-light shadow-lg">
             <Cpu className="w-3.5 h-3.5 text-reb-mint" />
             <span>
-              <strong className="text-reb-mint">{parts.length}</strong> HBOM Implants (
-              <span className="text-reb-mint">{activeCount} Active</span>)
+              <strong className="text-reb-mint">{parts.length}</strong>{' '}
+              {tr('HBOM Implants', 'Implantes HBOM')} (
+              <span className="text-reb-mint">
+                {activeCount} {tr('Active', 'Activos')}
+              </span>
+              )
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-mint/30 font-mono text-[11px] text-reb-mint shadow-lg">
             <ShieldCheck className="w-3.5 h-3.5 text-reb-mint" />
-            <span>100% SHAKE-256 Verified</span>
+            <span>{tr('100% SHAKE-256 Verified', '100% SHAKE-256 Verificado')}</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-blue/50 font-mono text-[11px] text-reb-periwinkle shadow-lg">
@@ -928,12 +1039,15 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse shadow-[0_0_8px_#A8F0C6]" />
                 <span className="font-display text-xs sm:text-sm font-bold uppercase tracking-wider text-reb-text-light truncate">
-                  IMMUTABLE FIRMWARE &amp; CALIBRATION AUDIT
+                  {tr(
+                    'IMMUTABLE FIRMWARE & CALIBRATION AUDIT',
+                    'AUDITORÍA INMUTABLE DE FIRMWARE Y CALIBRACIÓN'
+                  )}
                 </span>
               </div>
               <span className="font-mono text-[11px] text-reb-mint mt-0.5 truncate">
-                Target: {selectedPart?.modelName ?? 'NeuroLink-X9'} (
-                {selectedPart?.serialNumber ?? 'SN-9042-NLX9'}) • Cal:{' '}
+                {tr('Target:', 'Objetivo:')} {selectedPart?.modelName ?? 'NeuroLink-X9'} (
+                {selectedPart?.serialNumber ?? 'SN-9042-NLX9'}) • {tr('Cal:', 'Cal:')}{' '}
                 {selectedPart ? `${selectedPart.calibrationScorePct.toFixed(2)}%` : '99.95%'}
               </span>
             </div>
@@ -945,7 +1059,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                   className="px-2 py-1 rounded bg-reb-mint/20 border border-reb-mint/50 text-reb-mint hover:bg-reb-mint hover:text-reb-bg font-mono text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center gap-1"
                 >
                   <Wrench className="w-3 h-3" />
-                  <span>Patch</span>
+                  <span>{tr('Patch', 'Parchear')}</span>
                 </button>
               )}
               <HeartPulse className="w-4 h-4 text-reb-mint shrink-0" />
@@ -958,7 +1072,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] font-bold text-reb-mint uppercase flex items-center gap-1.5">
                   <Wrench className="w-3.5 h-3.5" />
-                  OEM ML-DSA-87 Firmware Patcher ({selectedPart.serialNumber})
+                  {tr(
+                    `OEM ML-DSA-87 Firmware Patcher (${selectedPart.serialNumber})`,
+                    `Parcheador de Firmware OEM ML-DSA-87 (${selectedPart.serialNumber})`
+                  )}
                 </span>
                 <button
                   type="button"
@@ -968,7 +1085,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                   }}
                   className="font-mono text-[10px] text-reb-text-muted hover:text-reb-pink cursor-pointer"
                 >
-                  CLOSE [X]
+                  {tr('CLOSE [X]', 'CERRAR [X]')}
                 </button>
               </div>
 
@@ -982,7 +1099,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div className="flex flex-col gap-0.5">
                       <label className="font-mono text-[9px] text-reb-text-muted uppercase">
-                        Rev #{selectedPart.firmwareVersion + 1} Semver
+                        {tr(
+                          `Rev #${selectedPart.firmwareVersion + 1} Semver`,
+                          `Semver Rev #${selectedPart.firmwareVersion + 1}`
+                        )}
                       </label>
                       <input
                         type="text"
@@ -993,7 +1113,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     </div>
                     <div className="sm:col-span-2 flex flex-col gap-0.5">
                       <label className="font-mono text-[9px] text-reb-text-muted uppercase">
-                        Clinical / Telemetry Patch Notes
+                        {tr(
+                          'Clinical / Telemetry Patch Notes',
+                          'Notas Clínicas / de Parche de Telemetría'
+                        )}
                       </label>
                       <input
                         type="text"
@@ -1011,7 +1134,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>
-                        Sign ML-DSA-87 &amp; Commit Rev #{selectedPart.firmwareVersion + 1}
+                        {tr(
+                          `Sign ML-DSA-87 & Commit Rev #${selectedPart.firmwareVersion + 1}`,
+                          `Firmar ML-DSA-87 y Confirmar Rev #${selectedPart.firmwareVersion + 1}`
+                        )}
                       </span>
                     </button>
                   </div>
@@ -1048,7 +1174,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                       {item.badge}
                     </span>
                     <span className="font-mono text-[9px] text-reb-text-muted">
-                      Block #{item.blockNumber.toLocaleString()}
+                      {tr('Block', 'Bloque')} #{item.blockNumber.toLocaleString()}
                     </span>
                   </div>
 
@@ -1058,7 +1184,7 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                         type="button"
                         onClick={() => handleCopyHash(item.firmwareHash)}
                         className="px-1.5 py-0.5 rounded bg-reb-mint/10 text-reb-mint hover:bg-reb-mint/20 flex items-center gap-1 cursor-pointer"
-                        title="Copy SHAKE-256 Digest"
+                        title={tr('Copy SHAKE-256 Digest', 'Copiar Resumen SHAKE-256')}
                       >
                         <span>
                           SHAKE-256: {item.firmwareHash.slice(0, 10)}...
@@ -1066,11 +1192,13 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                         </span>
                         <Copy className="w-2.5 h-2.5" />
                         {isCopied && (
-                          <span className="text-[8px] text-reb-yellow font-bold">COPIED</span>
+                          <span className="text-[8px] text-reb-yellow font-bold">
+                            {tr('COPIED', 'COPIADO')}
+                          </span>
                         )}
                       </button>
                       <span className="text-reb-mint font-bold text-[9px]">
-                        ML-DSA-87 VERIFIED
+                        {tr('ML-DSA-87 VERIFIED', 'ML-DSA-87 VERIFICADO')}
                       </span>
                     </div>
                     <p className="font-sans text-[10px] text-reb-text-muted leading-snug">
@@ -1088,7 +1216,10 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
               <div className="flex items-center gap-1.5 font-mono text-[10px] text-reb-text-muted truncate">
                 <Terminal className="w-3.5 h-3.5 text-reb-mint shrink-0" />
                 <span className="truncate">
-                  [L1:9800] PK ({oemDsaKeyPair.publicKey.length}B) Armed
+                  {tr(
+                    `[L1:9800] PK (${oemDsaKeyPair.publicKey.length}B) Armed`,
+                    `[L1:9800] PK (${oemDsaKeyPair.publicKey.length}B) Armada`
+                  )}
                 </span>
               </div>
               <button
@@ -1097,7 +1228,12 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 className="px-3 py-1.5 rounded-lg bg-reb-mint text-reb-bg font-mono text-[10px] font-bold uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_14px_rgba(168,240,198,0.25)] shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export HBOM Merkle Proof (JSON-LD)</span>
+                <span>
+                  {tr(
+                    'Export HBOM Merkle Proof (JSON-LD)',
+                    'Exportar Prueba Merkle HBOM (JSON-LD)'
+                  )}
+                </span>
               </button>
             </div>
 
@@ -1106,14 +1242,17 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[9px] font-bold text-reb-mint uppercase flex items-center gap-1">
                     <FileJson className="w-3 h-3" />
-                    JSON-LD HBOM MERKLE ATTESTATION
+                    {tr(
+                      'JSON-LD HBOM MERKLE ATTESTATION',
+                      'ATESTACIÓN MERKLE HBOM JSON-LD'
+                    )}
                   </span>
                   <button
                     type="button"
                     onClick={() => setJsonLdPreview(null)}
                     className="font-mono text-[9px] text-reb-text-muted hover:text-reb-pink cursor-pointer"
                   >
-                    HIDE
+                    {tr('HIDE', 'OCULTAR')}
                   </button>
                 </div>
                 <pre className="font-mono text-[9px] text-reb-text-light overflow-x-auto max-h-32 leading-relaxed">

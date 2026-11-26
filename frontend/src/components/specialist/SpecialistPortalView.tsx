@@ -20,6 +20,7 @@ import {
   Radio,
 } from 'lucide-react';
 import type { MockEphemeralPass } from '@/data/mockData';
+import { useI18n } from '@/i18n/context';
 
 /** Where a decrypted payload really came from. */
 export type UnsealProvenance = 'gateway-chain' | 'local-demo';
@@ -63,17 +64,25 @@ export interface SpecialistPortalViewProps {
   readonly onRefreshChainGrants: () => void;
 }
 
-function passSourceBadge(pass: MockEphemeralPass): { label: string; className: string } {
+function passSourceBadge(
+  pass: MockEphemeralPass,
+  tr: (en: string, es: string) => string
+): { label: string; className: string } {
   if (pass.isSample) {
-    return { label: 'EJEMPLO', className: 'border-reb-border text-reb-text-muted' };
+    return { label: tr('SAMPLE', 'EJEMPLO'), className: 'border-reb-border text-reb-text-muted' };
   }
   if (pass.onChain) {
     return {
-      label: pass.fromChainScan ? 'ON-CHAIN • leído de la cadena' : 'ON-CHAIN',
+      label: pass.fromChainScan
+        ? tr('ON-CHAIN • read from chain', 'ON-CHAIN • leído de la cadena')
+        : 'ON-CHAIN',
       className: 'border-reb-mint/60 text-reb-mint',
     };
   }
-  return { label: 'DEMO LOCAL', className: 'border-reb-yellow/60 text-reb-yellow' };
+  return {
+    label: tr('LOCAL DEMO', 'DEMO LOCAL'),
+    className: 'border-reb-yellow/60 text-reb-yellow',
+  };
 }
 
 type GrantFilterTab = 'active' | 'revoked' | 'all';
@@ -124,6 +133,8 @@ export function SpecialistPortalView(
     chainSync,
     onRefreshChainGrants,
   } = props;
+
+  const { tr } = useI18n();
 
   const [filterTab, setFilterTab] = useState<GrantFilterTab>('active');
   const [selectedPassId, setSelectedPassId] = useState<string | null>(() => {
@@ -205,13 +216,16 @@ export function SpecialistPortalView(
         setDecryptionError(
           err instanceof Error
             ? err.message
-            : 'Post-Quantum ML-KEM-1024 decapsulation or SHAKE-256 verification failed.'
+            : tr(
+                'Post-Quantum ML-KEM-1024 decapsulation or SHAKE-256 verification failed.',
+                'Falló la desencapsulación post-cuántica ML-KEM-1024 o la verificación SHAKE-256.'
+              )
         );
       } finally {
         setIsUnsealing(false);
       }
     },
-    [onUnsealPass]
+    [onUnsealPass, tr]
   );
 
   // Watch for on-chain Kill-Switch revocation while a pass is open in the viewer
@@ -308,7 +322,7 @@ export function SpecialistPortalView(
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-mono text-xs font-bold text-reb-text-light truncate">
-                  ML-KEM-1024 Lattice Key
+                  {tr('ML-KEM-1024 Lattice Key', 'Clave Reticular ML-KEM-1024')}
                 </span>
                 <span className="font-mono text-[9px] text-reb-text-muted">
                   1,568 B • NIST Cat 5
@@ -318,17 +332,17 @@ export function SpecialistPortalView(
 
             <div className="flex items-center gap-1 flex-shrink-0">
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-border text-reb-text-muted font-mono text-[9px]">
-                {keySource === 'wallet' ? 'WALLET' : 'EFÍMERA'}
+                {keySource === 'wallet' ? 'WALLET' : tr('EPHEMERAL', 'EFÍMERA')}
               </span>
               {isKeyPublishedOnChain ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-reb-surface border border-reb-mint/50 text-reb-mint font-mono text-[9px] font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse" />
-                  ON-CHAIN PKI
+                  {tr('ON-CHAIN PKI', 'PKI ON-CHAIN')}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-reb-surface border border-reb-yellow/60 text-reb-yellow font-mono text-[9px] font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-reb-yellow animate-pulse" />
-                  LOCAL ENCLAVE
+                  {tr('LOCAL ENCLAVE', 'ENCLAVE LOCAL')}
                 </span>
               )}
             </div>
@@ -340,7 +354,10 @@ export function SpecialistPortalView(
               type="button"
               onClick={() => void handleCopyPublicKey()}
               className="flex-1 flex items-center justify-between gap-1.5 px-2.5 py-1 rounded bg-reb-surface-code/80 hover:bg-reb-surface-code border border-reb-border hover:border-reb-mint/60 transition-all font-mono text-[10px] text-reb-mint group cursor-pointer min-w-0"
-              title="Copy full 1,568-byte ML-KEM-1024 hex public key"
+              title={tr(
+                'Copy full 1,568-byte ML-KEM-1024 hex public key',
+                'Copiar clave pública hexadecimal ML-KEM-1024 completa de 1.568 bytes'
+              )}
             >
               <span className="truncate">
                 {formatTruncatedKeyPreview(specialistKemPublicKeyHex)}
@@ -348,7 +365,7 @@ export function SpecialistPortalView(
               {copiedKey ? (
                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-reb-mint-bright flex-shrink-0">
                   <Check className="w-3 h-3" />
-                  COPIED!
+                  {tr('COPIED!', '¡COPIADA!')}
                 </span>
               ) : (
                 <Copy className="w-3 h-3 text-reb-text-muted group-hover:text-reb-mint transition-colors flex-shrink-0" />
@@ -363,11 +380,13 @@ export function SpecialistPortalView(
               }}
               className="inline-flex items-center gap-1 px-2 py-1 rounded bg-reb-surface-card/70 hover:bg-reb-surface-card border border-reb-border hover:border-reb-mint/50 text-reb-text-light font-mono text-[10px] font-semibold transition-all active:scale-95 cursor-pointer flex-shrink-0"
               title={
-                keySource === 'wallet' ? 'Re-derivar desde wallet' : 'Derivar / generar clave'
+                keySource === 'wallet'
+                  ? tr('Re-derive from wallet', 'Re-derivar desde wallet')
+                  : tr('Derive / generate key', 'Derivar / generar clave')
               }
             >
               <RefreshCw className="w-3 h-3 text-reb-mint" />
-              <span>Re-derivar</span>
+              <span>{tr('Re-derive', 'Re-derivar')}</span>
             </button>
           </div>
 
@@ -378,7 +397,7 @@ export function SpecialistPortalView(
             className="w-full py-1.5 px-3 rounded-lg bg-reb-mint hover:bg-reb-mint-bright text-reb-bg font-mono text-xs font-bold tracking-wide transition-all shadow-[0_0_14px_rgba(168,240,198,0.3)] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
           >
             <CloudUpload className="w-3.5 h-3.5" />
-            REGISTER KEY ON-CHAIN
+            {tr('REGISTER KEY ON-CHAIN', 'REGISTRAR CLAVE ON-CHAIN')}
           </button>
         </div>
 
@@ -389,7 +408,7 @@ export function SpecialistPortalView(
             <div className="flex items-center gap-1.5">
               <FolderKanban className="w-4 h-4 text-reb-mint" />
               <span className="font-mono text-xs font-bold tracking-wider text-reb-text-light uppercase">
-                TELEMETRY GRANTS
+                {tr('TELEMETRY GRANTS', 'CONCESIONES DE TELEMETRÍA')}
               </span>
             </div>
 
@@ -403,7 +422,7 @@ export function SpecialistPortalView(
                     : 'text-reb-text-muted hover:text-reb-text-light'
                 }`}
               >
-                Active ({activeCount})
+                {tr('Active', 'Activos')} ({activeCount})
               </button>
               <button
                 type="button"
@@ -414,7 +433,7 @@ export function SpecialistPortalView(
                     : 'text-reb-text-muted hover:text-reb-text-light'
                 }`}
               >
-                Revoked ({revokedCount})
+                {tr('Revoked', 'Revocados')} ({revokedCount})
               </button>
               <button
                 type="button"
@@ -425,7 +444,7 @@ export function SpecialistPortalView(
                     : 'text-reb-text-muted hover:text-reb-text-light'
                 }`}
               >
-                All ({passes.length})
+                {tr('All', 'Todos')} ({passes.length})
               </button>
             </div>
           </div>
@@ -442,13 +461,23 @@ export function SpecialistPortalView(
               }
             >
               {chainSync.status === 'off' &&
-                'Conecta la wallet (ON-CHAIN) para leer pases de la cadena.'}
-              {chainSync.status === 'loading' && 'Leyendo getGrantsBySpecialist on-chain…'}
+                tr(
+                  'Connect wallet (ON-CHAIN) to read passes from the chain.',
+                  'Conecta la wallet (ON-CHAIN) para leer pases de la cadena.'
+                )}
+              {chainSync.status === 'loading' &&
+                tr(
+                  'Reading getGrantsBySpecialist on-chain…',
+                  'Leyendo getGrantsBySpecialist on-chain…'
+                )}
               {chainSync.status === 'ok' &&
-                `${chainSync.count} pase(s) on-chain${
-                  chainSync.skipped > 0 ? ` • ${chainSync.skipped} omitido(s)` : ''
+                `${chainSync.count} ${tr('on-chain pass(es)', 'pase(s) on-chain')}${
+                  chainSync.skipped > 0
+                    ? ` • ${chainSync.skipped} ${tr('skipped', 'omitido(s)')}`
+                    : ''
                 }${chainSync.syncedAt ? ` • ${new Date(chainSync.syncedAt).toLocaleTimeString()}` : ''}`}
-              {chainSync.status === 'error' && `Error on-chain: ${chainSync.error ?? 'desconocido'}`}
+              {chainSync.status === 'error' &&
+                `${tr('On-chain error', 'Error on-chain')}: ${chainSync.error ?? tr('unknown', 'desconocido')}`}
             </span>
             {chainSync.status !== 'off' && (
               <button
@@ -460,7 +489,7 @@ export function SpecialistPortalView(
                 <RefreshCw
                   className={`w-2.5 h-2.5 ${chainSync.status === 'loading' ? 'animate-spin' : ''}`}
                 />
-                Recargar
+                {tr('Reload', 'Recargar')}
               </button>
             )}
           </div>
@@ -471,7 +500,7 @@ export function SpecialistPortalView(
               const isRevokedOrExpired = pass.revoked || pass.remainingSeconds <= 0;
               const isSelected = selectedPassId === pass.id;
               const isUnsealedActive = unsealedSession?.passId === pass.id && !isRevokedOrExpired;
-              const sourceBadge = passSourceBadge(pass);
+              const sourceBadge = passSourceBadge(pass, tr);
 
               return (
                 <div
@@ -489,15 +518,15 @@ export function SpecialistPortalView(
                     <div className="flex items-center gap-1 flex-wrap">
                       {isRevokedOrExpired ? (
                         <span className="px-1.5 py-0.5 rounded bg-reb-crimson/15 border border-reb-pink/40 text-reb-pink font-mono text-[8px] font-bold uppercase tracking-wider">
-                          REVOKED / ZEROIZED
+                          {tr('REVOKED / ZEROIZED', 'REVOCADO / BORRADO A CERO')}
                         </span>
                       ) : pass.domain === 'BIONIC_TELEMETRY' ? (
                         <span className="px-2 py-0.5 rounded bg-[#3B66E8]/20 border border-[#3B66E8]/60 text-reb-periwinkle font-mono text-[9px] font-bold uppercase tracking-wider">
-                          BIONIC_TELEMETRY
+                          {tr('BIONIC_TELEMETRY', 'TELEMETRÍA_BIÓNICA')}
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded bg-reb-surface border border-reb-mint/40 text-reb-mint font-mono text-[9px] font-bold uppercase tracking-wider">
-                          CLINICAL_DICOM
+                          {tr('CLINICAL_DICOM', 'DICOM_CLÍNICO')}
                         </span>
                       )}
 
@@ -546,7 +575,7 @@ export function SpecialistPortalView(
                       </p>
                       {isRevokedOrExpired && (
                         <span className="font-mono text-[9px] text-reb-pink flex-shrink-0">
-                          ZERO-FILL OVERWRITTEN
+                          {tr('ZERO-FILL OVERWRITTEN', 'SOBRESCRITO CON CEROS')}
                         </span>
                       )}
                     </div>
@@ -563,7 +592,9 @@ export function SpecialistPortalView(
                               : 'bg-reb-mint/60'
                           }`}
                         />
-                        {isUnsealedActive ? 'LIVE RAM STREAM' : 'READY FOR ENCLAVE'}
+                        {isUnsealedActive
+                          ? tr('LIVE RAM STREAM', 'FLUJO RAM EN VIVO')
+                          : tr('READY FOR ENCLAVE', 'LISTO PARA ENCLAVE')}
                       </span>
                       <span className="text-reb-text-muted">
                         {pass.gpsSector} // 2.4 KM
@@ -575,14 +606,14 @@ export function SpecialistPortalView(
                   {isRevokedOrExpired ? (
                     <div className="flex items-center justify-between pt-0.5 gap-1.5">
                       <span className="font-mono text-[9px] text-reb-text-muted">
-                        DECOUPLED ON-CHAIN
+                        {tr('DECOUPLED ON-CHAIN', 'DESACOPLADO ON-CHAIN')}
                       </span>
                       <button
                         type="button"
                         onClick={() => void handleUnsealPass(pass)}
                         className="py-1 px-2 rounded bg-reb-surface-card/40 border border-reb-pink/40 text-reb-pink font-mono text-[9px] font-semibold uppercase cursor-pointer hover:bg-reb-crimson/20 transition-all"
                       >
-                        INSPECT REVOCATION
+                        {tr('INSPECT REVOCATION', 'INSPECCIONAR REVOCACIÓN')}
                       </button>
                     </div>
                   ) : (
@@ -599,16 +630,16 @@ export function SpecialistPortalView(
                       >
                         <LockOpen className="w-3 h-3" />
                         {isUnsealing && isSelected
-                          ? 'DECAPSULATING...'
+                          ? tr('DECAPSULATING...', 'DESENCAPSULANDO...')
                           : isSelected
-                            ? 'UNSEAL STREAM'
-                            : 'UNSEAL IN MEMORY'}
+                            ? tr('UNSEAL STREAM', 'ABRIR FLUJO')
+                            : tr('UNSEAL IN MEMORY', 'DESCIFRAR EN MEMORIA')}
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleUnsealPass(pass)}
                         className="p-1 rounded bg-reb-surface-code/60 border border-reb-border hover:border-reb-mint/50 text-reb-text-muted hover:text-reb-text-light transition-all cursor-pointer"
-                        title="Inspect Node Attestation"
+                        title={tr('Inspect Node Attestation', 'Inspeccionar Atestación del Nodo')}
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -626,7 +657,12 @@ export function SpecialistPortalView(
         {/* Top-Center Floating HUD Compass Pill */}
         <div className="self-center hidden sm:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-[#0B100E]/70 backdrop-blur-md border border-reb-mint/20 font-mono text-xs text-reb-mint shadow-lg pointer-events-auto">
           <Compass className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '12s' }} />
-          <span>HUD BEARING 284° WNW • SHINJUKU ENCLAVE LINK 99.8% COHERENT</span>
+          <span>
+            {tr(
+              'HUD BEARING 284° WNW • SHINJUKU ENCLAVE LINK 99.8% COHERENT',
+              'RUMBO HUD 284° ONO • ENLACE ENCLAVE SHINJUKU 99.8% COHERENTE'
+            )}
+          </span>
           <span className="w-1.5 h-1.5 rounded-full bg-reb-mint-bright animate-pulse" />
         </div>
 
@@ -647,37 +683,49 @@ export function SpecialistPortalView(
                   </div>
                   <div className="flex flex-col min-w-0">
                     <h2 className="font-mono text-xs font-bold text-reb-pink tracking-tight uppercase truncate">
-                      ACCESS REVOKED ON-CHAIN — ENCLAVE RAM ZEROIZED
+                      {tr(
+                        'ACCESS REVOKED ON-CHAIN — ENCLAVE RAM ZEROIZED',
+                        'ACCESO REVOCADO ON-CHAIN — RAM DEL ENCLAVE BORRADA A CERO'
+                      )}
                     </h2>
                     <span className="font-mono text-[9px] text-reb-text-muted truncate">
-                      PASS #{revokedNoticePass.id} // {revokedNoticePass.title}
+                      {tr('PASS', 'PASE')} #{revokedNoticePass.id} // {revokedNoticePass.title}
                     </span>
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded-full bg-reb-crimson/20 border border-reb-pink text-reb-pink font-mono text-[9px] font-bold flex-shrink-0">
-                  DECOUPLED
+                  {tr('DECOUPLED', 'DESACOPLADO')}
                 </span>
               </div>
 
               <div className="p-3 rounded-lg bg-reb-surface-code/90 border border-reb-pink/40 flex flex-col gap-2">
                 <div className="flex items-center gap-1.5 text-reb-pink font-mono text-[10px] font-bold uppercase">
                   <Lock className="w-3.5 h-3.5" />
-                  <span>Kill-Switch Executed by Patient ({revokedNoticePass.patientPseudonym})</span>
+                  <span>
+                    {tr(
+                      'Kill-Switch Executed by Patient',
+                      'Kill-Switch Ejecutado por el Paciente'
+                    )}{' '}
+                    ({revokedNoticePass.patientPseudonym})
+                  </span>
                 </div>
                 <p className="font-mono text-[10px] text-reb-text-light leading-relaxed">
-                  On-chain <code className="text-reb-pink">revokeAccess(bytes32)</code> confirmed on
-                  QoreChain Diana Testnet. Unwrapped AES-256-GCM key and ML-KEM-1024 shared secret
-                  have been overwritten with zeros in browser memory.
+                  {tr('On-chain', 'Transacción on-chain')}{' '}
+                  <code className="text-reb-pink">revokeAccess(bytes32)</code>{' '}
+                  {tr(
+                    'confirmed on QoreChain Diana Testnet. Unwrapped AES-256-GCM key and ML-KEM-1024 shared secret have been overwritten with zeros in browser memory.',
+                    'confirmada en QoreChain Diana Testnet. La clave AES-256-GCM desenvuelta y el secreto compartido ML-KEM-1024 han sido sobrescritos con ceros en la memoria del navegador.'
+                  )}
                 </p>
                 <div className="grid grid-cols-3 gap-1.5 pt-1 font-mono text-[9px]">
                   <div className="p-1.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink text-center">
-                    RAM: 0x00 (WIPED)
+                    {tr('RAM: 0x00 (WIPED)', 'RAM: 0x00 (BORRADA)')}
                   </div>
                   <div className="p-1.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink text-center">
-                    ML-KEM: DECOUPLED
+                    {tr('ML-KEM: DECOUPLED', 'ML-KEM: DESACOPLADO')}
                   </div>
                   <div className="p-1.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink text-center">
-                    DISK: 0 BYTES
+                    {tr('DISK: 0 BYTES', 'DISCO: 0 BYTES')}
                   </div>
                 </div>
               </div>
@@ -689,14 +737,19 @@ export function SpecialistPortalView(
               <div className="flex items-center justify-between gap-2 border-b border-reb-pink/30 pb-2">
                 <div className="flex items-center gap-2 text-reb-pink font-mono text-xs font-bold uppercase">
                   <ShieldAlert className="w-4 h-4" />
-                  <span>PQC Decapsulation / Verification Failed</span>
+                  <span>
+                    {tr(
+                      'PQC Decapsulation / Verification Failed',
+                      'Falló la Desencapsulación / Verificación PQC'
+                    )}
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleFlushSessionMemory}
                   className="px-2 py-0.5 rounded bg-reb-surface-card border border-reb-border text-reb-text-muted hover:text-reb-text-light font-mono text-[9px] cursor-pointer"
                 >
-                  Dismiss
+                  {tr('Dismiss', 'Cerrar')}
                 </button>
               </div>
               <p className="font-mono text-xs text-reb-pink leading-relaxed">{decryptionError}</p>
@@ -713,17 +766,18 @@ export function SpecialistPortalView(
                   <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse shadow-[0_0_8px_#A8F0C6] flex-shrink-0" />
                   <div className="flex flex-col min-w-0">
                     <span className="font-mono text-xs font-bold text-reb-text-light truncate uppercase">
-                      STREAM: {unsealedSession.passTitle}
+                      {tr('STREAM', 'FLUJO')}: {unsealedSession.passTitle}
                     </span>
                     <span className="font-mono text-[9px] text-reb-text-muted truncate">
-                      BEACON #{unsealedSession.passId} // {unsealedSession.decapsulationTimeMs} ms
-                      PQC • RAM ONLY
+                      {tr('BEACON', 'BALIZA')} #{unsealedSession.passId} //{' '}
+                      {unsealedSession.decapsulationTimeMs} ms PQC •{' '}
+                      {tr('RAM ONLY', 'SOLO RAM')}
                     </span>
                   </div>
                 </div>
                 <div className="px-2 py-0.5 rounded-full bg-reb-surface-card border border-reb-mint/40 text-reb-mint font-mono text-[9px] font-semibold flex items-center gap-1 flex-shrink-0">
                   <ShieldCheck className="w-3 h-3" />
-                  <span>ISOLATED ENCLAVE</span>
+                  <span>{tr('ISOLATED ENCLAVE', 'ENCLAVE AISLADO')}</span>
                 </div>
               </div>
 
@@ -733,7 +787,7 @@ export function SpecialistPortalView(
                   {/* LATENCY */}
                   <div className="p-2 rounded-lg bg-reb-surface-code/70 border border-reb-mint/25 flex flex-col gap-0.5">
                     <span className="font-mono text-[8px] uppercase tracking-wider text-reb-text-muted">
-                      LATENCY
+                      {tr('LATENCY', 'LATENCIA')}
                     </span>
                     <div className="flex items-baseline gap-1">
                       <span className="font-display font-bold text-base text-reb-mint leading-none">
@@ -741,13 +795,15 @@ export function SpecialistPortalView(
                       </span>
                       <span className="font-mono text-[9px] text-reb-mint">ms</span>
                     </div>
-                    <span className="font-mono text-[8px] text-reb-mint-bright">Nominal</span>
+                    <span className="font-mono text-[8px] text-reb-mint-bright">
+                      {tr('Nominal', 'Nominal')}
+                    </span>
                   </div>
 
                   {/* IMPEDANCE */}
                   <div className="p-2 rounded-lg bg-reb-surface-code/70 border border-reb-mint-bright/25 flex flex-col gap-0.5">
                     <span className="font-mono text-[8px] uppercase tracking-wider text-reb-text-muted">
-                      IMPEDANCE
+                      {tr('IMPEDANCE', 'IMPEDANCIA')}
                     </span>
                     <div className="flex items-baseline gap-1">
                       <span className="font-display font-bold text-base text-reb-mint-bright leading-none">
@@ -755,13 +811,15 @@ export function SpecialistPortalView(
                       </span>
                       <span className="font-mono text-[9px] text-reb-mint-bright">kΩ</span>
                     </div>
-                    <span className="font-mono text-[8px] text-reb-text-muted">Lattice Matrix</span>
+                    <span className="font-mono text-[8px] text-reb-text-muted">
+                      {tr('Lattice Matrix', 'Matriz Reticular')}
+                    </span>
                   </div>
 
                   {/* COHERENCE */}
                   <div className="p-2 rounded-lg bg-reb-surface-code/70 border border-reb-mint/25 flex flex-col gap-0.5">
                     <span className="font-mono text-[8px] uppercase tracking-wider text-reb-text-muted">
-                      COHERENCE
+                      {tr('COHERENCE', 'COHERENCIA')}
                     </span>
                     <div className="flex items-baseline gap-1">
                       <span className="font-display font-bold text-base text-reb-mint leading-none">
@@ -769,7 +827,9 @@ export function SpecialistPortalView(
                       </span>
                       <span className="font-mono text-[9px] text-reb-mint">%</span>
                     </div>
-                    <span className="font-mono text-[8px] text-reb-text-muted">Zero Drift</span>
+                    <span className="font-mono text-[8px] text-reb-text-muted">
+                      {tr('Zero Drift', 'Sin Deriva')}
+                    </span>
                   </div>
                 </div>
               )}
@@ -784,7 +844,10 @@ export function SpecialistPortalView(
                 ) : (
                   <div
                     className="flex items-center justify-center gap-0.5 px-1 py-0.5 rounded bg-reb-surface-code/60 border border-reb-yellow/40 text-reb-yellow truncate"
-                    title="Caché local de demo (sin verificación on-chain)"
+                    title={tr(
+                      'Local demo cache (not verified on-chain)',
+                      'Caché local de demo (sin verificación on-chain)'
+                    )}
                   >
                     <ShieldAlert className="w-2.5 h-2.5 flex-shrink-0" />
                     <span>✓ Qore (Demo)</span>
@@ -809,7 +872,7 @@ export function SpecialistPortalView(
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[9px] uppercase tracking-wider text-reb-mint flex items-center gap-1 font-semibold">
                     <Terminal className="w-3 h-3" />
-                    EPHEMERAL PAYLOAD PREVIEW
+                    {tr('EPHEMERAL PAYLOAD PREVIEW', 'VISTA PREVIA DE CARGA EFÍMERA')}
                   </span>
                   <button
                     type="button"
@@ -819,12 +882,14 @@ export function SpecialistPortalView(
                     {copiedSnippet ? (
                       <>
                         <Check className="w-2.5 h-2.5 text-reb-mint" />
-                        <span className="text-reb-mint font-bold">COPIED!</span>
+                        <span className="text-reb-mint font-bold">
+                          {tr('COPIED!', '¡COPIADO!')}
+                        </span>
                       </>
                     ) : (
                       <>
                         <Copy className="w-2.5 h-2.5" />
-                        <span>COPY</span>
+                        <span>{tr('COPY', 'COPIAR')}</span>
                       </>
                     )}
                   </button>
@@ -853,7 +918,11 @@ export function SpecialistPortalView(
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-reb-surface-card hover:bg-reb-border-subtle border border-reb-border text-reb-text-muted hover:text-reb-mint font-mono text-[10px] transition-all cursor-pointer"
                 >
                   <Download className="w-3 h-3" />
-                  <span>{exportedAttestation ? 'Proof Exported' : 'Export Proof'}</span>
+                  <span>
+                    {exportedAttestation
+                      ? tr('Proof Exported', 'Prueba Exportada')
+                      : tr('Export Proof', 'Exportar Prueba')}
+                  </span>
                 </button>
 
                 <button
@@ -862,7 +931,7 @@ export function SpecialistPortalView(
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-reb-crimson/20 border border-reb-pink text-reb-pink hover:bg-reb-pink hover:text-reb-bg font-mono text-[10px] font-bold transition-all shadow-[0_0_12px_rgba(244,114,155,0.25)] cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>FLUSH SESSION RAM</span>
+                  <span>{tr('FLUSH SESSION RAM', 'PURGAR RAM DE SESIÓN')}</span>
                 </button>
               </div>
             </div>
@@ -877,22 +946,35 @@ export function SpecialistPortalView(
                   </div>
                   <div className="flex flex-col">
                     <span className="font-mono text-xs font-bold text-reb-text-light uppercase">
-                      ENCLAVE STREAM DRAWER (STANDBY)
+                      {tr(
+                        'ENCLAVE STREAM DRAWER (STANDBY)',
+                        'PANEL DE FLUJO DEL ENCLAVE (EN ESPERA)'
+                      )}
                     </span>
                     <span className="font-mono text-[9px] text-reb-text-muted">
-                      ZERO-PERSISTENCE RAM BUFFER • 0 BYTES ALLOCATED
+                      {tr(
+                        'ZERO-PERSISTENCE RAM BUFFER • 0 BYTES ALLOCATED',
+                        'BÚFER RAM DE CERO PERSISTENCIA • 0 BYTES ASIGNADOS'
+                      )}
                     </span>
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded-full bg-reb-surface-card border border-reb-border text-reb-text-muted font-mono text-[9px]">
-                  IDLE
+                  {tr('IDLE', 'INACTIVO')}
                 </span>
               </div>
               <p className="font-mono text-[11px] text-reb-text-muted leading-relaxed">
-                Select an active telemetry grant in the left rail and click{' '}
-                <span className="text-reb-mint font-semibold">UNSEAL STREAM</span> to execute
-                real-time ML-KEM-1024 decapsulation, AES-256-GCM decryption, and SHAKE-256
-                attestation in isolated browser RAM.
+                {tr(
+                  'Select an active telemetry grant in the left rail and click',
+                  'Selecciona una concesión de telemetría activa en el panel izquierdo y haz clic en'
+                )}{' '}
+                <span className="text-reb-mint font-semibold">
+                  {tr('UNSEAL STREAM', 'ABRIR FLUJO')}
+                </span>{' '}
+                {tr(
+                  'to execute real-time ML-KEM-1024 decapsulation, AES-256-GCM decryption, and SHAKE-256 attestation in isolated browser RAM.',
+                  'para ejecutar en tiempo real la desencapsulación ML-KEM-1024, el descifrado AES-256-GCM y la atestación SHAKE-256 en la RAM aislada del navegador.'
+                )}
               </p>
             </div>
           )}
