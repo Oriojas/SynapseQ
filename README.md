@@ -33,53 +33,111 @@ A medida que la humanidad integra interfaces cerebro-computadora (BCI), extremid
 
 SynapseQ combina cifrado post-cuántico en cliente (100% compatible con navegador), custodia Zero-Trust de sobres fuera de calldata público, almacenamiento descentralizado cifrado y gobernanza inmutable en **QoreChain Diana Testnet (`Chain ID 9800`)**:
 
-```text
-+-------------------------------------------------------------------------------------------------------------+
-|                                  ARQUITECTURA INTEGRADA SYNAPSEQ (BIO + CYBER)                              |
-+-------------------------------------------------------------------------------------------------------------+
-|                                                                                                             |
-|  [ 1. CLIENTE / SDK PQC (sdk/src/pqc.ts — Browser-Safe TypeScript) ]                                        |
-|       |                                                                                                     |
-|       +---> Cifrado simétrico local (Web Crypto AES-256-GCM) + Hash de integridad (SHAKE-256 del cifrado):  |
-|       |     • Datos Clínicos: Resonancias (DICOM), laboratorios, genómica.                                  |
-|       |     • Telemetría Ciber-Humana: Logs de implantes BCI, calibración, diagnósticos biónicos.           |
-|       |     Blob cifrado (.enc) se sube vía Key-Release Gateway (Pinata server-side) ---> Obtiene CID       |
-|       |                                                                                                     |
-|       +---> Encapsulamiento Post-Cuántico Oficial (`@qorechain/qoreseal` v1 — NIST FIPS 203 ML-KEM-1024):     |
-|       |     Consulta getKemPublicKey(especialista) on-chain y sella la clave con sobre QoreSeal v1 (o modo    |
-|       |     híbrido ML-KEM-1024 + X25519 de 1,720 bytes). Recuperación Shamir 2-de-3 (`sdk/src/recovery.ts`). |
-|       |                                                                                                     |
-|       +---> Firmas de Firmware y Certificación HBOM (`@qorechain/qoresign` — NIST FIPS 204 ML-DSA-87):        |
-|       |     Firma canónica (`deriveCanonicalPqKey`) de parches de firmware OEM (4,627 bytes).                 |
-|       |                                                                                                     |
-|  [ 2. SMART CONTRACT v2: SynapseVaultRegistry.sol (Foundry / QoreChain Diana Chain ID 9800) ]               |
-|       |                                                                                                     |
-|       +---> Solo compromisos on-chain: contentHash (SHAKE-256 del CIFRADO) y envelopeHash. El sobre y       |
-|       |     el CID NUNCA van al contrato (storage y calldata EVM son públicos aunque digan `private`).      |
-|       +---> Módulo Clínico / Efímero: grantTimedAccess, extendAccess, revokeAccess, emergencyRevokeAll.     |
-|       |     recordId = keccak256(patient, salt); Kill-Switch O(1) por época (~45k gas constante).           |
-|       +---> Módulo HBOM + Precompilados PQC Nativos: el fabricante registra (`partId = keccak256(oem, sn)`);  |
-|       |     verifica on-chain la firma `ML-DSA-87` mediante `pqcKeyStatus` (`0x...0a02`) y `pqcVerify`        |
-|       |     (`0x...0a01`); `DECOMMISSIONED` es terminal y emite `FirmwareAttestation` (~571k gas en Diana).   |
-|       +---> Módulo PKI: registerKemPublicKey / getKemPublicKey / hasKemPublicKey (1,568 ó 1,720 bytes).     |
-|       |                                                                                                     |
-|  [ 3. ZERO-TRUST KEY-RELEASE GATEWAY (gateway/) ]                                                           |
-|       |                                                                                                     |
-|       +---> Custodia el sobre QoreSeal ML-KEM-1024 y el CID. Lo entrega solo si la wallet del especialista    |
-|       |     firma un reto ligado a Chain ID 9800 + nonce single-use + recordId y `isAccessValid(recordId)`.   |
-|       +---> Proxy CORS-safe `GET /api/qore/evm-window/:address` para consultar la ventana de autorización     |
-|       |     EVM acotada (`allowedTargets`) en la API REST de QoreChain (`/qorechain/pqc/v1/evm_window/…`).    |
-|       +---> Verifica que el sobre coincida con envelopeHash on-chain; aplica cuotas de subida por wallet,   |
-|       |     rate-limiting por IP, CORS estricto, tokens de descarga single-use y crypto-shredding.          |
-|       |                                                                                                     |
-|  [ 4. FRONTEND: MAP-FIRST TACTICAL HUD + CINEMATIC LANDING v2 (Vite + React 19 + Tailwind v4 + Three.js) ]  |
-|       |                                                                                                     |
-|       +---> Cinematic Landing v2 (`/landing.html`): túnel sináptico 3D WebGL/GLSL, Blueprint Iris ciber-      |
-|       |     humano, narrativa bilingüe ES/EN con GSAP ScrollTrigger + Lenis y acceso directo al Bio-HUD.      |
-|       +---> Map-First Tactical HUD (`/`): mapa vectorial táctico GPS en pantalla completa, badge en vivo de   |
-|       |     ventana EVM acotada (`EvmWindowBadge.tsx`), riel lateral de cristal y cajón de descifrado en RAM. |
-|                                                                                                             |
-+-------------------------------------------------------------------------------------------------------------+
+### 1. Diagrama de Arquitectura Integrada (`flowchart`)
+
+```mermaid
+flowchart TB
+    subgraph UI["4. Frontend Dual-Entry (Vite + React 19 + Tailwind v4 + Three.js)"]
+        LAND["Cinematic Landing v2 (/landing.html) • Túnel 3D WebGL/GLSL + Blueprint Iris"]
+        HUD["Map-First Tactical HUD (/) • Patient Vault • Cyber-Human HBOM • Specialist Portal"]
+        BADGE["Semáforo Ventana EVM Acotada (EvmWindowBadge.tsx)"]
+        LAND -->|"Launch Console"| HUD
+    end
+
+    subgraph SDK["1. Cliente & SDK Post-Cuántico (sdk/src/ — Browser-Safe TypeScript)"]
+        SEAL["@qorechain/qoreseal v1 • ML-KEM-1024 (1,568 B) / Híbrido +X25519 (1,720 B)"]
+        AES["Web Crypto AES-256-GCM + SHAKE-256 (sobre texto cifrado)"]
+        SIGN["@qorechain/qoresign • ML-DSA-87 Canónica (4,627 B) + OEM CLI"]
+        SHAMIR["Recuperación Shamir 2-de-3 en GF(256) (recovery.ts)"]
+    end
+
+    subgraph GW["3. Zero-Trust Key-Release Gateway (gateway/)"]
+        AUTH["Reto firmado por wallet (Chain ID 9800 + Nonce single-use)"]
+        STORE["Custodia Off-Chain de Sobres QoreSeal + Pinata Proxy + Crypto-Shredding"]
+        EVMPROXY["Proxy CORS-Safe GET /api/qore/evm-window/:address"]
+    end
+
+    subgraph QORE["2. QoreChain Diana Testnet (Chain ID 9800)"]
+        CONTRACT["SynapseVaultRegistry.sol v2 • Solo Compromisos + Kill-Switch O(1) + PKI ML-KEM"]
+        PRECOMP["Precompilados PQC Nativos • pqcVerify (0x...0a01) & pqcKeyStatus (0x...0a02)"]
+        REST["QoreChain PQC REST API • /qorechain/pqc/v1/evm_window/qor1..."]
+        CONTRACT -->|"Verifica firma OEM ML-DSA-87"| PRECOMP
+    end
+
+    subgraph DA["Almacenamiento Cifrado (.enc)"]
+        IPFS["Pinata IPFS / Enclave Local (50-70 años)"]
+        RDK["QoreChain Sovereign Rollup x/rdk Native DA"]
+    end
+
+    HUD --> SEAL & AES & SIGN & SHAMIR
+    BADGE -->|"Consulta ventana acotada"| EVMPROXY
+    EVMPROXY --> REST
+    AES -->|"1. Sube blob cifrado (.enc)"| STORE
+    STORE -->|"Pin server-side"| IPFS
+    AES -.->|"Telemetría alta frecuencia"| RDK
+    SEAL -->|"2. Custodia sobre QoreSeal (envelopeHash)"| STORE
+    HUD -->|"3. grantTimedAccess (solo contentHash + envelopeHash)"| CONTRACT
+    SIGN -->|"registerBionicPart / logFirmwareUpdate"| CONTRACT
+    HUD -->|"4. Solicita liberación firmando reto"| AUTH
+    AUTH -->|"5. Verifica isAccessValid(recordId) en vivo"| CONTRACT
+    AUTH -->|"6. Libera sobre QoreSeal + token single-use"| STORE
+```
+
+### 2. Flujo Criptográfico de Sellado, Custodia, Descifrado y Kill-Switch (`sequenceDiagram`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente / Portador Biónico
+    actor OEM as Fabricante OEM (ML-DSA-87)
+    participant SDK as SDK PQC (@qorechain/qoreseal)
+    participant GW as Zero-Trust Key-Release Gateway
+    participant QC as SynapseVaultRegistry.sol (Diana 9800)
+    participant PQC as Precompilados QoreChain (0x...0a01/0a02)
+    actor S as Especialista / Bio-Ingeniero
+
+    Note over OEM,PQC: A. Registro y Atestación On-Chain de Implante Ciber-Humano (HBOM)
+    OEM->>QC: registerBionicPart(bearer, zone, model, serial, fwHash, calHash, sigMLDSA87)
+    QC->>PQC: pqcKeyStatus(oem) & pqcVerify(pubKey, attestationMsg, sigMLDSA87)
+    PQC-->>QC: Firma ML-DSA-87 válida (NIST FIPS 204)
+    QC-->>OEM: Emite BionicPartRegistered + FirmwareAttestation (partId)
+
+    Note over P,QC: B. Sellado Post-Cuántico y Pase Efímero (El sobre y el CID NUNCA van a calldata)
+    S->>QC: registerKemPublicKey(pubKey ML-KEM-1024 / Híbrida 1,720 B)
+    P->>QC: getKemPublicKey(specialist) + Verifica Ventana EVM Acotada
+    P->>SDK: Cifra payload (AES-256-GCM) + contentHash = SHAKE-256(ciphertext)
+    P->>SDK: Sella DEK con @qorechain/qoreseal v1 -> envelope + envelopeHash
+    P->>GW: POST /api/storage/pin (blob .enc)
+    GW-->>P: Retorna ipfsCID
+    P->>QC: grantTimedAccess(salt, contentHash, envelopeHash, partId, specialist, ttl)
+    P->>GW: POST /api/envelopes (recordId, ipfsCID, envelope)
+    GW->>QC: Verifica keccak256(envelope) == envelopeHash on-chain
+
+    Note over S,QC: C. Liberación Condicionada y Descifrado en Memoria RAM
+    S->>GW: POST /api/envelopes/:recordId/release (Firma reto Chain ID 9800 + Nonce)
+    GW->>QC: getGrantMetadata(recordId) -> isActive == true & block.timestamp < expiresAt
+    GW-->>S: Entrega envelope QoreSeal + downloadToken single-use
+    S->>SDK: Verifica SHAKE-256(ciphertext) == contentHash y desencapsula en RAM
+
+    Note over P,S: D. Revocación Instantánea / Kill-Switch O(1)
+    P->>QC: emergencyRevokeAll() (Incrementa patientEpoch en ~45k gas)
+    S->>GW: Intenta nueva liberación del sobre
+    GW->>QC: getGrantMetadata(recordId) -> isActive == false
+    GW-->>S: HTTP 403 Forbidden (Sobre bloqueado / Crypto-Shredded)
+```
+
+### 3. Ciclo de Vida de Piezas Ciber-Humanas HBOM y Pases Efímeros (`stateDiagram-v2`)
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> ACTIVE: registerBionicPart() [pqcVerify ML-DSA-87 OK]
+    ACTIVE --> ACTIVE: logFirmwareUpdate() [Versión monotónica + pqcVerify]
+    ACTIVE --> MAINTENANCE: updatePartStatus(MAINTENANCE) [Portador / OEM]
+    MAINTENANCE --> ACTIVE: updatePartStatus(ACTIVE) [Recalibración verificada]
+    ACTIVE --> DECOMMISSIONED: updatePartStatus(DECOMMISSIONED) [Estado Terminal]
+    MAINTENANCE --> DECOMMISSIONED: updatePartStatus(DECOMMISSIONED) [Estado Terminal]
+    DECOMMISSIONED --> [*]
 ```
 
 > **Escalabilidad Institucional (Roadmap `x/rdk`):** El campo `contentHash` (`SHAKE-256`) del contrato y el módulo `sdk/src/rdkDa.ts` están diseñados para soportar tanto compromisos de integridad sobre **IPFS** (archivos médicos de 50-70 años) como futuros blobs efímeros en un **Sovereign Rollup (`x/rdk`, perfil `enterprise`)** de QoreChain con poda automática para telemetría biónica de alta frecuencia.
