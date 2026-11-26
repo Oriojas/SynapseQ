@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Activity,
   AlertTriangle,
   CheckCircle2,
   Copy,
   Cpu,
   Download,
-  Eye,
   FileJson,
   Fingerprint,
   HeartPulse,
@@ -63,7 +61,7 @@ const ANATOMICAL_ZONES: readonly {
   readonly subtitle: string;
   readonly zoneIndex: number;
 }[] = [
-  { id: 'ALL', label: 'ALL ZONES', subtitle: 'Full Cyber-Human Substrate', zoneIndex: -1 },
+  { id: 'ALL', label: 'ALL', subtitle: 'Full Cyber-Human Substrate', zoneIndex: -1 },
   { id: 'NEURAL', label: 'NEURAL', subtitle: 'L1 BCI Synaptic Mesh', zoneIndex: 0 },
   { id: 'OCULAR', label: 'OCULAR', subtitle: 'Photonic Retina & HUD', zoneIndex: 1 },
   { id: 'CARDIOVASCULAR', label: 'CARDIOVASCULAR', subtitle: 'Hemodynamic Nano-Valves', zoneIndex: 2 },
@@ -403,187 +401,91 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
   };
 
   return (
-    <div className="w-full flex flex-col gap-5 text-reb-text-light">
-      {/* Top Telemetry KPI Row over Vivid GPS Map */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="reb-glass rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted font-semibold">
-              TOTAL REGISTERED IMPLANTS
-            </span>
-            <Cpu className="w-4 h-4 text-reb-mint" />
-          </div>
-          <div className="my-1.5 flex items-baseline gap-2">
-            <span className="font-display text-2xl font-bold text-reb-mint">
-              {parts.length}
-            </span>
-            <span className="font-mono text-xs text-reb-text-muted uppercase">
-              HBOM DEVICES ATTESTED
-            </span>
-          </div>
-          <div className="flex items-center justify-between font-mono text-[11px] pt-1 border-t border-reb-border/60">
-            <span className="text-reb-mint font-semibold">{activeCount} ACTIVE</span>
-            <span className="text-reb-yellow font-semibold">{maintenanceCount} MAINT</span>
-            <span className="text-reb-pink font-semibold">{decommissionedCount} DECOM</span>
-          </div>
-        </div>
-
-        <div className="reb-glass rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted font-semibold">
-              HBOM CRYPTOGRAPHIC INTEGRITY
-            </span>
-            <ShieldCheck className="w-4 h-4 text-reb-mint" />
-          </div>
-          <div className="my-1.5 flex items-baseline gap-2">
-            <span className="font-display text-2xl font-bold text-reb-mint">100.0%</span>
-            <span className="px-2 py-0.5 rounded bg-reb-mint/15 text-reb-mint font-mono text-[10px] font-bold">
-              ZERO DEVIATION
-            </span>
-          </div>
-          <div className="flex items-center gap-2 font-mono text-[11px] text-reb-text-muted">
-            <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse" />
-            <span>SHAKE-256 Sponge Digested</span>
-          </div>
-        </div>
-
-        <div className="reb-glass rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted font-semibold">
-              OEM ATTESTATION STANDARD
-            </span>
-            <Lock className="w-4 h-4 text-reb-blue" />
-          </div>
-          <div className="my-1.5 flex items-baseline gap-2">
-            <span className="font-display text-xl font-bold text-reb-text-light">
-              ML-DSA-87
-            </span>
-            <span className="px-2 py-0.5 rounded bg-reb-blue/25 border border-reb-blue/50 text-reb-periwinkle font-mono text-[10px] font-bold">
-              FIPS 204 (4,627 B)
-            </span>
-          </div>
-          <div className="flex items-center justify-between font-mono text-[11px] text-reb-text-muted">
-            <span>Monotonic Ledger</span>
-            <span className="text-reb-mint font-bold">ENFORCED</span>
-          </div>
-        </div>
-
-        <div className="reb-glass rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted font-semibold">
-              QORECHAIN L1 ANCHOR
-            </span>
-            <Activity className="w-4 h-4 text-reb-mint" />
-          </div>
-          <div className="my-1.5 flex items-baseline gap-2">
-            <span className="font-display text-xl font-bold text-reb-mint">
-              #4,892,105
-            </span>
-            <span className="font-mono text-xs text-reb-text-muted">[DIANA 9800]</span>
-          </div>
-          <div className="flex items-center justify-between font-mono text-[11px] text-reb-text-muted">
-            <span>Finality</span>
-            <span className="text-reb-mint font-bold">0.8s (Zero Rollback)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main 3-Column Translucent Glass Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ============================================================ */}
-        {/* LEFT COLUMN (lg:col-span-4): ANATOMICAL ZONES & REGISTER FORM */}
-        {/* ============================================================ */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          {/* Panel 1: Anatomical Zones Matrix */}
-          <div className="reb-glass rounded-xl p-5 flex flex-col gap-3">
-            <div className="flex items-center justify-between pb-2 border-b border-reb-border/60">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-reb-mint" />
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-reb-text-light">
-                  ANATOMICAL ZONES MATRIX
-                </h2>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-reb-mint/15 text-reb-mint font-mono text-[10px] font-bold">
-                6 SECTORS
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start text-reb-text-light">
+      {/* =================================================================== */}
+      {/* LEFT FLOATING GLASS HUD SIDEBAR (lg:col-span-4)                     */}
+      {/* =================================================================== */}
+      <aside className="lg:col-span-4 flex flex-col gap-3.5 pointer-events-auto">
+        {/* Card 1: Compact Anatomical Zone Filter Chips & Register Bionic Part HUD Card */}
+        <div className="bg-[#131B18]/55 backdrop-blur-md border border-reb-mint/30 rounded-xl p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] space-y-2.5">
+          {/* Header & Zone Filter Pills */}
+          <div className="flex items-center justify-between border-b border-reb-border/60 pb-2">
+            <div className="flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-reb-mint" />
+              <span className="font-display text-xs font-bold uppercase tracking-wider text-reb-text-light">
+                ANATOMICAL ZONE FILTER
               </span>
             </div>
-            <p className="text-xs text-reb-text-muted">
-              Filter cyber-human hardware bill of materials across anatomical micro-substrates.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
-              {ANATOMICAL_ZONES.map((zone) => {
-                const count =
-                  zone.id === 'ALL'
-                    ? parts.length
-                    : parts.filter((p) => p.zone === zone.id).length;
-                const isSelected = selectedZone === zone.id;
-
-                return (
-                  <button
-                    key={zone.id}
-                    type="button"
-                    onClick={() => setSelectedZone(zone.id)}
-                    className={`w-full p-2.5 rounded-lg text-left transition-all flex items-center justify-between cursor-pointer border ${
-                      isSelected
-                        ? 'bg-reb-mint/15 border-reb-mint text-reb-mint shadow-[0_0_15px_rgba(168,240,198,0.18)]'
-                        : 'bg-reb-surface/40 border-reb-border/60 text-reb-text-light hover:border-reb-mint/50'
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider">
-                        {zone.label}
-                      </span>
-                      <span className="font-mono text-[10px] text-reb-text-muted">
-                        {zone.subtitle}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded font-mono text-[11px] font-bold ${
-                          isSelected
-                            ? 'bg-reb-mint text-reb-bg'
-                            : 'bg-reb-blue/25 text-reb-periwinkle border border-reb-blue/40'
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <span className="px-1.5 py-0.5 rounded bg-reb-mint/15 text-reb-mint font-mono text-[9px] font-bold">
+              {selectedZone}
+            </span>
           </div>
 
-          {/* Panel 2: Register New Bionic Part On-Chain Form */}
-          <div className="reb-glass rounded-xl p-5 flex flex-col gap-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-reb-border/60">
-              <div className="flex items-center gap-2">
-                <PlusCircle className="w-4 h-4 text-reb-mint" />
-                <h2 className="font-display text-xs sm:text-sm font-bold uppercase tracking-wider text-reb-text-light">
-                  REGISTER NEW BIONIC PART ON-CHAIN (ML-DSA-87)
+          {/* Compact Zone Pills */}
+          <div className="flex flex-wrap gap-1.5">
+            {ANATOMICAL_ZONES.map((zone) => {
+              const count =
+                zone.id === 'ALL'
+                  ? parts.length
+                  : parts.filter((p) => p.zone === zone.id).length;
+              const isSelected = selectedZone === zone.id;
+
+              return (
+                <button
+                  key={zone.id}
+                  type="button"
+                  onClick={() => setSelectedZone(zone.id)}
+                  title={zone.subtitle}
+                  className={`px-2 py-1 rounded-md font-mono text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-reb-mint text-reb-bg border-reb-mint shadow-[0_0_12px_rgba(168,240,198,0.25)]'
+                      : 'bg-reb-surface-code/70 border-reb-border/70 text-reb-text-muted hover:text-reb-text-light hover:border-reb-mint/50'
+                  }`}
+                >
+                  <span>{zone.label}</span>
+                  <span
+                    className={`px-1 py-0.2 rounded text-[9px] ${
+                      isSelected
+                        ? 'bg-reb-bg/20 text-reb-bg'
+                        : 'bg-reb-blue/25 text-reb-periwinkle'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Compact Register Form */}
+          <div className="pt-2 border-t border-reb-border/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <PlusCircle className="w-3.5 h-3.5 text-reb-mint" />
+                <h2 className="font-display text-xs font-bold uppercase tracking-wider text-reb-text-light">
+                  REGISTER NEW BIONIC PART (ML-DSA-87)
                 </h2>
               </div>
+              <span className="font-mono text-[9px] text-reb-mint">FIPS 204</span>
             </div>
 
-            <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
-                  Model Name / Bionic Prosthetic Class
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={regModelName}
-                  onChange={(e) => setRegModelName(e.target.value)}
-                  placeholder="e.g. Neuro-Synapse Gen 5"
-                  className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-3 py-2 font-mono text-xs text-reb-text-light focus:outline-none focus:border-reb-mint"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="flex flex-col gap-1">
-                  <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
+            <form onSubmit={handleRegisterSubmit} className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
+                    Model Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={regModelName}
+                    onChange={(e) => setRegModelName(e.target.value)}
+                    placeholder="Neuro-Synapse Gen 5"
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-2.5 py-1 font-mono text-[11px] text-reb-text-light focus:outline-none focus:border-reb-mint"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
                     Serial Number
                   </label>
                   <input
@@ -592,18 +494,20 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     value={regSerialNumber}
                     onChange={(e) => setRegSerialNumber(e.target.value)}
                     placeholder="SN-8820-BCI-X"
-                    className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-3 py-2 font-mono text-xs text-reb-text-light focus:outline-none focus:border-reb-mint"
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-2.5 py-1 font-mono text-[11px] text-reb-text-light focus:outline-none focus:border-reb-mint"
                   />
                 </div>
+              </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
-                    Anatomical Zone
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
+                    Zone
                   </label>
                   <select
                     value={regZone}
                     onChange={(e) => setRegZone(e.target.value as AnatomicalZoneLabel)}
-                    className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-2.5 py-2 font-mono text-xs text-reb-text-light focus:outline-none focus:border-reb-mint"
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-1.5 py-1 font-mono text-[10px] text-reb-text-light focus:outline-none focus:border-reb-mint"
                   >
                     <option value="NEURAL">NEURAL</option>
                     <option value="OCULAR">OCULAR</option>
@@ -613,25 +517,21 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     <option value="SUBDERMAL">SUBDERMAL</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="flex flex-col gap-1">
-                  <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
-                    OEM Manufacturer
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
+                    OEM Name
                   </label>
                   <input
                     type="text"
                     required
                     value={regManufacturerName}
                     onChange={(e) => setRegManufacturerName(e.target.value)}
-                    className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-3 py-2 font-mono text-xs text-reb-text-light focus:outline-none focus:border-reb-mint"
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-2 py-1 font-mono text-[11px] text-reb-text-light focus:outline-none focus:border-reb-mint"
                   />
                 </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
-                    Genesis Firmware Semver
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
+                    Semver
                   </label>
                   <input
                     type="text"
@@ -639,95 +539,84 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                     value={regFirmwareSemver}
                     onChange={(e) => setRegFirmwareSemver(e.target.value)}
                     placeholder="v1.0.0"
-                    className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-3 py-2 font-mono text-xs text-reb-mint focus:outline-none focus:border-reb-mint"
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-2 py-1 font-mono text-[11px] text-reb-mint focus:outline-none focus:border-reb-mint"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
-                  OEM Manufacturer Address (QoreChain EVM)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={liveWallet ?? regManufacturerAddress}
-                  disabled={Boolean(liveWallet)}
-                  title={
-                    liveWallet
-                      ? 'En modo on-chain el fabricante es la wallet conectada (el contrato lo exige)'
-                      : undefined
-                  }
-                  onChange={(e) =>
-                    setRegManufacturerAddress(e.target.value as `0x${string}`)
-                  }
-                  className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-3 py-2 font-mono text-xs text-reb-mint focus:outline-none focus:border-reb-mint"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <label className="font-mono text-[10px] uppercase tracking-wider text-reb-text-muted font-semibold">
-                    Firmware Payload Image (For SHAKE-256 + ML-DSA-87)
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
+                    OEM Address (QoreChain)
                   </label>
-                  <span className="font-mono text-[10px] text-reb-mint">FIPS 204</span>
+                  <input
+                    type="text"
+                    required
+                    value={liveWallet ?? regManufacturerAddress}
+                    disabled={Boolean(liveWallet)}
+                    title={
+                      liveWallet
+                        ? 'En modo on-chain el fabricante es la wallet conectada (el contrato lo exige)'
+                        : undefined
+                    }
+                    onChange={(e) =>
+                      setRegManufacturerAddress(e.target.value as `0x${string}`)
+                    }
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-2 py-1 font-mono text-[10px] text-reb-mint focus:outline-none focus:border-reb-mint"
+                  />
                 </div>
-                <textarea
-                  rows={2}
-                  value={regPayloadText}
-                  onChange={(e) => setRegPayloadText(e.target.value)}
-                  className="w-full rounded-lg bg-reb-surface-code/80 border border-reb-border px-3 py-1.5 font-mono text-[11px] text-reb-text-light focus:outline-none focus:border-reb-mint"
-                />
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-mono text-[9px] uppercase tracking-wider text-reb-text-muted">
+                    Firmware Payload Image
+                  </label>
+                  <input
+                    type="text"
+                    value={regPayloadText}
+                    onChange={(e) => setRegPayloadText(e.target.value)}
+                    className="w-full rounded-md bg-reb-surface-code/85 border border-reb-border px-2 py-1 font-mono text-[10px] text-reb-text-light focus:outline-none focus:border-reb-mint"
+                  />
+                </div>
               </div>
 
               {regError && (
-                <div className="p-2.5 rounded-lg bg-reb-pink/15 border border-reb-pink text-[11px] font-mono text-reb-pink">
+                <div className="p-2 rounded-md bg-reb-pink/15 border border-reb-pink text-[10px] font-mono text-reb-pink">
                   {regError}
                 </div>
               )}
+
               <button
                 type="submit"
                 disabled={isRegistering}
-                className="mt-1 w-full py-2.5 disabled:opacity-50 px-4 rounded-lg bg-reb-mint text-reb-bg font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_20px_rgba(168,240,198,0.3)] flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2 disabled:opacity-50 px-3 rounded-lg bg-reb-mint text-reb-bg font-mono text-[11px] font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_0_16px_rgba(168,240,198,0.3)] flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Fingerprint className="w-4 h-4" />
+                <Fingerprint className="w-3.5 h-3.5" />
                 <span>
                   {isRegistering
                     ? 'Registrando…'
                     : liveWallet
-                      ? 'Sign with ML-DSA-87 & Register HBOM Part (on-chain)'
-                      : 'Sign with ML-DSA-87 & Register (demo local, sin cadena)'}
+                      ? 'Sign with ML-DSA-87 & Register (on-chain)'
+                      : 'Sign with ML-DSA-87 & Register'}
                 </span>
               </button>
             </form>
 
-            {/* Real-Time ML-DSA-87 Verification Result Banner */}
+            {/* Compact Real-Time ML-DSA-87 Verification Result Banner */}
             {regSignatureResult && (
-              <div className="mt-1 p-3 rounded-lg bg-reb-surface-code/90 border border-reb-mint/60 flex flex-col gap-1.5 font-mono text-[11px]">
+              <div className="p-2 rounded-lg bg-reb-surface-code/90 border border-reb-mint/60 flex flex-col gap-1 font-mono text-[10px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-reb-mint font-bold flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    ML-DSA-87 SIGNATURE VERIFIED: {regSignatureResult.verified ? 'TRUE' : 'FALSE'}
+                  <span className="text-reb-mint font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    ML-DSA-87 VERIFIED: {regSignatureResult.verified ? 'TRUE' : 'FALSE'}
                   </span>
-                  <span className="px-1.5 py-0.5 rounded bg-reb-mint/20 text-reb-mint text-[10px] font-bold">
-                    {regSignatureResult.signatureBytesLen.toLocaleString()} BYTES
+                  <span className="px-1.5 py-0.2 rounded bg-reb-mint/20 text-reb-mint text-[9px] font-bold">
+                    {regSignatureResult.signatureBytesLen.toLocaleString()} B
                   </span>
                 </div>
-                <div className="text-reb-text-muted text-[10px] flex justify-between">
-                  <span>Device Serial:</span>
-                  <span className="text-reb-text-light font-bold">{regSignatureResult.serial}</span>
-                </div>
-                <div className="text-reb-text-muted text-[10px] flex justify-between">
-                  <span>SHAKE-256 Digest:</span>
+                <div className="text-reb-text-muted text-[9px] flex justify-between">
+                  <span>{regSignatureResult.serial} • SHAKE-256:</span>
                   <span className="text-reb-mint">
-                    {regSignatureResult.firmwareHash.slice(0, 14)}...
-                    {regSignatureResult.firmwareHash.slice(-8)}
-                  </span>
-                </div>
-                <div className="text-reb-text-muted text-[10px] flex justify-between">
-                  <span>FIPS 204 Sig:</span>
-                  <span className="text-reb-periwinkle">
-                    {regSignatureResult.signatureHexPreview}
+                    {regSignatureResult.firmwareHash.slice(0, 12)}...
+                    {regSignatureResult.firmwareHash.slice(-6)}
                   </span>
                 </div>
               </div>
@@ -735,108 +624,123 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* CENTER COLUMN (lg:col-span-5): REGISTERED BIONIC IMPLANTS    */}
-        {/* ============================================================ */}
-        <div className="lg:col-span-5 flex flex-col gap-4">
-          {/* Search & Status Filter Tabs */}
-          <div className="reb-glass rounded-xl p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2 bg-reb-surface-code/80 border border-reb-border px-3 py-2 rounded-lg">
-              <Search className="w-4 h-4 text-reb-text-muted" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search implant model, serial, OEM address, or zone..."
-                className="w-full bg-transparent font-mono text-xs text-reb-text-light placeholder:text-reb-text-dim focus:outline-none"
-              />
+        {/* Card 2: Registered Bionic Implants Compact List */}
+        <div className="bg-[#131B18]/50 backdrop-blur-md border border-reb-mint/25 rounded-xl p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] space-y-2.5">
+          <div className="flex items-center justify-between border-b border-reb-border/60 pb-2">
+            <div className="flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-reb-mint" />
+              <span className="font-display text-xs font-bold uppercase tracking-wider text-reb-text-light">
+                REGISTERED BIONIC IMPLANTS ({filteredParts.length})
+              </span>
             </div>
+            <div className="flex items-center gap-1.5 font-mono text-[9px]">
+              <span className="text-reb-mint">{activeCount} ACT</span>
+              <span className="text-reb-yellow">{maintenanceCount} MNT</span>
+              <span className="text-reb-pink">{decommissionedCount} DEC</span>
+            </div>
+          </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {STATUS_TABS.map((tab) => {
-                const count =
-                  tab === 'ALL'
-                    ? parts.length
-                    : parts.filter((p) => p.status === tab).length;
-                const isSelected = selectedStatus === tab;
+          {/* Search input */}
+          <div className="flex items-center gap-2 bg-reb-surface-code/80 border border-reb-border px-2.5 py-1.5 rounded-lg">
+            <Search className="w-3.5 h-3.5 text-reb-text-muted shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search model, serial, OEM, or zone..."
+              className="w-full bg-transparent font-mono text-[11px] text-reb-text-light placeholder:text-reb-text-dim focus:outline-none"
+            />
+          </div>
 
-                let tabColorClass =
-                  'bg-reb-surface/60 text-reb-text-muted border-reb-border hover:text-reb-text-light';
-                if (isSelected) {
-                  if (tab === 'DECOMMISSIONED') {
-                    tabColorClass = 'bg-reb-pink text-reb-bg border-reb-pink font-bold';
-                  } else if (tab === 'MAINTENANCE') {
-                    tabColorClass = 'bg-reb-yellow text-reb-bg border-reb-yellow font-bold';
-                  } else {
-                    tabColorClass = 'bg-reb-mint text-reb-bg border-reb-mint font-bold';
-                  }
+          {/* Compact Status Tabs */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {STATUS_TABS.map((tab) => {
+              const count =
+                tab === 'ALL'
+                  ? parts.length
+                  : parts.filter((p) => p.status === tab).length;
+              const isSelected = selectedStatus === tab;
+
+              let tabColorClass =
+                'bg-reb-surface/60 text-reb-text-muted border-reb-border hover:text-reb-text-light';
+              if (isSelected) {
+                if (tab === 'DECOMMISSIONED') {
+                  tabColorClass = 'bg-reb-pink text-reb-bg border-reb-pink font-bold';
+                } else if (tab === 'MAINTENANCE') {
+                  tabColorClass = 'bg-reb-yellow text-reb-bg border-reb-yellow font-bold';
+                } else {
+                  tabColorClass = 'bg-reb-mint text-reb-bg border-reb-mint font-bold';
                 }
+              }
 
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setSelectedStatus(tab)}
-                    className={`px-3 py-1.5 rounded-lg border font-mono text-[11px] uppercase tracking-wider transition-all cursor-pointer ${tabColorClass}`}
-                  >
-                    {tab} ({count})
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setSelectedStatus(tab)}
+                  className={`px-2 py-0.5 rounded border font-mono text-[9px] uppercase tracking-wider transition-all cursor-pointer ${tabColorClass}`}
+                >
+                  {tab === 'DECOMMISSIONED'
+                    ? 'DECOM'
+                    : tab === 'MAINTENANCE'
+                      ? 'MAINT'
+                      : tab}{' '}
+                  ({count})
+                </button>
+              );
+            })}
           </div>
 
           {/* Latest Firmware Patch Success Notification */}
           {patchSuccessBanner && (
-            <div className="reb-glass rounded-xl p-3.5 border-reb-mint flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 font-mono text-xs">
-                <CheckCircle2 className="w-4 h-4 text-reb-mint shrink-0" />
+            <div className="p-2 rounded-lg bg-reb-surface-code/90 border border-reb-mint flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                <CheckCircle2 className="w-3.5 h-3.5 text-reb-mint shrink-0" />
                 <div>
                   <span className="text-reb-mint font-bold">
-                    MONOTONIC FIRMWARE {patchSuccessBanner.semver} COMMITTED
+                    FW {patchSuccessBanner.semver} COMMITTED
                   </span>
-                  <p className="text-[11px] text-reb-text-muted">
-                    ML-DSA-87 ({patchSuccessBanner.sigBytes.toLocaleString()}B) verified • SHAKE-256:{' '}
-                    {patchSuccessBanner.firmwareHash.slice(0, 14)}...
+                  <p className="text-[9px] text-reb-text-muted">
+                    ML-DSA-87 ({patchSuccessBanner.sigBytes.toLocaleString()}B) •{' '}
+                    {patchSuccessBanner.firmwareHash.slice(0, 10)}...
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setPatchSuccessBanner(null)}
-                className="text-xs font-mono text-reb-text-muted hover:text-reb-text-light cursor-pointer"
+                className="text-[9px] font-mono text-reb-text-muted hover:text-reb-text-light cursor-pointer"
               >
-                DISMISS
+                [X]
               </button>
             </div>
           )}
 
-          {/* Feed of Bionic Implant Cards */}
-          <div className="flex flex-col gap-4">
+          {/* Scrollable Compact Implant Cards */}
+          <div className="max-h-[280px] overflow-y-auto space-y-2 pr-1">
             {filteredParts.map((part) => {
               const isSelected = selectedPart?.partId === part.partId;
               const isDecommissioned = part.status === 'DECOMMISSIONED';
               const isMaintenance = part.status === 'MAINTENANCE';
-              const isPatchingThis = patchingPartId === part.partId;
 
               return (
                 <article
                   key={part.partId}
                   onClick={() => setSelectedPartId(part.partId)}
-                  className={`${
-                    isDecommissioned ? 'reb-glass-pink' : 'reb-glass'
-                  } rounded-xl p-5 flex flex-col gap-3.5 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'ring-1 ring-reb-mint shadow-[0_0_24px_rgba(168,240,198,0.16)]'
-                      : 'hover:border-reb-mint/50'
+                  className={`p-2.5 rounded-lg border transition-all cursor-pointer space-y-2 ${
+                    isDecommissioned
+                      ? 'bg-reb-pink/10 border-reb-pink/40'
+                      : isSelected
+                        ? 'bg-[#17221E]/85 border-reb-mint shadow-[0_0_16px_rgba(168,240,198,0.16)]'
+                        : 'bg-[#17221E]/50 border-reb-border hover:border-reb-mint/50'
                   }`}
                 >
-                  {/* Header: Model Name, Zone Badge (#3B66E8), Lifecycle Status Badge */}
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 flex-wrap">
+                  {/* Top Row: Model, Zone Badge, Status Badge */}
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <h3
-                          className={`font-display text-base font-bold tracking-tight ${
+                          className={`font-display text-xs font-bold truncate ${
                             isDecommissioned
                               ? 'text-reb-pink line-through'
                               : 'text-reb-text-light'
@@ -844,135 +748,76 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                         >
                           {part.modelName}
                         </h3>
-                        {/* Anatomical Zone Badge in Cobalt Blue (#3B66E8) */}
                         <span
-                          className="px-2 py-0.5 rounded font-mono text-[10px] font-bold uppercase tracking-wider text-white shadow-sm"
+                          className="px-1.5 py-0.2 rounded font-mono text-[8px] font-bold uppercase tracking-wider text-white"
                           style={{ backgroundColor: '#3B66E8' }}
                         >
-                          [{part.zone}]
+                          {part.zone}
                         </span>
                       </div>
-                      <span className="font-mono text-xs text-reb-text-muted">
-                        Serial: <strong className="text-reb-text-light">{part.serialNumber}</strong> • OEM:{' '}
-                        {part.manufacturerName} ({part.manufacturerAddress.slice(0, 6)}...
-                        {part.manufacturerAddress.slice(-4)})
-                      </span>
+                      <p className="font-mono text-[10px] text-reb-text-muted truncate">
+                        {part.serialNumber} • {part.manufacturerName}
+                      </p>
                     </div>
 
-                    {/* Lifecycle Status Badge */}
                     {part.status === 'ACTIVE' && (
-                      <span className="px-2.5 py-1 rounded-md bg-reb-mint/20 border border-reb-mint/50 text-reb-mint font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse" />
+                      <span className="px-1.5 py-0.5 rounded bg-reb-mint/20 border border-reb-mint/50 text-reb-mint font-mono text-[9px] font-bold uppercase flex items-center gap-1 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse" />
                         ACTIVE
                       </span>
                     )}
                     {part.status === 'MAINTENANCE' && (
-                      <span className="px-2.5 py-1 rounded-md bg-reb-yellow/20 border border-reb-yellow/50 text-reb-yellow font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        MAINTENANCE
+                      <span className="px-1.5 py-0.5 rounded bg-reb-yellow/20 border border-reb-yellow/50 text-reb-yellow font-mono text-[9px] font-bold uppercase flex items-center gap-1 shrink-0">
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        MAINT
                       </span>
                     )}
                     {part.status === 'DECOMMISSIONED' && (
-                      <span className="px-2.5 py-1 rounded-md bg-reb-pink/20 border border-reb-pink/50 text-reb-pink font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <XCircle className="w-3.5 h-3.5" />
-                        DECOMMISSIONED
+                      <span className="px-1.5 py-0.5 rounded bg-reb-pink/20 border border-reb-pink/50 text-reb-pink font-mono text-[9px] font-bold uppercase flex items-center gap-1 shrink-0">
+                        <XCircle className="w-2.5 h-2.5" />
+                        DECOM
                       </span>
                     )}
                   </div>
 
-                  {/* Firmware & SHAKE-256 Digest & Calibration Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-lg bg-reb-surface-code/75 border border-reb-border/70 font-mono text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase text-reb-text-muted">
-                        MONOTONIC FIRMWARE VERSION
-                      </span>
-                      <span className="text-reb-mint font-bold">
-                        {part.firmwareSemver} • Revision #{part.firmwareVersion}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] uppercase text-reb-text-muted">
-                        SHAKE-256 FIRMWARE HASH
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[11px] truncate ${
-                            isDecommissioned
-                              ? 'bg-reb-pink/15 text-reb-pink'
-                              : 'bg-reb-mint/10 text-reb-mint'
-                          }`}
-                        >
-                          {part.firmwareHash.slice(0, 12)}...{part.firmwareHash.slice(-6)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyHash(part.firmwareHash);
-                          }}
-                          className="text-reb-text-muted hover:text-reb-mint cursor-pointer"
-                          title="Copy SHAKE-256 Firmware Hash"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Calibration Score Bar */}
-                    <div className="sm:col-span-2 flex flex-col gap-1 pt-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-reb-text-muted uppercase">
-                          NEURAL / BIOMETRIC CALIBRATION SCORE
-                        </span>
-                        <span
-                          className={`font-bold ${
-                            isDecommissioned
-                              ? 'text-reb-pink'
-                              : isMaintenance
+                  {/* Firmware & Hash Row */}
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-reb-surface-code/75 border border-reb-border/60 font-mono text-[10px]">
+                    <span className="text-reb-mint font-bold">
+                      {part.firmwareSemver} (#{part.firmwareVersion})
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={
+                          isDecommissioned
+                            ? 'text-reb-pink'
+                            : isMaintenance
                               ? 'text-reb-yellow'
-                              : 'text-reb-mint'
-                          }`}
-                        >
-                          {part.calibrationScorePct.toFixed(2)}%
-                        </span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-reb-surface overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 ${
-                            isDecommissioned
-                              ? 'bg-reb-pink'
-                              : isMaintenance
-                              ? 'bg-reb-yellow'
-                              : 'bg-reb-mint'
-                          }`}
-                          style={{ width: `${Math.min(100, Math.max(4, part.calibrationScorePct))}%` }}
-                        />
-                      </div>
+                              : 'text-reb-text-muted'
+                        }
+                      >
+                        {part.firmwareHash.slice(0, 8)}...{part.firmwareHash.slice(-4)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyHash(part.firmwareHash);
+                        }}
+                        className="text-reb-text-muted hover:text-reb-mint cursor-pointer"
+                        title="Copy SHAKE-256 Firmware Hash"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Interactive Action Bar */}
+                  {/* Action Controls Row */}
                   <div
-                    className="flex items-center justify-between gap-2 pt-1 flex-wrap"
+                    className="flex items-center justify-between gap-1.5 flex-wrap"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* 1. Push ML-DSA-87 Firmware Patch */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenPatcher(part)}
-                      className={`px-3 py-1.5 rounded-lg font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isDecommissioned
-                          ? 'bg-reb-pink/20 border border-reb-pink/50 text-reb-pink hover:bg-reb-pink/30'
-                          : 'bg-reb-mint text-reb-bg hover:brightness-110 shadow-[0_0_12px_rgba(168,240,198,0.25)]'
-                      }`}
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Push ML-DSA-87 Firmware Patch</span>
-                    </button>
-
-                    {/* 2. Lifecycle Status Quick Selector */}
-                    <div className="flex items-center gap-1 bg-reb-surface-code/80 p-1 rounded-lg border border-reb-border">
+                    {/* Quick status selector */}
+                    <div className="flex items-center gap-0.5 bg-reb-surface-code/90 p-0.5 rounded border border-reb-border">
                       {(['ACTIVE', 'MAINTENANCE', 'DECOMMISSIONED'] as const).map(
                         (statusOption) => {
                           const activeBtn = part.status === statusOption;
@@ -992,269 +837,290 @@ export const CyberHbomView: React.FC<Readonly<CyberHbomViewProps>> = ({
                               type="button"
                               onClick={() => {
                                 setPatchErrorMsg(null);
-                                onUpdatePartStatus(part.partId, statusOption).catch((err: unknown) =>
-                                  setPatchErrorMsg(err instanceof Error ? err.message : String(err))
+                                onUpdatePartStatus(part.partId, statusOption).catch(
+                                  (err: unknown) =>
+                                    setPatchErrorMsg(
+                                      err instanceof Error ? err.message : String(err)
+                                    )
                                 );
                               }}
-                              className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase transition-all cursor-pointer ${activeStyle}`}
+                              className={`px-1.5 py-0.5 rounded font-mono text-[8px] uppercase transition-all cursor-pointer ${activeStyle}`}
                               title={`Set lifecycle status to ${statusOption} (Index ${getStatusIndex(statusOption)})`}
                             >
                               {statusOption === 'DECOMMISSIONED'
                                 ? 'DECOM'
                                 : statusOption === 'MAINTENANCE'
-                                ? 'MAINT'
-                                : 'ACTIVE'}
+                                  ? 'MAINT'
+                                  : 'ACTIVE'}
                             </button>
                           );
                         }
                       )}
                     </div>
 
-                    {/* 3. Grant 2h Telemetry Pass */}
-                    <button
-                      type="button"
-                      onClick={() => onGrantTelemetryPassForPart(part)}
-                      className="px-3 py-1.5 rounded-lg bg-reb-blue/25 border border-reb-blue/60 text-reb-periwinkle hover:bg-reb-blue hover:text-white font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <Key className="w-3.5 h-3.5" />
-                      <span>Grant 2h Telemetry Pass</span>
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPatcher(part)}
+                        className={`px-2 py-1 rounded font-mono text-[9px] font-bold uppercase flex items-center gap-1 transition-all cursor-pointer ${
+                          isDecommissioned
+                            ? 'bg-reb-pink/20 border border-reb-pink/50 text-reb-pink'
+                            : 'bg-reb-mint text-reb-bg hover:brightness-110'
+                        }`}
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" />
+                        <span>Patch FW</span>
+                      </button>
 
-                  {/* Inline ML-DSA-87 Firmware Patcher Drawer */}
-                  {isPatchingThis && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-2 p-3.5 rounded-lg bg-reb-surface-code/95 border border-reb-mint/50 flex flex-col gap-2.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold text-reb-mint uppercase flex items-center gap-1.5">
-                          <Wrench className="w-3.5 h-3.5" />
-                          OEM ML-DSA-87 Monotonic Firmware Patcher ({part.serialNumber})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPatchingPartId(null);
-                            setPatchErrorMsg(null);
-                          }}
-                          className="font-mono text-[10px] text-reb-text-muted hover:text-reb-pink cursor-pointer"
-                        >
-                          CLOSE [X]
-                        </button>
-                      </div>
-
-                      {patchErrorMsg ? (
-                        <div className="p-2.5 rounded bg-reb-pink/20 border border-reb-pink text-reb-pink font-mono text-xs flex items-start gap-2">
-                          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                          <span>{patchErrorMsg}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div className="flex flex-col gap-1">
-                              <label className="font-mono text-[10px] text-reb-text-muted uppercase">
-                                Target Revision #{part.firmwareVersion + 1} Semver
-                              </label>
-                              <input
-                                type="text"
-                                value={patchSemver}
-                                onChange={(e) => setPatchSemver(e.target.value)}
-                                className="rounded bg-reb-surface border border-reb-border px-2.5 py-1.5 font-mono text-xs text-reb-mint focus:outline-none focus:border-reb-mint"
-                              />
-                            </div>
-                            <div className="sm:col-span-2 flex flex-col gap-1">
-                              <label className="font-mono text-[10px] text-reb-text-muted uppercase">
-                                Clinical / Telemetry Patch Notes
-                              </label>
-                              <input
-                                type="text"
-                                value={patchDescription}
-                                onChange={(e) => setPatchDescription(e.target.value)}
-                                className="rounded bg-reb-surface border border-reb-border px-2.5 py-1.5 font-mono text-xs text-reb-text-light focus:outline-none focus:border-reb-mint"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => void handleExecuteFirmwarePatch(part)}
-                              className="px-3.5 py-1.5 rounded-lg bg-reb-mint text-reb-bg font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 cursor-pointer flex items-center gap-1.5"
-                            >
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                              <span>Sign ML-DSA-87 &amp; Commit Revision #{part.firmwareVersion + 1}</span>
-                            </button>
-                          </div>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => onGrantTelemetryPassForPart(part)}
+                        className="px-2 py-1 rounded bg-reb-blue/25 border border-reb-blue/60 text-reb-periwinkle hover:bg-reb-blue hover:text-white font-mono text-[9px] font-bold uppercase flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <Key className="w-2.5 h-2.5" />
+                        <span>2h Pass</span>
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </article>
               );
             })}
           </div>
         </div>
+      </aside>
 
-        {/* ============================================================ */}
-        {/* RIGHT COLUMN (lg:col-span-3): IMMUTABLE AUDIT TRAIL          */}
-        {/* ============================================================ */}
-        <div className="lg:col-span-3 flex flex-col gap-6">
-          <div className="reb-glass rounded-xl p-5 flex flex-col gap-4">
-            <div className="flex items-start justify-between pb-2 border-b border-reb-border/60">
-              <div className="flex flex-col">
-                <span className="font-display text-sm font-bold uppercase tracking-wider text-reb-text-light">
+      {/* =================================================================== */}
+      {/* CENTER & RIGHT TACTICAL MAP CORRIDOR (lg:col-span-8)                */}
+      {/* =================================================================== */}
+      <div className="lg:col-span-8 min-h-[560px] flex flex-col justify-between pointer-events-none">
+        {/* Top Floating HBOM Telemetry Pill Bar */}
+        <div className="self-center flex flex-wrap items-center gap-2 pointer-events-auto">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-mint/30 font-mono text-[11px] text-reb-text-light shadow-lg">
+            <Cpu className="w-3.5 h-3.5 text-reb-mint" />
+            <span>
+              <strong className="text-reb-mint">{parts.length}</strong> HBOM Implants (
+              <span className="text-reb-mint">{activeCount} Active</span>)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-mint/30 font-mono text-[11px] text-reb-mint shadow-lg">
+            <ShieldCheck className="w-3.5 h-3.5 text-reb-mint" />
+            <span>100% SHAKE-256 Verified</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B100E]/75 backdrop-blur-md border border-reb-blue/50 font-mono text-[11px] text-reb-periwinkle shadow-lg">
+            <Lock className="w-3.5 h-3.5 text-reb-periwinkle" />
+            <span>NIST FIPS 204 ML-DSA-87 (4,627 B)</span>
+          </div>
+        </div>
+
+        {/* Open Center Map Space: leaves the central tactical GPS map corridor unobstructed */}
+        <div className="my-auto" />
+
+        {/* Bottom-Right Floating Glass Firmware Audit & Patcher Drawer */}
+        <div className="self-end w-full max-w-[520px] pointer-events-auto mt-auto bg-[#131B18]/65 backdrop-blur-md border border-reb-mint/35 rounded-xl p-4 sm:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.8)] relative overflow-hidden space-y-3">
+          {/* Top Gradient Bar */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-reb-blue via-reb-mint-bright to-reb-pink" />
+
+          {/* Drawer Header */}
+          <div className="flex items-start justify-between border-b border-reb-border/70 pb-2.5">
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse shadow-[0_0_8px_#A8F0C6]" />
+                <span className="font-display text-xs sm:text-sm font-bold uppercase tracking-wider text-reb-text-light truncate">
                   IMMUTABLE FIRMWARE &amp; CALIBRATION AUDIT
                 </span>
-                <span className="font-mono text-xs text-reb-mint mt-0.5">
-                  Target: {selectedPart?.modelName ?? 'NeuroLink-X9'} (
-                  {selectedPart?.serialNumber ?? 'SN-9042-NLX9'})
-                </span>
               </div>
+              <span className="font-mono text-[11px] text-reb-mint mt-0.5 truncate">
+                Target: {selectedPart?.modelName ?? 'NeuroLink-X9'} (
+                {selectedPart?.serialNumber ?? 'SN-9042-NLX9'}) • Cal:{' '}
+                {selectedPart ? `${selectedPart.calibrationScorePct.toFixed(2)}%` : '99.95%'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {selectedPart && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenPatcher(selectedPart)}
+                  className="px-2 py-1 rounded bg-reb-mint/20 border border-reb-mint/50 text-reb-mint hover:bg-reb-mint hover:text-reb-bg font-mono text-[10px] font-bold uppercase transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <Wrench className="w-3 h-3" />
+                  <span>Patch</span>
+                </button>
+              )}
               <HeartPulse className="w-4 h-4 text-reb-mint shrink-0" />
             </div>
+          </div>
 
-            <p className="text-xs text-reb-text-muted">
-              Monotonically increasing firmware history anchored on QoreChain Diana L1 with
-              SHAKE-256 digests and NIST FIPS 204 ML-DSA-87 OEM attestations.
-            </p>
+          {/* Inline ML-DSA-87 Firmware Patcher Form (if open for selectedPart or any active patching target) */}
+          {selectedPart && patchingPartId === selectedPart.partId && (
+            <div className="p-3 rounded-lg bg-reb-surface-code/95 border border-reb-mint/50 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[11px] font-bold text-reb-mint uppercase flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5" />
+                  OEM ML-DSA-87 Firmware Patcher ({selectedPart.serialNumber})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPatchingPartId(null);
+                    setPatchErrorMsg(null);
+                  }}
+                  className="font-mono text-[10px] text-reb-text-muted hover:text-reb-pink cursor-pointer"
+                >
+                  CLOSE [X]
+                </button>
+              </div>
 
-            {/* Vertical Monotonic Timeline */}
-            <div className="relative pl-5 flex flex-col gap-4 my-1">
-              <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-reb-border" />
-
-              {firmwareHistory.map((item, idx) => {
-                const isLatest = idx === 0;
-                const isCopied = copiedHash === item.firmwareHash;
-
-                return (
-                  <div key={`${item.version}-${item.blockNumber}-${idx}`} className="relative flex flex-col gap-1.5">
-                    <span
-                      className={`absolute -left-5 top-1.5 w-2.5 h-2.5 rounded-full ${
-                        isLatest
-                          ? 'bg-reb-mint shadow-[0_0_8px_#A8F0C6]'
-                          : 'bg-reb-blue'
-                      }`}
-                    />
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span
-                        className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold uppercase ${
-                          isLatest
-                            ? 'bg-reb-mint/20 text-reb-mint border border-reb-mint/40'
-                            : 'bg-reb-surface-code text-reb-text-muted border border-reb-border'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                      <span className="font-mono text-[10px] text-reb-text-muted">
-                        Block #{item.blockNumber.toLocaleString()}
-                      </span>
+              {patchErrorMsg ? (
+                <div className="p-2 rounded bg-reb-pink/20 border border-reb-pink text-reb-pink font-mono text-[11px] flex items-start gap-2">
+                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{patchErrorMsg}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="flex flex-col gap-0.5">
+                      <label className="font-mono text-[9px] text-reb-text-muted uppercase">
+                        Rev #{selectedPart.firmwareVersion + 1} Semver
+                      </label>
+                      <input
+                        type="text"
+                        value={patchSemver}
+                        onChange={(e) => setPatchSemver(e.target.value)}
+                        className="rounded bg-reb-surface border border-reb-border px-2 py-1 font-mono text-[11px] text-reb-mint focus:outline-none focus:border-reb-mint"
+                      />
                     </div>
-
-                    <div className="p-3 rounded-lg bg-reb-surface-code/85 border border-reb-border/70 flex flex-col gap-1.5 font-mono text-[11px]">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-reb-text-muted uppercase">
-                          SHAKE-256 Digest:
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyHash(item.firmwareHash)}
-                          className="text-reb-mint hover:underline flex items-center gap-1 cursor-pointer"
-                          title="Copy SHAKE-256 Digest"
-                        >
-                          <span>
-                            {item.firmwareHash.slice(0, 10)}...{item.firmwareHash.slice(-6)}
-                          </span>
-                          <Copy className="w-3 h-3" />
-                          {isCopied && (
-                            <span className="text-[9px] text-reb-yellow font-bold">
-                              COPIED
-                            </span>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-reb-text-muted uppercase">
-                          Attestation:
-                        </span>
-                        <span className="text-reb-mint font-bold text-[10px]">
-                          ML-DSA-87 (FIPS 204) VERIFIED
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-reb-text-muted uppercase">
-                          OEM Signer:
-                        </span>
-                        <span className="text-reb-periwinkle text-[10px]">
-                          {item.signerAddress.slice(0, 8)}...{item.signerAddress.slice(-6)}
-                        </span>
-                      </div>
-
-                      <p className="font-sans text-[11px] text-reb-text-muted pt-1 border-t border-reb-border/50">
-                        {item.description}
-                      </p>
+                    <div className="sm:col-span-2 flex flex-col gap-0.5">
+                      <label className="font-mono text-[9px] text-reb-text-muted uppercase">
+                        Clinical / Telemetry Patch Notes
+                      </label>
+                      <input
+                        type="text"
+                        value={patchDescription}
+                        onChange={(e) => setPatchDescription(e.target.value)}
+                        className="rounded bg-reb-surface border border-reb-border px-2 py-1 font-mono text-[11px] text-reb-text-light focus:outline-none focus:border-reb-mint"
+                      />
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void handleExecuteFirmwarePatch(selectedPart)}
+                      className="px-3 py-1.5 rounded-lg bg-reb-mint text-reb-bg font-mono text-[10px] font-bold uppercase tracking-wider hover:brightness-110 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>
+                        Sign ML-DSA-87 &amp; Commit Rev #{selectedPart.firmwareVersion + 1}
+                      </span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+          )}
 
-            {/* Export Full HBOM Merkle Proof (JSON-LD) Button */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-reb-border/60">
+          {/* Compact Monotonic Firmware Audit Timeline */}
+          <div className="max-h-[170px] overflow-y-auto pr-1 space-y-2.5 relative pl-4">
+            <div className="absolute left-1.5 top-1.5 bottom-1.5 w-0.5 bg-reb-border" />
+            {firmwareHistory.map((item, idx) => {
+              const isLatest = idx === 0;
+              const isCopied = copiedHash === item.firmwareHash;
+
+              return (
+                <div
+                  key={`${item.version}-${item.blockNumber}-${idx}`}
+                  className="relative flex flex-col gap-1"
+                >
+                  <span
+                    className={`absolute -left-4 top-1.5 w-2 h-2 rounded-full ${
+                      isLatest ? 'bg-reb-mint shadow-[0_0_8px_#A8F0C6]' : 'bg-reb-blue'
+                    }`}
+                  />
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span
+                      className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
+                        isLatest
+                          ? 'bg-reb-mint/20 text-reb-mint border border-reb-mint/40'
+                          : 'bg-reb-surface-code text-reb-text-muted border border-reb-border'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                    <span className="font-mono text-[9px] text-reb-text-muted">
+                      Block #{item.blockNumber.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-reb-surface-code/85 border border-reb-border/70 flex flex-col gap-1 font-mono text-[10px]">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyHash(item.firmwareHash)}
+                        className="px-1.5 py-0.5 rounded bg-reb-mint/10 text-reb-mint hover:bg-reb-mint/20 flex items-center gap-1 cursor-pointer"
+                        title="Copy SHAKE-256 Digest"
+                      >
+                        <span>
+                          SHAKE-256: {item.firmwareHash.slice(0, 10)}...
+                          {item.firmwareHash.slice(-6)}
+                        </span>
+                        <Copy className="w-2.5 h-2.5" />
+                        {isCopied && (
+                          <span className="text-[8px] text-reb-yellow font-bold">COPIED</span>
+                        )}
+                      </button>
+                      <span className="text-reb-mint font-bold text-[9px]">
+                        ML-DSA-87 VERIFIED
+                      </span>
+                    </div>
+                    <p className="font-sans text-[10px] text-reb-text-muted leading-snug">
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Export HBOM Merkle Proof (JSON-LD) & Live Diana Stream */}
+          <div className="pt-2 border-t border-reb-border/60 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-mono text-[10px] text-reb-text-muted truncate">
+                <Terminal className="w-3.5 h-3.5 text-reb-mint shrink-0" />
+                <span className="truncate">
+                  [L1:9800] PK ({oemDsaKeyPair.publicKey.length}B) Armed
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={handleExportMerkleProof}
-                className="w-full py-2.5 px-3 rounded-lg bg-reb-mint text-reb-bg font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_16px_rgba(168,240,198,0.25)]"
+                className="px-3 py-1.5 rounded-lg bg-reb-mint text-reb-bg font-mono text-[10px] font-bold uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_14px_rgba(168,240,198,0.25)] shrink-0"
               >
-                <Download className="w-4 h-4" />
-                <span>Export Full HBOM Merkle Proof (JSON-LD)</span>
+                <Download className="w-3.5 h-3.5" />
+                <span>Export HBOM Merkle Proof (JSON-LD)</span>
               </button>
-
-              {jsonLdPreview && (
-                <div className="mt-2 p-3 rounded-lg bg-reb-surface-code/95 border border-reb-mint/40 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-bold text-reb-mint uppercase flex items-center gap-1">
-                      <FileJson className="w-3.5 h-3.5" />
-                      JSON-LD HBOM MERKLE ATTESTATION
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setJsonLdPreview(null)}
-                      className="font-mono text-[10px] text-reb-text-muted hover:text-reb-pink cursor-pointer"
-                    >
-                      HIDE
-                    </button>
-                  </div>
-                  <pre className="font-mono text-[10px] text-reb-text-light overflow-x-auto max-h-48 leading-relaxed">
-                    {jsonLdPreview}
-                  </pre>
-                </div>
-              )}
             </div>
 
-            {/* Live Diana L1 HBOM Event Stream */}
-            <div className="p-3 rounded-lg bg-reb-surface-code/90 border border-reb-border/70 font-mono text-[11px] flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-reb-text-muted pb-1 border-b border-reb-border/50">
-                <div className="flex items-center gap-1.5">
-                  <Terminal className="w-3.5 h-3.5 text-reb-mint" />
-                  <span className="uppercase tracking-wider text-[10px] font-bold text-reb-text-light">
-                    DIANA L1 HBOM EVENT STREAM
+            {jsonLdPreview && (
+              <div className="p-2.5 rounded-lg bg-reb-surface-code/95 border border-reb-mint/40 flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] font-bold text-reb-mint uppercase flex items-center gap-1">
+                    <FileJson className="w-3 h-3" />
+                    JSON-LD HBOM MERKLE ATTESTATION
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setJsonLdPreview(null)}
+                    className="font-mono text-[9px] text-reb-text-muted hover:text-reb-pink cursor-pointer"
+                  >
+                    HIDE
+                  </button>
                 </div>
-                <Eye className="w-3.5 h-3.5 text-reb-mint" />
+                <pre className="font-mono text-[9px] text-reb-text-light overflow-x-auto max-h-32 leading-relaxed">
+                  {jsonLdPreview}
+                </pre>
               </div>
-              <div className="text-reb-mint truncate">
-                [L1:9800] HBOM_ATTEST_OK: {selectedPart?.serialNumber ?? 'SN-9042-NLX9'}
-              </div>
-              <div className="text-reb-periwinkle truncate">
-                [FIPS-204] ML-DSA-87 Enclave PK ({oemDsaKeyPair.publicKey.length}B) Armed
-              </div>
-              <div className="text-reb-yellow truncate">
-                [MONOTONIC] Version #{selectedPart?.firmwareVersion ?? 2} Root Anchored
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
