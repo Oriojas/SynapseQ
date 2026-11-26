@@ -53,8 +53,9 @@ Los hallazgos de las secciones 3 a 5 se corrigieron en la misma rama, **sin comm
 - **`registerKemPublicKey` cuesta ~1.16M de gas**, porque guarda la clave de 1568 bytes. El registro nativo de QoreChain lo resolvería.
 - **La EVM no verifica ML-DSA-87.** La firma se guarda como hash, la firma completa va en un evento y la verificación es fuera de la cadena. Si eligen *Post-Quantum dApp*, deberían usar `pqcVerify`.
 - **El gateway es un custodio de confianza:** un solo proceso, almacén en JSON, límites en memoria que se reinician con cada arranque. Sirve para el hackathon, no para producción.
-- **El Portal Especialista solo ve los pases creados en la misma sesión del navegador.** Falta cargarlos de `getGrantsBySpecialist`.
-- **No se probó** con QoreX ni MetaMask reales, ni en Diana: la wallet fue simulada sobre Anvil. Tampoco se ejecutaron los nuevos jobs de CI en GitHub.
+- **✅ RESUELTO (PR #7): Bandeja On-Chain del Especialista (`getGrantsBySpecialist`).** El Portal Especialista ahora sincroniza automáticamente los pases otorgados a la wallet conectada directamente desde el contrato en QoreChain (`refreshSpecialistGrants` en `App.tsx`).
+- **✅ RESUELTO: Interfaz Minimalista Map-First Tactical HUD (Paleta Rebecca Glass).** Las 3 vistas (*Patient Vault*, *Cyber-Human HBOM* y *Specialist Portal*) fueron rediseñadas desde Stitch MCP con un riel lateral flotante, corredor central de mapa táctico GPS despejado y cajón flotante inferior derecho.
+- **No se probó** con QoreX ni MetaMask reales en Diana Testnet aún: la wallet fue simulada sobre Anvil local (`Chain ID 9800`).
 - **La revocación no recupera** lo que el especialista ya descifró. Está documentado en la interfaz y en el README.
 
 ---
