@@ -12,7 +12,7 @@ FOUNDRY_PATH := $(HOME)/.foundry/bin
 export PATH := $(FOUNDRY_PATH):$(PATH)
 
 .DEFAULT_GOAL := help
-.PHONY: help build init down lint audit test test-contracts test-sdk test-gateway test-front demo oem-status deploy-local dev-pqc-mock deploy-diana clean
+.PHONY: help build init down lint audit test test-contracts test-sdk test-gateway test-front test-quantum cbom demo oem-status deploy-local dev-pqc-mock deploy-diana clean
 
 # Dirección del último despliegue local (leída del broadcast de Foundry)
 VAULT_ADDR_CMD = grep -m1 -o '"contractAddress": *"0x[0-9a-fA-F]*"' contracts/broadcast/DeploySynapseVault.s.sol/$${QORECHAIN_CHAIN_ID:-9800}/run-latest.json | grep -o '0x[0-9a-fA-F]*'
@@ -101,9 +101,10 @@ init: ## 🚀 Levantar el stack local (Anvil QoreChain 9800 :8545 · Deploy Syna
 	  exit 1; \
 	fi; \
 	echo "✅ Stack SynapseQ arriba:"; \
-	echo "   Frontend Bio-HUD → http://localhost:$$FRONTEND_PORT"; \
-	echo "   Gateway          → http://127.0.0.1:$$GATEWAY_PORT"; \
-	echo "   Anvil EVM (9800) → $$LOCAL_RPC_URL"; \
+	echo "   Cinematic Landing → http://localhost:$$FRONTEND_PORT/"; \
+	echo "   Tactical Bio-HUD  → http://localhost:$$FRONTEND_PORT/app.html"; \
+	echo "   Gateway           → http://127.0.0.1:$$GATEWAY_PORT"; \
+	echo "   Anvil EVM (9800)  → $$LOCAL_RPC_URL"; \
 	echo ""; \
 	echo "   Logs:  tail -f $(ANVIL_LOG)"; \
 	echo "          tail -f $(GATEWAY_LOG)"; \
@@ -163,9 +164,16 @@ test-contracts: ## ⛓️  Smart Contracts: tests unitarios, timelocks, Kill-Swi
 	@echo "→ Ejecutando suite de tests en Foundry (forge test -vvv)..."
 	@cd contracts && forge test -vvv
 
-test-sdk: ## 🔐 SDK Post-Cuántico: validación de tipos y linting sobre ML-KEM-1024, ML-DSA-87, SHAKE-256 y StorageRouter
-	@echo "→ Verificando SDK Post-Cuántico..."
-	@cd sdk && npm run typecheck && npm run lint
+test-sdk: ## 🔐 SDK Post-Cuántico: validación de tipos, linting y simulación anti-cuántica (ML-KEM-1024 + ML-DSA-87 + SHAKE-256 + StorageRouter)
+	@echo "→ Verificando SDK Post-Cuántico y simulación de defensa Q-Day..."
+	@cd sdk && npm run typecheck && npm run lint && npm run test:quantum-defense
+
+test-quantum: ## 🛡️ Ejecutar simulación de 5 vectores de ataque post-cuántico (HNDL, Tampering, SHAKE-256, ML-DSA-87, x/rdk)
+	@cd sdk && npm run test:quantum-defense
+
+cbom: ## 📋 Auditar y validar el reporte CycloneDX CBOM v1.6 (cbom-report.json)
+	@echo "→ Verificando reporte CycloneDX CBOM v1.6 (cbom-report.json)..."
+	@node -e 'const fs=require("fs"); const b=JSON.parse(fs.readFileSync("cbom-report.json","utf8")); console.log("   ✅ CBOM Formato:", b.bomFormat, "v"+b.specVersion, "| Activos PQC:", b.components.map(c=>c.name).join(", "));'
 
 test-gateway: ## 🛡️  Gateway: firma de wallet, release condicionado, tokens de descarga, cuotas, CORS y crypto-shredding
 	@echo "→ Ejecutando tests del Key-Release Gateway..."
@@ -187,7 +195,7 @@ deploy-local: ## 📦 Desplegar SynapseVaultRegistry.sol en el nodo Anvil local 
 	@$(ENV_EXPORTS) && \
 	  anvil_key="$${DEPLOYER_PRIVATE_KEY}"; \
 	  if [ -z "$$anvil_key" ] || echo "$$anvil_key" | grep -q '<'; then \
-	    anvil_key=$$(grep -m 1 -A 2 "Private Keys" $(ANVIL_LOG) 2>/dev/null | tail -n 1 | awk '{print $$2}'); \
+	    anvil_key=$$(grep -A 5 "Private Keys" $(ANVIL_LOG) 2>/dev/null | grep -m 1 "(0)" | awk '{print $$2}'); \
 	  fi; \
 	  if [ -z "$$anvil_key" ]; then \
 	    echo "❌ No se detectó DEPLOYER_PRIVATE_KEY en .env ni un nodo Anvil activo en $(ANVIL_LOG)."; exit 1; \

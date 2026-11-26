@@ -79,6 +79,12 @@ type WritableFunction =
   | 'logFirmwareUpdate'
   | 'updatePartStatus';
 
+import { detectDappLocale } from '@/i18n/context';
+
+function bi(en: string, es: string): string {
+  return detectDappLocale() === 'es' ? es : en;
+}
+
 /** Turns viem errors into a short, user-readable message (custom error name when available). */
 export function describeTxError(err: unknown, contract?: string): string {
   // QoreChain EVM-lane refusals (no ML-DSA key / no window / exhausted / bad bounds) come first
@@ -87,7 +93,8 @@ export function describeTxError(err: unknown, contract?: string): string {
   if (err instanceof BaseError) {
     const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
     if (revert instanceof ContractFunctionRevertedError) {
-      return `La transacción revertiría: ${revert.data?.errorName ?? revert.reason ?? 'revert'}`;
+      const reason = revert.data?.errorName ?? revert.reason ?? 'revert';
+      return bi(`Transaction would revert: ${reason}`, `La transacción revertiría: ${reason}`);
     }
     return err.shortMessage;
   }
@@ -159,10 +166,15 @@ export function useSynapseVault() {
 
   const getWalletClient = useCallback(async () => {
     if (typeof window === 'undefined' || !window.ethereum) {
-      throw new Error('No hay wallet Web3 disponible (instala QoreX Wallet o MetaMask).');
+      throw new Error(
+        bi(
+          'No Web3 wallet detected (install QoreX Wallet or MetaMask).',
+          'No hay wallet Web3 disponible (instala QoreX Wallet o MetaMask).'
+        )
+      );
     }
     const account = walletAddress ?? (await connectWallet());
-    if (!account) throw new Error('Wallet no conectada.');
+    if (!account) throw new Error(bi('Wallet not connected.', 'Wallet no conectada.'));
     return {
       account,
       client: createWalletClient({ account, chain, transport: custom(window.ethereum) }),
@@ -222,8 +234,14 @@ export function useSynapseVault() {
       args: readonly unknown[],
       label: string
     ): Promise<TxResult<T>> => {
-      if (!contractAddress) throw new Error('VITE_SYNAPSE_VAULT_ADDRESS no está configurada.');
-      if (!publicClient) throw new Error('No hay RPC configurado (VITE_QORECHAIN_RPC_URL).');
+      if (!contractAddress)
+        throw new Error(
+          bi('VITE_SYNAPSE_VAULT_ADDRESS is not configured.', 'VITE_SYNAPSE_VAULT_ADDRESS no está configurada.')
+        );
+      if (!publicClient)
+        throw new Error(
+          bi('No RPC configured (VITE_QORECHAIN_RPC_URL).', 'No hay RPC configurado (VITE_QORECHAIN_RPC_URL).')
+        );
       const wallet = await getWalletClient();
       // Bounded EVM window: refuse early (no wallet prompt) if the window cannot admit this call
       const win = evmWindowEnforced ? await refreshEvmWindow() : null;
@@ -253,7 +271,12 @@ export function useSynapseVault() {
         }
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         if (receipt.status !== 'success') {
-          throw new Error(`La transacción ${label} revirtió on-chain (tx ${hash.slice(0, 12)}…)`);
+          throw new Error(
+            bi(
+              `Transaction ${label} reverted on-chain (tx ${hash.slice(0, 12)}…)`,
+              `La transacción ${label} revirtió on-chain (tx ${hash.slice(0, 12)}…)`
+            )
+          );
         }
         setTxHistory((prev) => [
           { txHash: hash, action: label, blockNumber: receipt.blockNumber, gasUsed: receipt.gasUsed, timestamp: Date.now() },
@@ -298,7 +321,8 @@ export function useSynapseVault() {
 
   const getGrantMetadata = useCallback(
     async (recordId: `0x${string}`): Promise<OnChainGrantMetadata> => {
-      if (!contractAddress || !publicClient) throw new Error('Cadena no configurada.');
+      if (!contractAddress || !publicClient)
+        throw new Error(bi('Chain not configured.', 'Cadena no configurada.'));
       return publicClient.readContract({
         address: contractAddress,
         abi: SYNAPSE_VAULT_ABI,
@@ -317,7 +341,8 @@ export function useSynapseVault() {
    */
   const getGrantsForSpecialist = useCallback(
     async (specialist: Address): Promise<SpecialistGrantsResult> => {
-      if (!contractAddress || !publicClient) throw new Error('Cadena no configurada.');
+      if (!contractAddress || !publicClient)
+        throw new Error(bi('Chain not configured.', 'Cadena no configurada.'));
       const ids = await publicClient.readContract({
         address: contractAddress,
         abi: SYNAPSE_VAULT_ABI,

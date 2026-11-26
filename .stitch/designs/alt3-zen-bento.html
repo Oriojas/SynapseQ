@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_standard" name="shell-type"/>
+<title>Specialist Portal (Zen Bento Grid) - SynapseQ</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "reb-bg": "#0B100E",
+            "reb-surface": "#131B18",
+            "reb-surface-card": "#17221E",
+            "reb-surface-code": "#0E1513",
+            "reb-border": "#23332C",
+            "reb-border-subtle": "#1B2822",
+            "reb-mint": "#A8F0C6",
+            "reb-mint-bright": "#5EEAD4",
+            "reb-pink": "#F4729B",
+            "reb-crimson": "#E14D79",
+            "reb-blue": "#3B66E8",
+            "reb-periwinkle": "#60A5FA",
+            "reb-yellow": "#FACC15",
+            "reb-text-light": "#F1F5F9",
+            "reb-text-muted": "#86A798",
+            "reb-text-dim": "#5B7569"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"],
+            display: ["Space Grotesk", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #0B100E;
+        color: #F1F5F9;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-reb-bg text-reb-text-light antialiased min-h-screen selection:bg-reb-mint selection:text-reb-bg flex flex-col justify-between">
+<!-- BACKGROUND: Expansive dark obsidian charcoal-green background with subtle, airy GPS map layer (25% opacity) -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none">
+<svg class="w-full h-full opacity-25" preserveaspectratio="xMidYMid slice" viewbox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<pattern height="60" id="zen-gps-grid" patternunits="userSpaceOnUse" width="60">
+<path d="M 60 0 L 0 0 0 60" fill="none" stroke="#23332C" stroke-opacity="0.4" stroke-width="0.75"></path>
+<circle cx="30" cy="30" fill="#5EEAD4" fill-opacity="0.25" r="0.75"></circle>
+</pattern>
+<lineargradient id="zen-nav-glow" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#3B66E8" stop-opacity="0.8"></stop>
+<stop offset="50%" stop-color="#5EEAD4" stop-opacity="0.9"></stop>
+<stop offset="100%" stop-color="#F4729B" stop-opacity="0.8"></stop>
+</lineargradient>
+</defs>
+<rect fill="#0B100E" height="100%" width="100%"></rect>
+<rect fill="url(#zen-gps-grid)" height="100%" width="100%"></rect>
+<!-- Topographic Contours -->
+<g fill="none" stroke="#A8F0C6" stroke-linecap="round" stroke-opacity="0.3" stroke-width="1.2">
+<path d="M -100 240 C 350 200, 680 340, 1150 290 S 1680 180, 2040 230"></path>
+<path d="M -100 420 C 300 370, 720 500, 1220 450 S 1720 330, 2040 390"></path>
+<path d="M -100 600 C 320 570, 760 710, 1280 640 S 1750 510, 2040 570" stroke-dasharray="6 4"></path>
+<path d="M -100 780 C 360 740, 800 890, 1340 820 S 1800 710, 2040 760"></path>
+</g>
+<!-- Radar Rings -->
+<g fill="none" stroke="#A8F0C6" stroke-opacity="0.25" transform="translate(960, 540)">
+<circle r="180" stroke-dasharray="4 4" stroke-width="1"></circle>
+<circle r="340" stroke-width="1"></circle>
+<circle r="520" stroke-dasharray="6 6" stroke-width="1"></circle>
+<line stroke-opacity="0.2" stroke-width="1" x1="-600" x2="600" y1="0" y2="0"></line>
+<line stroke-opacity="0.2" stroke-width="1" x1="0" x2="0" y1="-600" y2="600"></line>
+</g>
+<!-- Navigation Path & Waypoints -->
+<path d="M 420 360 Q 780 440 1080 520 T 1520 680" fill="none" stroke="url(#zen-nav-glow)" stroke-dasharray="8 6" stroke-width="2.5"></path>
+<g transform="translate(420, 360)">
+<circle fill="none" r="28" stroke="#A8F0C6" stroke-opacity="0.5" stroke-width="1.2"></circle>
+<circle fill="#A8F0C6" r="6"></circle>
+<circle fill="#0B100E" r="2.5"></circle>
+</g>
+<g transform="translate(1520, 680)">
+<circle fill="none" r="32" stroke="#F4729B" stroke-dasharray="4 4" stroke-opacity="0.5" stroke-width="1.2"></circle>
+<circle fill="#F4729B" r="6"></circle>
+<circle fill="#0B100E" r="2.5"></circle>
+</g>
+</svg>
+</div>
+<!-- TOP HEADER: Clean minimalist navbar -->
+<header class="sticky top-0 z-50 w-full bg-[#0B100E]/80 backdrop-blur-xl border-b border-reb-border/60">
+<div class="max-w-5xl mx-auto h-16 px-6 flex items-center justify-between gap-6">
+<!-- Brand & 3 Navigation Links -->
+<div class="flex items-center gap-8">
+<a class="flex items-center gap-3 group" href="#">
+<div class="w-7 h-7 rounded-md bg-[#131B18] border border-reb-border/80 flex items-center justify-center relative overflow-hidden group-hover:border-reb-mint transition-colors">
+<span class="w-2 h-2 rounded-full bg-reb-mint shadow-[0_0_8px_#A8F0C6] animate-pulse"></span>
+<div class="absolute -right-0.5 -bottom-0.5 w-1.5 h-1.5 rounded-full bg-reb-pink"></div>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-display font-bold text-base tracking-tight text-reb-text-light">Synapse<span class="text-reb-mint">Q</span></span>
+<span class="w-1.5 h-1.5 rounded-full bg-reb-pink"></span>
+</div>
+</a>
+<nav class="hidden sm:flex items-center gap-1">
+<a class="px-3 py-1.5 rounded-md font-mono text-xs uppercase tracking-wider text-reb-text-muted hover:text-reb-text-light hover:bg-[#131B18]/60 transition-all" href="#">
+          Patient Vault
+        </a>
+<a class="px-3 py-1.5 rounded-md font-mono text-xs uppercase tracking-wider text-reb-text-muted hover:text-reb-text-light hover:bg-[#131B18]/60 transition-all" href="#">
+          Cyber-Human HBOM
+        </a>
+<a class="relative px-3 py-1.5 rounded-md font-mono text-xs uppercase tracking-wider text-reb-mint font-semibold bg-[#131B18] border border-[#A8F0C6]/25" href="#">
+          Specialist Portal
+          <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] bg-reb-mint rounded-full shadow-[0_0_6px_#A8F0C6]"></span>
+</a>
+</nav>
+</div>
+<!-- Right: Network & Connected Wallet Pill -->
+<div class="flex items-center gap-3">
+<div class="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#131B18]/70 border border-reb-border/60 text-reb-text-muted font-mono text-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-reb-mint shadow-[0_0_6px_#A8F0C6]"></span>
+<span class="text-reb-text-light">Diana</span>
+<span class="text-reb-text-dim">[9800]</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-[#131B18]/70 border border-reb-border/60 font-mono text-xs text-reb-text-muted">
+<span class="text-reb-mint font-medium">0x71c...b9F4</span>
+<span class="px-1.5 py-0.2 rounded bg-[#17221E] text-[10px] text-reb-mint font-semibold">ML-KEM</span>
+</div>
+<div class="relative">
+<img alt="Specialist Avatar" class="w-7 h-7 rounded-full object-cover ring-1 ring-reb-mint/60" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvr02ogN3l-24HYsZHui2eW8M9f0tSMRtmV4CDQw82ss2fY6-sIlZUJ3YmWrkPA9rHAGScAiaLmip5RSmXljYrZIEjzvzVlzAvSRT1eE9ihPex9efn7mVuaBBVbf9_QGwaydzvO23mYukbMfrSh6UMN0PeQy0XSDpdl7dw53QcThQXRdCI1RVUvqrog3Vj-jpIgScshrdVASen_ZTp9JMu5_Dc6n55aQy0mTQZvtj7oLsJqKj2AwTUQGyT22eK"/>
+<span class="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-reb-mint ring-1 ring-reb-bg"></span>
+</div>
+</div>
+</div>
+</header>
+<!-- MAIN WORKSPACE: Centered 3-Tile Bento Grid -->
+<main class="w-full max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6 flex-1 relative z-10 justify-center">
+<!-- ========================================================
+       TILE 1: Top Wide Strip (Ultra-clean 1-line ML-KEM-1024 PKI status bar)
+       ======================================================== -->
+<section class="w-full bg-[#131B18]/30 backdrop-blur-sm border border-[#A8F0C6]/20 rounded-xl p-3.5 sm:px-5 flex flex-wrap items-center justify-between gap-4 transition-all hover:border-[#A8F0C6]/30 shadow-lg">
+<div class="flex items-center gap-3.5 min-w-0 flex-wrap">
+<div class="w-8 h-8 rounded-lg bg-[#17221E]/60 border border-[#A8F0C6]/30 flex items-center justify-center flex-shrink-0 text-reb-mint">
+<span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
+</div>
+<div class="flex items-center gap-2.5 flex-wrap">
+<span class="font-display font-semibold text-sm text-reb-text-light tracking-tight">ML-KEM-1024</span>
+<span class="font-mono text-[11px] text-reb-text-muted hidden md:inline">(1,568 B • NIST PQC Cat 5)</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#131B18]/80 border border-[#A8F0C6]/35 text-reb-mint font-mono text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse"></span>
+          LATTICE ACTIVE
+        </span>
+</div>
+<!-- Monospace Key Preview Pill -->
+<button class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#0E1513]/70 hover:bg-[#0E1513] border border-reb-border hover:border-[#A8F0C6]/40 transition-all font-mono text-xs text-reb-mint group" onclick="navigator.clipboard.writeText('kem1q0w4e892c90fa41189c4a899bc27e0fa88c7f91'); this.innerText='COPIED!';">
+<span class="truncate max-w-[200px] sm:max-w-[260px]">kem1q0w4e892c90fa41189...88c7f91</span>
+<span class="material-symbols-outlined text-xs text-reb-text-dim group-hover:text-reb-mint transition-colors">content_copy</span>
+</button>
+<span class="font-mono text-xs text-reb-text-dim hidden lg:inline">Diana #9800</span>
+</div>
+<!-- Pastel Mint CTA Button -->
+<button class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-reb-mint hover:bg-reb-mint-bright text-reb-bg font-mono text-xs font-bold tracking-wider transition-all shadow-[0_0_14px_rgba(168,240,198,0.25)] active:scale-95 whitespace-nowrap ml-auto">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
+      PUBLISH KEY ON-CHAIN
+    </button>
+</section>
+<!-- ========================================================
+       TILE 2: Middle Wide Bento Panel (Horizontal 3-card pass carousel/row)
+       ======================================================== -->
+<section class="w-full bg-[#131B18]/30 backdrop-blur-sm border border-[#A8F0C6]/20 rounded-xl p-5 flex flex-col gap-4 shadow-lg">
+<!-- Header of Tile 2 -->
+<div class="flex items-center justify-between border-b border-reb-border/40 pb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-reb-mint text-base">folder_shared</span>
+<h2 class="font-display font-semibold text-sm tracking-wide text-reb-text-light uppercase">Assigned Telemetry Grants</h2>
+</div>
+<div class="flex items-center gap-1.5 font-mono text-[11px] text-reb-text-muted">
+<span class="px-2 py-0.5 rounded bg-[#17221E] text-reb-mint font-semibold border border-[#A8F0C6]/30">Active: 2</span>
+<span class="px-2 py-0.5 rounded bg-[#17221E]/50 text-reb-pink border border-reb-pink/20">Revoked: 1</span>
+</div>
+</div>
+<!-- 3-Card Bento Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+<!-- Card 1: Pass #EQ-9042 (Bionic Telemetry in #3B66E8 with #FACC15 timer) -->
+<div class="rounded-xl bg-[#17221E]/40 border-2 border-reb-mint/80 p-4 flex flex-col justify-between gap-3 shadow-[0_0_18px_rgba(168,240,198,0.08)] relative group">
+<div class="flex flex-col gap-2.5">
+<div class="flex items-center justify-between gap-1">
+<span class="px-2 py-0.5 rounded bg-[#3B66E8]/20 border border-[#3B66E8]/60 text-[#60A5FA] font-mono text-[10px] font-bold uppercase tracking-wider">
+              BIONIC_TELEMETRY
+            </span>
+<div class="flex items-center gap-1 text-reb-yellow font-mono text-xs font-semibold">
+<span class="material-symbols-outlined text-xs">timer</span>
+              00:43:18
+            </div>
+</div>
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-display font-bold text-sm text-reb-text-light group-hover:text-reb-mint transition-colors">NeuroLink-X9 BCI</h3>
+<span class="font-mono text-xs text-reb-mint font-medium">#EQ-9042</span>
+</div>
+<p class="font-sans text-xs text-reb-text-muted mt-1">AnonPatient-0x94B • 64 Ch Sync</p>
+</div>
+<div class="flex items-center justify-between py-1 px-2.5 rounded bg-[#0E1513]/60 border border-reb-border text-[11px] font-mono">
+<span class="flex items-center gap-1.5 text-reb-mint">
+<span class="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse"></span>
+              RAM Stream Live
+            </span>
+<span class="text-reb-text-dim">Sec-09 // 2.4km</span>
+</div>
+</div>
+<button class="w-full py-2 px-3 rounded-lg bg-reb-mint hover:bg-reb-mint-bright text-reb-bg font-mono text-xs font-bold tracking-wider uppercase transition-all shadow-[0_0_10px_rgba(168,240,198,0.2)] flex items-center justify-center gap-1.5 active:scale-95">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'FILL' 1;">lock_open</span>
+          UNSEAL IN MEMORY
+        </button>
+</div>
+<!-- Card 2: Pass #EQ-8819 (Clinical DICOM with 01:14:52) -->
+<div class="rounded-xl bg-[#17221E]/20 border border-[#A8F0C6]/25 p-4 flex flex-col justify-between gap-3 hover:border-[#A8F0C6]/50 transition-all">
+<div class="flex flex-col gap-2.5">
+<div class="flex items-center justify-between gap-1">
+<span class="px-2 py-0.5 rounded bg-[#17221E]/80 border border-[#A8F0C6]/40 text-reb-mint font-mono text-[10px] font-bold uppercase tracking-wider">
+              CLINICAL_DICOM
+            </span>
+<div class="flex items-center gap-1 text-reb-yellow font-mono text-xs font-semibold">
+<span class="material-symbols-outlined text-xs">timer</span>
+              01:14:52
+            </div>
+</div>
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-display font-semibold text-sm text-reb-text-light truncate max-w-[170px]">Cranial CT &amp; Mesh Vol. 3</h3>
+<span class="font-mono text-xs text-reb-text-muted font-medium">#EQ-8819</span>
+</div>
+<p class="font-sans text-xs text-reb-text-muted mt-1">AnonPatient-0x12A • 420MB Voxel</p>
+</div>
+<div class="flex items-center justify-between py-1 px-2.5 rounded bg-[#0E1513]/60 border border-reb-border text-[11px] font-mono">
+<span class="text-reb-text-muted">Enclave Buffer 4</span>
+<span class="text-reb-text-dim">1.8 km</span>
+</div>
+</div>
+<button class="w-full py-2 px-3 rounded-lg bg-[#17221E]/60 hover:bg-[#1B2640] border border-[#A8F0C6]/40 hover:border-reb-mint text-reb-mint font-mono text-xs font-semibold tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 active:scale-95">
+<span class="material-symbols-outlined text-xs">lock_open</span>
+          UNSEAL IN MEMORY
+        </button>
+</div>
+<!-- Card 3: Pass #EQ-6211 (Revoked in #F4729B) -->
+<div class="rounded-xl bg-[#17221E]/15 border border-[#F4729B]/25 p-4 flex flex-col justify-between gap-3 opacity-75 hover:opacity-100 transition-opacity">
+<div class="flex flex-col gap-2.5">
+<div class="flex items-center justify-between gap-1">
+<span class="px-2 py-0.5 rounded bg-reb-crimson/15 border border-reb-pink/40 text-reb-pink font-mono text-[10px] font-bold uppercase tracking-wider">
+              REVOKED / ZEROIZED
+            </span>
+<span class="font-mono text-xs text-reb-text-dim">#EQ-6211</span>
+</div>
+<div>
+<h3 class="font-display font-medium text-sm text-reb-text-muted line-through">CardioPulse Nano-Mesh</h3>
+<p class="font-sans text-xs text-reb-pink mt-1">Decoupled on block #4,110,880</p>
+</div>
+<div class="py-1 px-2.5 rounded bg-[#0E1513]/60 border border-reb-border text-[11px] font-mono text-reb-text-dim">
+            Zero-fill RAM Overwritten
+          </div>
+</div>
+<button class="w-full py-2 px-3 rounded-lg bg-[#17221E]/40 border border-reb-border text-reb-text-dim font-mono text-xs uppercase tracking-wider cursor-not-allowed">
+          DECOUPLED
+        </button>
+</div>
+</div>
+</section>
+<!-- ========================================================
+       TILE 3: Bottom Bento Split Panel (Left: KPIs + Chain; Right: JSON Payload + Flush)
+       ======================================================== -->
+<section class="w-full bg-[#131B18]/30 backdrop-blur-sm border border-[#A8F0C6]/20 rounded-xl p-5 shadow-xl">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- LEFT SUB-TILE: 3 KPIs + 4-Step Attestation Chain (5 cols) -->
+<div class="lg:col-span-5 flex flex-col gap-4">
+<!-- Sub-tile Title -->
+<div class="flex items-center justify-between border-b border-reb-border/40 pb-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-reb-mint shadow-[0_0_6px_#A8F0C6] animate-pulse"></span>
+<h3 class="font-display font-bold text-sm tracking-tight text-reb-text-light uppercase">In-Memory Decryption Status</h3>
+</div>
+<span class="font-mono text-[10px] text-reb-mint uppercase tracking-wider px-2 py-0.5 rounded bg-[#17221E] border border-[#A8F0C6]/30">Zero-Disk</span>
+</div>
+<!-- 3 Large Minimalist Telemetry KPIs -->
+<div class="grid grid-cols-3 gap-2.5">
+<!-- KPI 1 -->
+<div class="p-3 rounded-lg bg-[#17221E]/40 border border-[#A8F0C6]/20 flex flex-col gap-0.5">
+<span class="font-mono text-[10px] uppercase text-reb-text-muted">Latency</span>
+<div class="flex items-baseline gap-1 my-0.5">
+<span class="font-display text-2xl font-bold text-reb-mint">0.42</span>
+<span class="font-mono text-xs text-reb-mint">ms</span>
+</div>
+<span class="font-mono text-[9px] text-reb-text-dim truncate">Nominal sub-ms</span>
+</div>
+<!-- KPI 2 -->
+<div class="p-3 rounded-lg bg-[#17221E]/40 border border-[#A8F0C6]/20 flex flex-col gap-0.5">
+<span class="font-mono text-[10px] uppercase text-reb-text-muted">Impedance</span>
+<div class="flex items-baseline gap-1 my-0.5">
+<span class="font-display text-2xl font-bold text-reb-mint-bright">12.4</span>
+<span class="font-mono text-xs text-reb-mint-bright">kΩ</span>
+</div>
+<span class="font-mono text-[9px] text-reb-text-dim truncate">Lattice matrix</span>
+</div>
+<!-- KPI 3 -->
+<div class="p-3 rounded-lg bg-[#17221E]/40 border border-[#A8F0C6]/20 flex flex-col gap-0.5">
+<span class="font-mono text-[10px] uppercase text-reb-text-muted">Coherence</span>
+<div class="flex items-baseline gap-1 my-0.5">
+<span class="font-display text-2xl font-bold text-reb-mint">99.8</span>
+<span class="font-mono text-xs text-reb-mint">%</span>
+</div>
+<span class="font-mono text-[9px] text-reb-text-dim truncate">Zero drift</span>
+</div>
+</div>
+<!-- 4-Step Attestation Chain -->
+<div class="flex flex-col gap-2 pt-1">
+<span class="font-mono text-[10px] uppercase tracking-wider text-reb-text-dim">Post-Quantum Attestation Chain</span>
+<div class="grid grid-cols-2 gap-2">
+<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/25 text-reb-mint font-mono text-xs font-medium">
+<span class="material-symbols-outlined text-xs text-reb-mint">check_circle</span>
+              1. QoreChain
+            </div>
+<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/25 text-reb-mint font-mono text-xs font-medium">
+<span class="material-symbols-outlined text-xs text-reb-mint">check_circle</span>
+              2. ML-KEM-1024
+            </div>
+<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/25 text-reb-mint font-mono text-xs font-medium">
+<span class="material-symbols-outlined text-xs text-reb-mint">check_circle</span>
+              3. AES-256-GCM
+            </div>
+<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0E1513]/70 border border-[#A8F0C6]/25 text-reb-mint font-mono text-xs font-medium">
+<span class="material-symbols-outlined text-xs text-reb-mint">check_circle</span>
+              4. SHAKE-256
+            </div>
+</div>
+</div>
+<!-- Attestation Export Button -->
+<button class="w-full py-2 px-3 rounded-lg bg-[#17221E]/60 border border-reb-border hover:border-[#A8F0C6]/40 text-reb-text-muted hover:text-reb-mint font-mono text-xs font-medium transition-all flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-sm">download</span>
+          EXPORT ATTESTATION RECEIPT
+        </button>
+</div>
+<!-- RIGHT SUB-TILE: Collapsible/Clean Formatted JSON Payload + Flush Memory CTA (7 cols) -->
+<div class="lg:col-span-7 flex flex-col gap-3">
+<div class="flex items-center justify-between border-b border-reb-border/40 pb-2">
+<span class="font-mono text-xs uppercase tracking-wider text-reb-mint flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs">terminal</span>
+            EPHEMERAL DECRYPTED PAYLOAD (#EQ-9042)
+          </span>
+<button class="inline-flex items-center gap-1 font-mono text-xs text-reb-text-muted hover:text-reb-mint transition-colors" onclick="navigator.clipboard.writeText(document.getElementById('zen-payload-code').innerText); alert('Payload snippet copied.');">
+<span class="material-symbols-outlined text-xs">content_copy</span>
+            COPY JSON
+          </button>
+</div>
+<!-- Formatted JSON snippet -->
+<pre class="p-3.5 rounded-lg bg-[#0E1513]/85 border border-reb-border font-mono text-xs text-reb-text-light overflow-x-auto leading-relaxed selection:bg-reb-mint selection:text-reb-bg h-[190px]" id="zen-payload-code"><code>{
+  <span class="text-reb-pink">"@context"</span>: <span class="text-reb-mint">"https://synapseq.io/ns/telemetry/v2"</span>,
+  <span class="text-reb-pink">"passId"</span>: <span class="text-reb-mint-bright">"EQ-9042"</span>,
+  <span class="text-reb-pink">"patientPseudonym"</span>: <span class="text-reb-mint">"AnonPatient-0x94B"</span>,
+  <span class="text-reb-pink">"deviceClass"</span>: <span class="text-reb-yellow">"NEURAL_BCI_MK5"</span>,
+  <span class="text-reb-pink">"gpsCoordinates"</span>: {
+    <span class="text-reb-pink">"lat"</span>: 35.6762,
+    <span class="text-reb-pink">"lon"</span>: 139.6503,
+    <span class="text-reb-pink">"sector"</span>: <span class="text-reb-mint-bright">"NEO-SHINJUKU-09"</span>
+  },
+  <span class="text-reb-pink">"ephemeralDecryptionExpiry"</span>: <span class="text-reb-mint">"Block #4,892,300"</span>,
+  <span class="text-reb-pink">"zeroizationFlag"</span>: <span class="text-reb-pink">"ON_TERMINATE"</span>
+}</code></pre>
+<!-- Zero-disk note & Coral Pink Flush Session Memory CTA -->
+<div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+<div class="flex items-center gap-1.5 text-reb-text-dim font-mono text-[11px]">
+<span class="material-symbols-outlined text-xs text-reb-mint">verified_user</span>
+<span>Zero-disk write guarantee strictly active</span>
+</div>
+<button class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-reb-crimson/15 border border-reb-pink text-reb-pink hover:bg-reb-pink hover:text-[#0B100E] font-mono text-xs font-bold transition-all shadow-[0_0_14px_rgba(244,114,155,0.2)] ml-auto active:scale-95">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">delete_forever</span>
+            FLUSH SESSION MEMORY
+          </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- MINIMAL CLEAN FOOTER -->
+<footer class="w-full border-t border-reb-border/60 bg-[#0B100E]/80 py-3 px-6 relative z-10">
+<div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-reb-text-dim">
+<div class="flex items-center gap-4 flex-wrap">
+<span class="flex items-center gap-1.5 text-reb-text-muted"><span class="w-1.5 h-1.5 rounded-full bg-reb-mint"></span>NIST FIPS 203: ML-KEM-1024</span>
+<span class="flex items-center gap-1.5 text-reb-text-muted"><span class="w-1.5 h-1.5 rounded-full bg-reb-mint"></span>FIPS 204: ML-DSA-87</span>
+<span class="flex items-center gap-1.5 text-reb-text-muted"><span class="w-1.5 h-1.5 rounded-full bg-reb-periwinkle"></span>SHAKE-256 Synced</span>
+</div>
+<div>
+<span>Block #4,892,104 • <span class="text-reb-mint font-medium">0 ms Latency</span></span>
+</div>
+</div>
+</footer>
+</body></html>

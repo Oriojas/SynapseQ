@@ -169,7 +169,6 @@ gateway/data/
 *.enc
 *.pem
 *.key
-cbom-report.json
 
 # OS & Local Tooling
 .DS_Store

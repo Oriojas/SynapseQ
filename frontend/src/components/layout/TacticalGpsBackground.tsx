@@ -8,371 +8,390 @@ export interface TacticalGpsBackgroundProps {
 }
 
 export function TacticalGpsBackground({
-  sectorLabel = 'NEO-SHINJUKU SEC-09',
-  enclaveNodeLabel = 'ENCLAVE NODE [DIANA-9800] // SECTOR 09',
-  patientBeaconLabel = 'PATIENT BEACON [#EQ-9042] // NON-INVASIVE CORTEX',
+  sectorLabel = 'SECTOR-09 // WEST LATTICE',
+  enclaveNodeLabel = 'ENCLAVE NODE [DIANA-9800]',
+  patientBeaconLabel = 'PATIENT BEACON [#EQ-9042]',
   className = '',
 }: Readonly<TacticalGpsBackgroundProps>): React.JSX.Element {
   return (
     <div
-      className={`fixed inset-0 pointer-events-none z-0 overflow-hidden select-none ${className}`}
+      className={`fixed inset-0 z-0 pointer-events-none select-none overflow-hidden ${className}`}
       aria-hidden="true"
     >
       <svg
-        className="w-full h-full min-w-[1280px] opacity-85"
+        className="w-full h-full object-cover min-w-[1440px]"
         fill="none"
-        viewBox="0 0 1440 980"
+        viewBox="0 0 1920 1080"
         preserveAspectRatio="xMidYMid slice"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient
-            gradientUnits="userSpaceOnUse"
-            id="vivid-nav-glow"
-            x1="180"
-            x2="1140"
-            y1="220"
-            y2="760"
-          >
+          <radialGradient cx="50%" cy="50%" id="vignette-ambient" r="75%">
+            <stop offset="0%" stopColor="#0B100E" stopOpacity="0.05" />
+            <stop offset="70%" stopColor="#0B100E" stopOpacity="0.38" />
+            <stop offset="100%" stopColor="#0B100E" stopOpacity="0.82" />
+          </radialGradient>
+          <linearGradient id="route-stream" x1="0%" x2="100%" y1="0%" y2="100%">
             <stop offset="0%" stopColor="#3B66E8" stopOpacity="0.95" />
-            <stop offset="45%" stopColor="#5EEAD4" stopOpacity="1" />
-            <stop offset="85%" stopColor="#F4729B" stopOpacity="0.95" />
+            <stop offset="50%" stopColor="#5EEAD4" stopOpacity="1" />
+            <stop offset="100%" stopColor="#F4729B" stopOpacity="0.95" />
           </linearGradient>
           <pattern
-            height="48"
-            id="tactical-grid-ticks"
+            height="60"
+            id="tactical-mesh-grid"
             patternUnits="userSpaceOnUse"
-            width="48"
+            width="60"
           >
             <path
-              d="M 48 0 L 0 0 0 48"
+              d="M 60 0 L 0 0 0 60"
               fill="none"
               stroke="#23332C"
-              strokeOpacity="0.6"
+              strokeOpacity="0.45"
               strokeWidth="0.75"
             />
-            <circle cx="24" cy="24" fill="#5EEAD4" fillOpacity="0.35" r="0.8" />
+            <circle cx="30" cy="30" fill="#5EEAD4" fillOpacity="0.25" r="0.75" />
           </pattern>
+          <filter height="200%" id="beacon-glow-mint" width="200%" x="-50%" y="-50%">
+            <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="6" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter height="200%" id="beacon-glow-pink" width="200%" x="-50%" y="-50%">
+            <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="6" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
-        {/* Grid Foundation */}
-        <rect fill="url(#tactical-grid-ticks)" height="100%" width="100%" />
+        {/* Base Tactical Grid Mesh */}
+        <rect fill="#0B100E" height="100%" width="100%" />
+        <rect fill="url(#tactical-mesh-grid)" height="100%" width="100%" />
 
-        {/* High-Contrast Topographic Contour Elevation Lines */}
-        <g fill="none" stroke="#A8F0C6" strokeLinecap="round" strokeWidth="1.8">
+        {/* Topographic Contour Lines across Central Tokyo Neo-Shinjuku Basin */}
+        <g fill="none" stroke="#A8F0C6" strokeLinecap="round" strokeWidth="1.2">
           <path
-            d="M -80 140 C 260 80, 520 230, 890 190 C 1180 150, 1340 90, 1540 120"
-            strokeOpacity="0.55"
+            d="M -100 210 C 320 170, 680 310, 1140 260 S 1700 140, 2040 180"
+            strokeOpacity="0.32"
           />
           <path
-            d="M -80 270 C 290 220, 560 380, 960 320 C 1220 270, 1380 210, 1540 250"
-            strokeOpacity="0.5"
+            d="M -100 340 C 360 290, 720 440, 1220 380 S 1780 250, 2040 310"
+            strokeOpacity="0.38"
           />
           <path
-            d="M -80 430 C 240 390, 600 520, 1020 460 C 1280 410, 1420 330, 1540 370"
-            strokeDasharray="8 3"
-            strokeOpacity="0.58"
+            d="M -100 480 C 400 440, 800 580, 1320 520 S 1820 390, 2040 450"
+            strokeDasharray="10 4"
+            strokeOpacity="0.42"
           />
           <path
-            d="M -80 590 C 270 540, 640 680, 1080 610 C 1320 560, 1440 490, 1540 520"
-            strokeOpacity="0.5"
+            d="M -100 640 C 380 590, 860 740, 1400 670 S 1860 560, 2040 610"
+            strokeOpacity="0.35"
           />
           <path
-            d="M -80 750 C 310 700, 680 840, 1140 770 C 1350 710, 1460 650, 1540 680"
-            strokeOpacity="0.52"
-          />
-          <path
-            d="M -80 890 C 340 850, 720 970, 1200 910 C 1380 860, 1490 810, 1540 840"
-            strokeOpacity="0.45"
+            d="M -100 810 C 420 760, 920 900, 1480 840 S 1900 730, 2040 780"
+            strokeOpacity="0.28"
           />
         </g>
 
-        {/* Contour Elevation Text Callouts Stamped on Curves */}
+        {/* Contour Labels */}
         <g
-          className="font-mono text-[10px]"
           fill="#A8F0C6"
-          opacity="0.85"
+          fillOpacity="0.65"
+          fontFamily="JetBrains Mono"
+          fontSize="10"
+          letterSpacing="1"
         >
-          <text letterSpacing="1.5" x="360" y="170">
-            ELEV +34.2m
+          <text x="560" y="240">
+            ELEV +34.2m [BASIN CONTOUR]
           </text>
-          <text letterSpacing="1.5" x="890" y="300">
-            ELEV +42.8m
+          <text x="1240" y="365">
+            ELEV +48.6m
           </text>
-          <text letterSpacing="1.5" x="310" y="555">
-            CONTOUR INTERVAL 5m
+          <text x="780" y="605">
+            ELEV +64.5m [SHINJUKU CREST INTERV 5m]
           </text>
-          <text letterSpacing="1.5" x="1210" y="390">
-            ELEV +58.0m
-          </text>
-          <text letterSpacing="1.5" x="760" y="790">
-            ELEV +64.5m [SHINJUKU CREST]
+          <text x="1560" y="540">
+            ELEV +72.0m [OUTER PLATEAU]
           </text>
         </g>
 
-        {/* Crisp City Sector Street Grid & District Blocks in Neon Mint / Teal */}
-        <g fill="none" stroke="#5EEAD4" strokeOpacity="0.42" strokeWidth="1.2">
-          <line strokeDasharray="12 6" x1="160" x2="160" y1="0" y2="980" />
-          <line x1="390" x2="390" y1="0" y2="980" />
-          <line strokeDasharray="16 8" x1="720" x2="720" y1="0" y2="980" />
-          <line x1="1040" x2="1040" y1="0" y2="980" />
-          <line strokeDasharray="10 5" x1="1290" x2="1290" y1="0" y2="980" />
-          <line x1="0" x2="1440" y1="210" y2="210" />
-          <line strokeDasharray="12 6" x1="0" x2="1440" y1="460" y2="460" />
-          <line x1="0" x2="1440" y1="690" y2="690" />
-          <line strokeDasharray="14 7" x1="0" x2="1440" y1="880" y2="880" />
+        {/* Tactical Street Axis Vectors (Neon Mint & Cobalt) */}
+        <g fill="none" stroke="#5EEAD4" strokeOpacity="0.32" strokeWidth="1.2">
+          <line strokeDasharray="8 6" x1="280" x2="280" y1="0" y2="1080" />
+          <line x1="580" x2="580" y1="0" y2="1080" />
+          <line strokeDasharray="14 6" x1="920" x2="920" y1="0" y2="1080" />
+          <line x1="1260" x2="1260" y1="0" y2="1080" />
+          <line strokeDasharray="10 5" x1="1580" x2="1580" y1="0" y2="1080" />
+          <line x1="1780" x2="1780" y1="0" y2="1080" />
 
-          {/* District Block Polygons */}
+          <line x1="0" x2="1920" y1="180" y2="180" />
+          <line strokeDasharray="12 6" x1="0" x2="1920" y1="360" y2="360" />
+          <line x1="0" x2="1920" y1="580" y2="580" />
+          <line strokeDasharray="16 8" x1="0" x2="1920" y1="780" y2="780" />
+          <line x1="0" x2="1920" y1="940" y2="940" />
+
+          {/* District Enclave Boundary Blocks */}
           <polygon
             fill="#131B18"
             fillOpacity="0.35"
-            points="180,230 360,230 360,330 180,330"
+            points="340,220 540,220 540,320 340,320"
             stroke="#A8F0C6"
-            strokeOpacity="0.45"
-            strokeWidth="1.2"
-          />
-          <polygon
-            fill="#131B18"
-            fillOpacity="0.3"
-            points="410,230 690,230 690,430 410,430"
-            stroke="#5EEAD4"
             strokeOpacity="0.4"
-            strokeWidth="1.2"
           />
           <polygon
             fill="#131B18"
             fillOpacity="0.32"
-            points="740,480 1010,480 1010,660 740,660"
-            stroke="#A8F0C6"
+            points="620,380 880,380 880,540 620,540"
+            stroke="#5EEAD4"
             strokeOpacity="0.45"
-            strokeWidth="1.2"
           />
           <polygon
             fill="#131B18"
-            fillOpacity="0.28"
-            points="1060,230 1260,230 1260,430 1060,430"
-            stroke="#5EEAD4"
-            strokeOpacity="0.38"
-            strokeWidth="1.2"
+            fillOpacity="0.35"
+            points="980,590 1220,590 1220,740 980,740"
+            stroke="#A8F0C6"
+            strokeOpacity="0.4"
+          />
+          <polygon
+            fill="#131B18"
+            fillOpacity="0.3"
+            points="1320,220 1540,220 1540,380 1320,380"
+            stroke="#3B66E8"
+            strokeOpacity="0.4"
+          />
+          <polygon
+            fill="#131B18"
+            fillOpacity="0.3"
+            points="1360,620 1620,620 1620,820 1360,820"
+            stroke="#F4729B"
+            strokeOpacity="0.35"
           />
         </g>
 
-        {/* Street Block Labels & Coordinates */}
-        <g className="font-mono text-[10px]" fill="#5EEAD4" opacity="0.9">
-          <text letterSpacing="1" x="195" y="255">
+        {/* District Coordinates & Tactical Markers */}
+        <g fill="#86A798" fontFamily="JetBrains Mono" fontSize="9" letterSpacing="1.5">
+          <text x="350" y="245">
             {sectorLabel}
           </text>
-          <text letterSpacing="1" x="425" y="255">
-            LATTICE BOULEVARD // EXPRESS ROUTE
+          <text x="635" y="405">
+            LATTICE BLVD EXPRESS • ELEV +42m
           </text>
-          <text letterSpacing="1" x="755" y="505">
-            Q-ENCLAVE BUFFER 4 [ISOLATION ZONE]
+          <text x="995" y="615">
+            Q-ENCLAVE ZONE 4 [RESTRICTED TELEMETRY]
           </text>
-          <text letterSpacing="1" x="1075" y="255">
-            KEM-RELAY ALLEY [CAT-5 PQC]
+          <text x="1335" y="245">
+            CHOME-3 BUFFER // HIGHWAY CORRIDOR
+          </text>
+          <text x="1375" y="645">
+            BIO-TELEMETRY CLUSTER [#PATIENT-0x94B]
           </text>
         </g>
 
-        {/* Radar Range Rings & Azimuth Circles */}
+        {/* Radar Range Rings & Azimuth Circles (Positioned in Center Tactical Field) */}
         <g
           fill="none"
           stroke="#A8F0C6"
-          strokeOpacity="0.38"
-          transform="translate(680, 520)"
+          strokeOpacity="0.35"
+          transform="translate(1040, 520)"
         >
           <circle r="140" strokeDasharray="4 4" strokeWidth="1.2" />
-          <circle r="260" strokeWidth="1.4" />
-          <circle r="380" strokeDasharray="8 6" strokeWidth="1.2" />
-          <circle r="520" strokeWidth="1.4" />
-          <line
-            strokeOpacity="0.35"
-            strokeWidth="1"
-            x1="-560"
-            x2="560"
-            y1="0"
-            y2="0"
+          <circle r="280" strokeWidth="1.4" />
+          <circle r="440" strokeDasharray="8 6" strokeWidth="1.2" />
+          <circle r="600" strokeWidth="1.5" />
+          <line strokeOpacity="0.3" x1="-660" x2="660" y1="0" y2="0" />
+          <line strokeOpacity="0.3" x1="0" x2="0" y1="-660" y2="660" />
+          <path
+            d="M 0 -605 L 0 -595 M 0 605 L 0 595 M -605 0 L -595 0 M 605 0 L 595 0"
+            stroke="#5EEAD4"
+            strokeWidth="2.5"
           />
-          <line
-            strokeOpacity="0.35"
-            strokeWidth="1"
-            x1="0"
-            x2="0"
-            y1="-560"
-            y2="560"
-          />
-          <text className="font-mono text-[10px]" fill="#A8F0C6" x="145" y="-6">
+          <text fill="#A8F0C6" fontFamily="JetBrains Mono" fontSize="10" x="150" y="-8">
             1.0 km
           </text>
-          <text className="font-mono text-[10px]" fill="#A8F0C6" x="265" y="-6">
+          <text fill="#A8F0C6" fontFamily="JetBrains Mono" fontSize="10" x="290" y="-8">
             2.0 km
           </text>
-          <text className="font-mono text-[10px]" fill="#A8F0C6" x="385" y="-6">
+          <text fill="#A8F0C6" fontFamily="JetBrains Mono" fontSize="10" x="450" y="-8">
             3.0 km
           </text>
-          <text className="font-mono text-[10px]" fill="#A8F0C6" x="525" y="-6">
+          <text fill="#A8F0C6" fontFamily="JetBrains Mono" fontSize="10" x="610" y="-8">
             4.0 km
           </text>
           <text
-            className="font-mono text-[10px]"
             fill="#A8F0C6"
+            fontFamily="JetBrains Mono"
+            fontSize="11"
             fontWeight="700"
-            x="-4"
-            y="-530"
+            x="-8"
+            y="-615"
           >
             000° N [POLARIS LOCK]
           </text>
           <text
-            className="font-mono text-[10px]"
             fill="#A8F0C6"
+            fontFamily="JetBrains Mono"
+            fontSize="11"
             fontWeight="700"
-            x="535"
+            x="625"
             y="4"
           >
             090° E
           </text>
           <text
-            className="font-mono text-[10px]"
             fill="#A8F0C6"
+            fontFamily="JetBrains Mono"
+            fontSize="11"
             fontWeight="700"
-            x="-4"
-            y="545"
+            x="-8"
+            y="630"
           >
             180° S
           </text>
           <text
-            className="font-mono text-[10px]"
             fill="#A8F0C6"
+            fontFamily="JetBrains Mono"
+            fontSize="11"
             fontWeight="700"
-            x="-555"
+            x="-665"
             y="4"
           >
             270° W
           </text>
         </g>
 
-        {/* Vibrant Navigation Trajectory Line */}
+        {/* Dynamic Vector Route Connecting Enclave and Patient Beacon */}
         <path
-          d="M 280 290 Q 520 380 730 490 T 1160 680"
+          d="M 680 320 Q 940 410 1120 520 T 1460 700"
           fill="none"
-          opacity="0.95"
-          stroke="url(#vivid-nav-glow)"
-          strokeDasharray="9 5"
+          filter="url(#beacon-glow-mint)"
+          stroke="url(#route-stream)"
+          strokeDasharray="10 6"
           strokeLinecap="round"
           strokeWidth="3.5"
         />
 
-        {/* Trajectory Data Strip */}
-        <g transform="translate(480, 420)">
+        {/* Mid-Route Telemetry Speed & Latency Callout Pill */}
+        <g transform="translate(970, 435)">
           <rect
-            fill="#131B18"
+            fill="#0B100E"
             fillOpacity="0.9"
-            height="24"
+            height="26"
             rx="4"
             stroke="#3B66E8"
             strokeWidth="1.2"
-            width="370"
+            width="310"
             x="0"
             y="0"
           />
           <text
-            className="font-mono text-[9px]"
             fill="#5EEAD4"
-            fontWeight="600"
+            fontFamily="JetBrains Mono"
+            fontSize="9"
+            fontWeight="700"
             letterSpacing="1"
             x="12"
-            y="16"
+            y="17"
           >
-            GPS ROUTE // 2.4 km • AZIMUTH 284° • LAT 35.6762° N // LON 139.6503° E
+            GPS VECTOR // 2.4 km • 0.42ms LAT • AZIMUTH 284°
           </text>
         </g>
 
-        {/* Waypoint 1: Enclave Specialist Node (Bright Pastel Mint) */}
-        <g transform="translate(280, 290)">
+        {/* BEACON 1: Enclave Specialist Node [DIANA-9800] */}
+        <g transform="translate(680, 320)">
           <circle
+            className="animate-pulse"
             fill="none"
-            r="36"
+            r="44"
             stroke="#A8F0C6"
             strokeDasharray="4 4"
-            strokeOpacity="0.4"
-            strokeWidth="1.2"
+            strokeOpacity="0.25"
           />
-          <circle
-            fill="none"
-            r="20"
-            stroke="#A8F0C6"
-            strokeOpacity="0.8"
-            strokeWidth="1.8"
-          />
-          <circle fill="#A8F0C6" r="8" />
-          <circle fill="#0B100E" r="3" />
-          <g transform="translate(18, -14)">
+          <circle fill="none" r="26" stroke="#A8F0C6" strokeOpacity="0.6" strokeWidth="1.5" />
+          <circle fill="#A8F0C6" filter="url(#beacon-glow-mint)" r="10" />
+          <circle fill="#0B100E" r="4" />
+          <g transform="translate(20, -18)">
             <rect
               fill="#131B18"
-              fillOpacity="0.95"
-              height="22"
-              rx="3"
+              fillOpacity="0.92"
+              height="26"
+              rx="4"
               stroke="#A8F0C6"
-              strokeWidth="1"
-              width="235"
+              strokeWidth="1.2"
+              width="220"
               x="0"
               y="0"
             />
+            <circle className="animate-pulse" cx="12" cy="13" fill="#A8F0C6" r="3.5" />
             <text
-              className="font-mono text-[9px]"
               fill="#A8F0C6"
+              fontFamily="JetBrains Mono"
+              fontSize="10"
               fontWeight="700"
               letterSpacing="0.5"
-              x="8"
-              y="15"
+              x="22"
+              y="17"
             >
               {enclaveNodeLabel}
             </text>
           </g>
         </g>
 
-        {/* Waypoint 2: Bionic Patient Telemetry Node (Bright Coral Pink) */}
-        <g transform="translate(1160, 680)">
+        {/* BEACON 2: Patient Telemetry Node [#EQ-9042] (Pulsating Coral Pink) */}
+        <g transform="translate(1460, 700)">
           <circle
+            className="animate-ping"
             fill="none"
-            r="42"
+            r="52"
             stroke="#F4729B"
             strokeDasharray="6 4"
-            strokeOpacity="0.45"
-            strokeWidth="1.2"
+            strokeOpacity="0.3"
+            style={{ animationDuration: '3s' }}
           />
-          <circle
-            fill="none"
-            r="22"
-            stroke="#F4729B"
-            strokeOpacity="0.9"
-            strokeWidth="2"
-          />
-          <circle fill="#F4729B" r="8" />
-          <circle fill="#0B100E" r="3" />
-          <g transform="translate(18, -14)">
+          <circle fill="none" r="30" stroke="#F4729B" strokeOpacity="0.75" strokeWidth="1.8" />
+          <circle fill="#F4729B" filter="url(#beacon-glow-pink)" r="10" />
+          <circle fill="#0B100E" r="4" />
+          <g transform="translate(22, -18)">
             <rect
               fill="#131B18"
-              fillOpacity="0.95"
-              height="22"
-              rx="3"
+              fillOpacity="0.92"
+              height="26"
+              rx="4"
               stroke="#F4729B"
-              strokeWidth="1"
-              width="265"
+              strokeWidth="1.2"
+              width="240"
               x="0"
               y="0"
             />
+            <circle className="animate-pulse" cx="12" cy="13" fill="#F4729B" r="3.5" />
             <text
-              className="font-mono text-[9px]"
               fill="#F4729B"
+              fontFamily="JetBrains Mono"
+              fontSize="10"
               fontWeight="700"
               letterSpacing="0.5"
-              x="8"
-              y="15"
+              x="22"
+              y="17"
             >
               {patientBeaconLabel}
             </text>
           </g>
         </g>
+
+        {/* Satellite Orbit telemetry status watermark at corner */}
+        <g fill="#5B7569" fontFamily="JetBrains Mono" fontSize="9" letterSpacing="1">
+          <text x="440" y="1025">
+            SATELLITE SYNC: QORE-SAT-4 // LAT 35.6762° N LON 139.6503° E // DOPPLER COMPENSATED
+          </text>
+          <text x="1440" y="1025">
+            PQC CIPHER: ML-KEM-1024 / FIPS 203 READY
+          </text>
+        </g>
+
+        {/* Ambient Vignette */}
+        <rect fill="url(#vignette-ambient)" height="100%" width="100%" />
       </svg>
     </div>
   );

@@ -1,0 +1,112 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:9800f203-f204-4b7f-9042-synapseq2026",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-25T21:45:00Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "qorescan-cbom-auditor",
+          "version": "1.6.0",
+          "description": "QoreChain Post-Quantum Cryptography Bill of Materials (CBOM) Generator"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:github/Oriojas/SynapseQ@1.0.0",
+      "name": "SynapseQ",
+      "version": "1.0.0",
+      "description": "Post-Quantum Ephemeral Health Data Vault & Cyber-Human HBOM Registry on QoreChain Diana Testnet (Chain ID 9800)"
+    }
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:kem/ml-kem-1024",
+      "name": "ML-KEM-1024",
+      "description": "NIST FIPS 203 Module-Lattice-Based Key-Encapsulation Mechanism via official @qorechain/qoreseal v1 envelopes (including optional ML-KEM-1024 + X25519 hybrid recipient keys, 1,568 / 1,720 bytes) used to seal ephemeral AES-256-GCM medical and bionic telemetry keys (sdk/src/pqc.ts & SynapseVaultRegistry.sol).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kem",
+          "parameterSetIdentifier": "1024",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "wasm-and-typescript-browser-safe",
+          "nistQuantumSecurityCategory": 5,
+          "cryptoFunctions": ["keygen", "encapsulate", "decapsulate"]
+        },
+        "oid": "2.16.840.1.101.3.4.4.3"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:signature/ml-dsa-87",
+      "name": "ML-DSA-87",
+      "description": "NIST FIPS 204 Module-Lattice-Based Digital Signature Algorithm (@qorechain/qoresign canonical key derivation + on-chain QoreChain precompiles pqcKeyStatus 0x...0a02 and pqcVerify 0x...0a01) used for Cyber-Human HBOM implant attestation and monotonic firmware patch verification (sdk/src/oem.ts & SynapseVaultRegistry.sol).",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "parameterSetIdentifier": "87",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "wasm-and-typescript-browser-safe",
+          "nistQuantumSecurityCategory": 5,
+          "cryptoFunctions": ["keygen", "sign", "verify"]
+        },
+        "oid": "2.16.840.1.101.3.4.3.19"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:hash/shake-256",
+      "name": "SHAKE-256",
+      "description": "NIST FIPS 202 Extendable-Output Function (256-bit digest) used for on-chain contentHash integrity commitments and QoreChain x/rdk Native DA blob binding.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "parameterSetIdentifier": "256",
+          "nistQuantumSecurityCategory": 5,
+          "cryptoFunctions": ["digest"]
+        },
+        "oid": "2.16.840.1.101.3.4.2.12"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:ae/aes-256-gcm",
+      "name": "AES-256-GCM",
+      "description": "Grover-resistant authenticated symmetric cipher (Web Crypto API hardware-accelerated) used for client-side payload encryption prior to Pinata IPFS or QoreChain x/rdk DA routing.",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "parameterSetIdentifier": "256",
+          "mode": "gcm",
+          "executionEnvironment": "hardware-assisted-webcrypto",
+          "nistQuantumSecurityCategory": 5,
+          "cryptoFunctions": ["encrypt", "decrypt"]
+        },
+        "oid": "2.16.840.1.101.3.4.1.46"
+      }
+    }
+  ],
+  "properties": [
+    {
+      "name": "qorechain:targetNetwork",
+      "value": "QoreChain Diana Testnet (EVM Chain ID 9800)"
+    },
+    {
+      "name": "qorechain:rdkProfile",
+      "value": "enterprise-sovereign-native-da"
+    },
+    {
+      "name": "qorechain:quantumVulnerablePrimitivesDetected",
+      "value": "0 (Zero RSA/ECDSA/DH used for payload confidentiality or firmware attestation)"
+    }
+  ]
+}

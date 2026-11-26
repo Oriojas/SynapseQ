@@ -1,5 +1,6 @@
 import React from 'react';
 import { describeEvmWindowProblem, windowBlocksTarget, type EvmWindowStatus } from '@sdk/evmWindow';
+import { useI18n } from '@/i18n/context';
 
 export interface EvmWindowBadgeProps {
   readonly window: EvmWindowStatus | null;
@@ -14,24 +15,47 @@ export interface EvmWindowBadgeProps {
  * unbounded; pink when the next transaction would be refused by the EVM lane.
  */
 export function EvmWindowBadge({ window: win, enforced, contract, onRefresh }: EvmWindowBadgeProps): React.JSX.Element | null {
+  const { tr } = useI18n();
   if (!enforced || !contract) return null;
 
   let tone = 'border-reb-pink/60 text-reb-pink';
-  let label = 'Ventana EVM: ?';
-  let title = 'No se pudo leer la ventana EVM (se reintenta cada 30 s).';
+  let label = tr('EVM Window: ?', 'Ventana EVM: ?');
+  let title = tr(
+    'Could not read the EVM authorisation window (retrying every 30 s).',
+    'No se pudo leer la ventana EVM (se reintenta cada 30 s).'
+  );
 
   if (win) {
     const problem = windowBlocksTarget(win, contract);
     if (problem) {
-      label = problem === 'no-window' ? 'Sin ventana EVM' : problem === 'exhausted' ? 'Ventana EVM agotada' : 'Ventana EVM fuera de alcance';
+      label =
+        problem === 'no-window'
+          ? tr('No EVM Window', 'Sin ventana EVM')
+          : problem === 'exhausted'
+            ? tr('EVM Window Exhausted', 'Ventana EVM agotada')
+            : tr('EVM Window Out of Scope', 'Ventana EVM fuera de alcance');
       title = describeEvmWindowProblem(problem, contract);
     } else {
       const bounded = win.allowedTargets.length > 0;
       tone = bounded ? 'border-reb-mint/60 text-reb-mint' : 'border-reb-yellow/60 text-reb-yellow';
-      label = `Ventana EVM ${bounded ? 'acotada' : 'SIN ACOTAR'} • ${win.remainingTxs} tx • ${win.remainingBlocks} bloques`;
+      label = bounded
+        ? tr(
+            `EVM Window Bounded • ${win.remainingTxs} tx • ${win.remainingBlocks} blocks`,
+            `Ventana EVM acotada • ${win.remainingTxs} tx • ${win.remainingBlocks} bloques`
+          )
+        : tr(
+            `EVM Window UNBOUNDED • ${win.remainingTxs} tx • ${win.remainingBlocks} blocks`,
+            `Ventana EVM SIN ACOTAR • ${win.remainingTxs} tx • ${win.remainingBlocks} bloques`
+          );
       title = bounded
-        ? `Solo admite llamadas a ${win.allowedTargets.join(', ')}.`
-        : `Admite llamadas a cualquier contrato. Recomendado: reabrirla restringida a ${contract}.`;
+        ? tr(
+            `Only admits calls to ${win.allowedTargets.join(', ')}.`,
+            `Solo admite llamadas a ${win.allowedTargets.join(', ')}.`
+          )
+        : tr(
+            `Admits calls to any contract. Recommended: reopen bounded to ${contract}.`,
+            `Admite llamadas a cualquier contrato. Recomendado: reabrirla restringida a ${contract}.`
+          );
     }
   }
 

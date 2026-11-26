@@ -16,8 +16,11 @@ import {
   Trash2,
   ShieldAlert,
   Lock,
+  Compass,
+  Radio,
 } from 'lucide-react';
 import type { MockEphemeralPass } from '@/data/mockData';
+import { useI18n } from '@/i18n/context';
 
 /** Where a decrypted payload really came from. */
 export type UnsealProvenance = 'gateway-chain' | 'local-demo';
@@ -61,17 +64,25 @@ export interface SpecialistPortalViewProps {
   readonly onRefreshChainGrants: () => void;
 }
 
-function passSourceBadge(pass: MockEphemeralPass): { label: string; className: string } {
+function passSourceBadge(
+  pass: MockEphemeralPass,
+  tr: (en: string, es: string) => string
+): { label: string; className: string } {
   if (pass.isSample) {
-    return { label: 'EJEMPLO', className: 'border-reb-border text-reb-text-muted' };
+    return { label: tr('SAMPLE', 'EJEMPLO'), className: 'border-reb-border text-reb-text-muted' };
   }
   if (pass.onChain) {
     return {
-      label: pass.fromChainScan ? 'ON-CHAIN • leído de la cadena' : 'ON-CHAIN',
+      label: pass.fromChainScan
+        ? tr('ON-CHAIN • read from chain', 'ON-CHAIN • leído de la cadena')
+        : 'ON-CHAIN',
       className: 'border-reb-mint/60 text-reb-mint',
     };
   }
-  return { label: 'DEMO LOCAL', className: 'border-reb-yellow/60 text-reb-yellow' };
+  return {
+    label: tr('LOCAL DEMO', 'DEMO LOCAL'),
+    className: 'border-reb-yellow/60 text-reb-yellow',
+  };
 }
 
 type GrantFilterTab = 'active' | 'revoked' | 'all';
@@ -122,6 +133,8 @@ export function SpecialistPortalView(
     chainSync,
     onRefreshChainGrants,
   } = props;
+
+  const { tr } = useI18n();
 
   const [filterTab, setFilterTab] = useState<GrantFilterTab>('active');
   const [selectedPassId, setSelectedPassId] = useState<string | null>(() => {
@@ -203,13 +216,16 @@ export function SpecialistPortalView(
         setDecryptionError(
           err instanceof Error
             ? err.message
-            : 'Post-Quantum ML-KEM-1024 decapsulation or SHAKE-256 verification failed.'
+            : tr(
+                'Post-Quantum ML-KEM-1024 decapsulation or SHAKE-256 verification failed.',
+                'Falló la desencapsulación post-cuántica ML-KEM-1024 o la verificación SHAKE-256.'
+              )
         );
       } finally {
         setIsUnsealing(false);
       }
     },
-    [onUnsealPass]
+    [onUnsealPass, tr]
   );
 
   // Watch for on-chain Kill-Switch revocation while a pass is open in the viewer
@@ -292,143 +308,149 @@ export function SpecialistPortalView(
   }, [unsealedSession, selectedPass]);
 
   return (
-    <div className="flex flex-col gap-6 w-full">
-      {/* 1. Top Translucent Glass Bar — On-Chain ML-KEM-1024 Public Key Directory */}
-      <div className="w-full reb-glass rounded-xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-        {/* Left: Key Details */}
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-11 h-11 rounded-lg bg-reb-surface-card/70 border border-reb-mint/40 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-            <KeyRound className="w-5 h-5 text-reb-mint" />
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-reb-pink" />
-          </div>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start relative">
+      {/* LEFT FLOATING GLASS HUD SIDEBAR */}
+      <aside className="lg:col-span-4 flex flex-col gap-3.5 pointer-events-auto">
+        {/* Card 1: Compact ML-KEM-1024 Lattice Key HUD Card */}
+        <div className="bg-[#131B18]/55 backdrop-blur-md border border-reb-mint/30 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+          {/* Header Row */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded bg-reb-surface-card border border-reb-mint/50 flex items-center justify-center flex-shrink-0 text-reb-mint relative overflow-hidden">
+                <KeyRound className="w-3.5 h-3.5" />
+                <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-reb-pink" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-mono text-xs font-bold text-reb-text-light truncate">
+                  {tr('ML-KEM-1024 Lattice Key', 'Clave Reticular ML-KEM-1024')}
+                </span>
+                <span className="font-mono text-[9px] text-reb-text-muted">
+                  1,568 B • NIST Cat 5
+                </span>
+              </div>
+            </div>
 
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="font-display text-base sm:text-lg text-reb-text-light font-semibold tracking-tight">
-                ML-KEM-1024 Public Key (1,568 B • NIST PQC CAT 5)
-              </span>
-
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-border text-reb-text-muted font-mono text-[11px]">
-                {keySource === 'wallet' ? 'DERIVADA DE LA WALLET' : 'EFÍMERA (se pierde al recargar)'}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-border text-reb-text-muted font-mono text-[9px]">
+                {keySource === 'wallet' ? 'WALLET' : tr('EPHEMERAL', 'EFÍMERA')}
               </span>
               {isKeyPublishedOnChain ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-mint/60 text-reb-mint font-mono text-[11px] font-semibold">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-reb-surface border border-reb-mint/50 text-reb-mint font-mono text-[9px] font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-reb-mint animate-pulse" />
-                  ON-CHAIN PKI REGISTERED
+                  {tr('ON-CHAIN PKI', 'PKI ON-CHAIN')}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-reb-surface/90 border border-reb-yellow/60 text-reb-yellow font-mono text-[11px] font-semibold">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-reb-surface border border-reb-yellow/60 text-reb-yellow font-mono text-[9px] font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-reb-yellow animate-pulse" />
-                  LOCAL ENCLAVE ONLY
+                  {tr('LOCAL ENCLAVE', 'ENCLAVE LOCAL')}
                 </span>
               )}
             </div>
-
-            {/* Monospace Snippet Pill */}
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <button
-                type="button"
-                onClick={handleCopyPublicKey}
-                className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-reb-surface-code/80 hover:bg-reb-surface-code border border-reb-border hover:border-reb-mint/60 transition-all font-mono text-xs text-reb-mint group cursor-pointer"
-                title="Copy full 1,568-byte ML-KEM-1024 hex public key"
-              >
-                <span className="truncate max-w-[240px] sm:max-w-[360px]">
-                  {formatTruncatedKeyPreview(specialistKemPublicKeyHex)}
-                </span>
-                {copiedKey ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-reb-mint-bright">
-                    <Check className="w-3.5 h-3.5" />
-                    COPIED!
-                  </span>
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-reb-text-muted group-hover:text-reb-mint transition-colors" />
-                )}
-              </button>
-              <span className="font-mono text-xs text-reb-text-muted">
-                Diana Chain ID: 9800
-              </span>
-            </div>
           </div>
-        </div>
 
-        {/* Right: Action CTAs */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              onRegenerateKemKeyPair();
-              setUnsealedSession(null);
-            }}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-reb-surface-card/70 hover:bg-reb-surface-card border border-reb-border hover:border-reb-mint/50 text-reb-text-light font-mono text-xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-reb-mint" />
-            {keySource === 'wallet' ? 'Re-derivar desde wallet' : 'Derivar / generar clave'}
-          </button>
+          {/* Monospace Truncated Key Copy Button + Re-derivar button */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void handleCopyPublicKey()}
+              className="flex-1 flex items-center justify-between gap-1.5 px-2.5 py-1 rounded bg-reb-surface-code/80 hover:bg-reb-surface-code border border-reb-border hover:border-reb-mint/60 transition-all font-mono text-[10px] text-reb-mint group cursor-pointer min-w-0"
+              title={tr(
+                'Copy full 1,568-byte ML-KEM-1024 hex public key',
+                'Copiar clave pública hexadecimal ML-KEM-1024 completa de 1.568 bytes'
+              )}
+            >
+              <span className="truncate">
+                {formatTruncatedKeyPreview(specialistKemPublicKeyHex)}
+              </span>
+              {copiedKey ? (
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-reb-mint-bright flex-shrink-0">
+                  <Check className="w-3 h-3" />
+                  {tr('COPIED!', '¡COPIADA!')}
+                </span>
+              ) : (
+                <Copy className="w-3 h-3 text-reb-text-muted group-hover:text-reb-mint transition-colors flex-shrink-0" />
+              )}
+            </button>
 
+            <button
+              type="button"
+              onClick={() => {
+                onRegenerateKemKeyPair();
+                setUnsealedSession(null);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-reb-surface-card/70 hover:bg-reb-surface-card border border-reb-border hover:border-reb-mint/50 text-reb-text-light font-mono text-[10px] font-semibold transition-all active:scale-95 cursor-pointer flex-shrink-0"
+              title={
+                keySource === 'wallet'
+                  ? tr('Re-derive from wallet', 'Re-derivar desde wallet')
+                  : tr('Derive / generate key', 'Derivar / generar clave')
+              }
+            >
+              <RefreshCw className="w-3 h-3 text-reb-mint" />
+              <span>{tr('Re-derive', 'Re-derivar')}</span>
+            </button>
+          </div>
+
+          {/* Full-width Pastel Mint CTA button */}
           <button
             type="button"
             onClick={onPublishKemKeyOnChain}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-reb-mint hover:bg-reb-mint-bright text-reb-bg font-mono text-xs font-bold tracking-wide transition-all shadow-[0_0_18px_rgba(168,240,198,0.35)] active:scale-95 cursor-pointer"
+            className="w-full py-1.5 px-3 rounded-lg bg-reb-mint hover:bg-reb-mint-bright text-reb-bg font-mono text-xs font-bold tracking-wide transition-all shadow-[0_0_14px_rgba(168,240,198,0.3)] flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
           >
-            <CloudUpload className="w-4 h-4" />
-            PUBLISH KEY ON-CHAIN (REGISTERKEMPUBLICKEY)
+            <CloudUpload className="w-3.5 h-3.5" />
+            {tr('REGISTER KEY ON-CHAIN', 'REGISTRAR CLAVE ON-CHAIN')}
           </button>
         </div>
-      </div>
 
-      {/* 2. Two-Column Translucent Glass Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* LEFT COLUMN (lg:col-span-5) — Assigned Telemetry Grants */}
-        <div className="lg:col-span-5 flex flex-col gap-4">
+        {/* Card 2: Telemetry Grants List Floating Panel */}
+        <div className="bg-[#131B18]/50 backdrop-blur-md border border-reb-mint/25 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
           {/* Header with Filter Tabs */}
-          <div className="flex items-center justify-between flex-wrap gap-2 pb-1">
-            <div className="flex items-center gap-2">
-              <FolderKanban className="w-5 h-5 text-reb-mint" />
-              <h2 className="font-display text-sm sm:text-base font-bold text-reb-text-light tracking-tight uppercase">
-                ASSIGNED TELEMETRY GRANTS
-              </h2>
+          <div className="flex items-center justify-between gap-2 flex-wrap border-b border-reb-border/70 pb-2">
+            <div className="flex items-center gap-1.5">
+              <FolderKanban className="w-4 h-4 text-reb-mint" />
+              <span className="font-mono text-xs font-bold tracking-wider text-reb-text-light uppercase">
+                {tr('TELEMETRY GRANTS', 'CONCESIONES DE TELEMETRÍA')}
+              </span>
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1 bg-reb-surface/60 p-1 rounded-lg border border-reb-border font-mono text-xs">
+            <div className="flex items-center gap-0.5 bg-reb-surface-code/70 p-0.5 rounded border border-reb-border font-mono text-[9px]">
               <button
                 type="button"
                 onClick={() => setFilterTab('active')}
-                className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                   filterTab === 'active'
-                    ? 'text-reb-mint bg-reb-surface-card font-semibold border border-reb-mint/30'
+                    ? 'text-reb-mint bg-reb-surface-card font-semibold'
                     : 'text-reb-text-muted hover:text-reb-text-light'
                 }`}
               >
-                Active ({activeCount})
+                {tr('Active', 'Activos')} ({activeCount})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterTab('revoked')}
-                className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+                className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
                   filterTab === 'revoked'
-                    ? 'text-reb-pink bg-reb-surface-card font-semibold border border-reb-pink/30'
+                    ? 'text-reb-pink bg-reb-surface-card font-semibold'
                     : 'text-reb-text-muted hover:text-reb-text-light'
                 }`}
               >
-                Revoked ({revokedCount})
+                {tr('Revoked', 'Revocados')} ({revokedCount})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterTab('all')}
-                className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+                className={`px-1.5 py-0.5 rounded transition-all cursor-pointer ${
                   filterTab === 'all'
-                    ? 'text-reb-mint bg-reb-surface-card font-semibold border border-reb-mint/30'
+                    ? 'text-reb-mint bg-reb-surface-card font-semibold'
                     : 'text-reb-text-muted hover:text-reb-text-light'
                 }`}
               >
-                All ({passes.length})
+                {tr('All', 'Todos')} ({passes.length})
               </button>
             </div>
           </div>
 
-          {/* On-chain grant scan status (getGrantsBySpecialist) */}
-          <div className="flex items-center justify-between gap-2 flex-wrap px-3 py-2 rounded-lg bg-reb-surface-code/70 border border-reb-border font-mono text-[11px]">
+          {/* Compact chainSync status bar with Recargar button */}
+          <div className="flex items-center justify-between gap-2 flex-wrap px-2.5 py-1.5 rounded bg-reb-surface-code/70 border border-reb-border font-mono text-[10px]">
             <span
               className={
                 chainSync.status === 'error'
@@ -439,447 +461,521 @@ export function SpecialistPortalView(
               }
             >
               {chainSync.status === 'off' &&
-                'Conecta la wallet (modo ON-CHAIN) para leer tus pases de la cadena.'}
-              {chainSync.status === 'loading' && 'Leyendo getGrantsBySpecialist on-chain…'}
+                tr(
+                  'Connect wallet (ON-CHAIN) to read passes from the chain.',
+                  'Conecta la wallet (ON-CHAIN) para leer pases de la cadena.'
+                )}
+              {chainSync.status === 'loading' &&
+                tr(
+                  'Reading getGrantsBySpecialist on-chain…',
+                  'Leyendo getGrantsBySpecialist on-chain…'
+                )}
               {chainSync.status === 'ok' &&
-                `${chainSync.count} pase(s) on-chain para tu wallet${
-                  chainSync.skipped > 0 ? ` • ${chainSync.skipped} omitido(s) (lectura revertida)` : ''
+                `${chainSync.count} ${tr('on-chain pass(es)', 'pase(s) on-chain')}${
+                  chainSync.skipped > 0
+                    ? ` • ${chainSync.skipped} ${tr('skipped', 'omitido(s)')}`
+                    : ''
                 }${chainSync.syncedAt ? ` • ${new Date(chainSync.syncedAt).toLocaleTimeString()}` : ''}`}
-              {chainSync.status === 'error' && `Error leyendo la cadena: ${chainSync.error ?? 'desconocido'}`}
+              {chainSync.status === 'error' &&
+                `${tr('On-chain error', 'Error on-chain')}: ${chainSync.error ?? tr('unknown', 'desconocido')}`}
             </span>
             {chainSync.status !== 'off' && (
               <button
                 type="button"
                 onClick={onRefreshChainGrants}
                 disabled={chainSync.status === 'loading'}
-                className="flex items-center gap-1 px-2 py-0.5 rounded border border-reb-border text-reb-text-muted hover:text-reb-mint hover:border-reb-mint/60 transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-reb-border text-reb-text-muted hover:text-reb-mint hover:border-reb-mint/60 transition-all cursor-pointer disabled:opacity-50"
               >
-                <RefreshCw className={`w-3 h-3 ${chainSync.status === 'loading' ? 'animate-spin' : ''}`} />
-                Recargar
+                <RefreshCw
+                  className={`w-2.5 h-2.5 ${chainSync.status === 'loading' ? 'animate-spin' : ''}`}
+                />
+                {tr('Reload', 'Recargar')}
               </button>
             )}
           </div>
 
-          {/* Grant Cards List */}
-          {filteredPasses.map((pass) => {
-            const isRevokedOrExpired = pass.revoked || pass.remainingSeconds <= 0;
-            const isSelected = selectedPassId === pass.id;
-            const isUnsealedActive = unsealedSession?.passId === pass.id && !isRevokedOrExpired;
+          {/* Scrollable Compact Pass Cards */}
+          <div className="max-h-[calc(100vh-330px)] overflow-y-auto space-y-2.5 pr-1">
+            {filteredPasses.map((pass) => {
+              const isRevokedOrExpired = pass.revoked || pass.remainingSeconds <= 0;
+              const isSelected = selectedPassId === pass.id;
+              const isUnsealedActive = unsealedSession?.passId === pass.id && !isRevokedOrExpired;
+              const sourceBadge = passSourceBadge(pass, tr);
 
-            return (
-              <div
-                key={pass.id}
-                className={`w-full rounded-xl p-5 flex flex-col gap-3.5 transition-all ${
-                  isRevokedOrExpired
-                    ? 'reb-glass-pink opacity-85'
-                    : isSelected
-                      ? 'reb-glass border-2 border-reb-mint shadow-[0_0_20px_rgba(168,240,198,0.14)]'
-                      : 'reb-glass hover:border-reb-mint/60 shadow-lg'
-                }`}
-              >
-                {/* Card Top Row: Domain Badge + GPS Sector + Countdown / Decoupled */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+              return (
+                <div
+                  key={pass.id}
+                  className={`p-3 rounded-lg transition-all flex flex-col gap-2 ${
+                    isRevokedOrExpired
+                      ? 'bg-[#17221E]/25 border border-reb-pink/30 opacity-75'
+                      : isSelected
+                        ? 'bg-[#17221E]/75 border border-reb-mint shadow-[0_0_14px_rgba(168,240,198,0.12)]'
+                        : 'bg-[#17221E]/45 hover:bg-[#17221E]/65 border border-reb-border hover:border-reb-mint/50'
+                  }`}
+                >
+                  {/* Top Row: Domain Badge + Source Badge + Countdown */}
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {isRevokedOrExpired ? (
+                        <span className="px-1.5 py-0.5 rounded bg-reb-crimson/15 border border-reb-pink/40 text-reb-pink font-mono text-[8px] font-bold uppercase tracking-wider">
+                          {tr('REVOKED / ZEROIZED', 'REVOCADO / BORRADO A CERO')}
+                        </span>
+                      ) : pass.domain === 'BIONIC_TELEMETRY' ? (
+                        <span className="px-2 py-0.5 rounded bg-[#3B66E8]/20 border border-[#3B66E8]/60 text-reb-periwinkle font-mono text-[9px] font-bold uppercase tracking-wider">
+                          {tr('BIONIC_TELEMETRY', 'TELEMETRÍA_BIÓNICA')}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded bg-reb-surface border border-reb-mint/40 text-reb-mint font-mono text-[9px] font-bold uppercase tracking-wider">
+                          {tr('CLINICAL_DICOM', 'DICOM_CLÍNICO')}
+                        </span>
+                      )}
+
+                      <span
+                        className={`px-1.5 py-0.5 rounded bg-reb-surface-card/70 border font-mono text-[8px] ${sourceBadge.className}`}
+                      >
+                        {sourceBadge.label}
+                      </span>
+                    </div>
+
                     {isRevokedOrExpired ? (
-                      <span className="px-2 py-0.5 rounded bg-reb-crimson/20 border border-reb-pink/50 text-reb-pink font-mono text-[11px] font-bold uppercase tracking-wider">
-                        REVOKED / ZEROIZED
-                      </span>
-                    ) : pass.domain === 'BIONIC_TELEMETRY' ? (
-                      <span className="px-2 py-0.5 rounded bg-reb-blue/20 border border-reb-blue/60 text-reb-periwinkle font-mono text-[11px] font-bold uppercase tracking-wider">
-                        BIONIC_TELEMETRY
-                      </span>
+                      <span className="font-mono text-[9px] text-reb-text-dim">#{pass.id}</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded bg-reb-surface-card/80 border border-reb-mint/50 text-reb-mint font-mono text-[11px] font-bold uppercase tracking-wider">
-                        CLINICAL_DICOM
-                      </span>
-                    )}
-
-                    <span className="px-2 py-0.5 rounded bg-reb-surface-card/70 border border-reb-border text-reb-mint-bright font-mono text-[11px]">
-                      {pass.gpsSector}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded bg-reb-surface-card/70 border font-mono text-[11px] ${passSourceBadge(pass).className}`}
-                    >
-                      {passSourceBadge(pass).label}
-                    </span>
-                  </div>
-
-                  {isRevokedOrExpired ? (
-                    <span className="font-mono text-xs text-reb-pink font-semibold">
-                      Pass #{pass.id}
-                    </span>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-reb-yellow font-mono text-xs font-semibold">
-                      <Timer className="w-3.5 h-3.5" />
-                      <span>⏱ {formatRemainingCountdown(pass.remainingSeconds)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Card Body: Title, Pseudonym & Storage Provider */}
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3
-                      className={`font-display text-base font-bold ${
-                        isRevokedOrExpired
-                          ? 'text-reb-text-muted line-through'
-                          : 'text-reb-text-light'
-                      }`}
-                    >
-                      {pass.title}
-                    </h3>
-                    {!isRevokedOrExpired && (
-                      <span className="font-mono text-xs text-reb-text-muted">
-                        Pass #{pass.id}
+                      <span className="flex items-center gap-1 text-reb-yellow font-mono text-[10px] font-bold">
+                        <Timer className="w-3 h-3" />
+                        <span>⏱ {formatRemainingCountdown(pass.remainingSeconds)}</span>
                       </span>
                     )}
                   </div>
 
-                  {isRevokedOrExpired ? (
-                    <p className="font-mono text-xs text-reb-pink mt-1">
-                      Enclave decoupled on QoreChain • Patient: {pass.patientPseudonym}
-                    </p>
-                  ) : (
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap font-mono text-xs text-reb-text-muted">
-                      <span>
-                        Patient:{' '}
-                        <strong className="text-reb-text-light">{pass.patientPseudonym}</strong>
+                  {/* Pass Title, #pass.id & Patient Pseudonym */}
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`font-sans font-bold text-xs ${
+                          isRevokedOrExpired
+                            ? 'text-reb-text-muted line-through'
+                            : 'text-reb-text-light'
+                        }`}
+                      >
+                        {pass.title}
                       </span>
-                      <span>•</span>
-                      <span className="px-1.5 py-0.5 rounded bg-reb-surface-code/80 border border-reb-border text-reb-mint text-[11px]">
-                        {pass.storageProvider}
+                      {!isRevokedOrExpired && (
+                        <span
+                          className={`font-mono text-[10px] ${
+                            isSelected ? 'text-reb-mint' : 'text-reb-text-muted'
+                          }`}
+                        >
+                          #{pass.id}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <p className="font-mono text-[10px] text-reb-text-muted truncate">
+                        {pass.patientPseudonym} • {pass.storageProvider}
+                      </p>
+                      {isRevokedOrExpired && (
+                        <span className="font-mono text-[9px] text-reb-pink flex-shrink-0">
+                          {tr('ZERO-FILL OVERWRITTEN', 'SOBRESCRITO CON CEROS')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Geo Sector Pill */}
+                  {!isRevokedOrExpired && (
+                    <div className="flex items-center justify-between py-1 px-2 rounded bg-reb-surface-code/70 border border-reb-border text-[9px] font-mono">
+                      <span className="text-reb-mint-bright flex items-center gap-1">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isUnsealedActive
+                              ? 'bg-reb-mint-bright animate-pulse'
+                              : 'bg-reb-mint/60'
+                          }`}
+                        />
+                        {isUnsealedActive
+                          ? tr('LIVE RAM STREAM', 'FLUJO RAM EN VIVO')
+                          : tr('READY FOR ENCLAVE', 'LISTO PARA ENCLAVE')}
+                      </span>
+                      <span className="text-reb-text-muted">
+                        {pass.gpsSector} // 2.4 KM
                       </span>
                     </div>
                   )}
-                </div>
 
-                {/* Live RAM Stream indicator when currently unsealed */}
-                {isUnsealedActive && (
-                  <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-reb-surface-code/70 border border-reb-border">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse" />
-                      <span className="font-mono text-xs text-reb-mint font-semibold">
-                        ACTIVE RAM STREAM
-                      </span>
-                    </div>
-                    <span className="font-mono text-[11px] text-reb-text-muted">
-                      Ephemeral Shard Verified
-                    </span>
-                  </div>
-                )}
-
-                {/* Bottom Action Row */}
-                {isRevokedOrExpired ? (
-                  <div className="flex items-center justify-between pt-1 gap-2">
-                    <span className="font-mono text-xs text-reb-text-muted">
-                      Zero-fill RAM Overwritten
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded bg-reb-surface-card/70 border border-reb-border text-reb-text-muted font-mono text-xs">
-                        DECOUPLED
+                  {/* Action Buttons */}
+                  {isRevokedOrExpired ? (
+                    <div className="flex items-center justify-between pt-0.5 gap-1.5">
+                      <span className="font-mono text-[9px] text-reb-text-muted">
+                        {tr('DECOUPLED ON-CHAIN', 'DESACOPLADO ON-CHAIN')}
                       </span>
                       <button
                         type="button"
-                        disabled
-                        className="py-1.5 px-3 rounded-lg bg-reb-surface-card/40 border border-reb-border text-reb-text-dim font-mono text-xs font-semibold uppercase cursor-not-allowed"
+                        onClick={() => void handleUnsealPass(pass)}
+                        className="py-1 px-2 rounded bg-reb-surface-card/40 border border-reb-pink/40 text-reb-pink font-mono text-[9px] font-semibold uppercase cursor-pointer hover:bg-reb-crimson/20 transition-all"
                       >
-                        UNSEAL IN MEMORY
+                        {tr('INSPECT REVOCATION', 'INSPECCIONAR REVOCACIÓN')}
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      disabled={isRevokedOrExpired || isUnsealing}
-                      onClick={() => void handleUnsealPass(pass)}
-                      className={`flex-1 py-2 px-3 rounded-lg font-mono text-xs font-bold tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        isSelected
-                          ? 'bg-reb-mint hover:bg-reb-mint-bright text-reb-bg shadow-[0_0_12px_rgba(168,240,198,0.25)]'
-                          : 'bg-reb-surface-card/70 hover:bg-reb-mint hover:text-reb-bg border border-reb-mint/40 text-reb-mint'
-                      }`}
-                    >
-                      <LockOpen className="w-3.5 h-3.5" />
-                      {isUnsealing && isSelected ? 'DECAPSULATING...' : 'UNSEAL IN MEMORY'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleUnsealPass(pass)}
-                      className="p-2 rounded-lg bg-reb-surface-card/70 border border-reb-border hover:border-reb-mint/50 text-reb-text-muted hover:text-reb-text-light transition-all cursor-pointer"
-                      title="Inspect Node Attestation"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  ) : (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        disabled={isUnsealing}
+                        onClick={() => void handleUnsealPass(pass)}
+                        className={`flex-1 py-1 px-2 rounded font-mono text-[10px] font-bold tracking-wider uppercase transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? 'bg-reb-mint hover:bg-reb-mint-bright text-reb-bg shadow-[0_0_10px_rgba(168,240,198,0.2)]'
+                            : 'bg-reb-surface hover:bg-reb-surface-card border border-reb-mint/40 hover:border-reb-mint text-reb-mint'
+                        }`}
+                      >
+                        <LockOpen className="w-3 h-3" />
+                        {isUnsealing && isSelected
+                          ? tr('DECAPSULATING...', 'DESENCAPSULANDO...')
+                          : isSelected
+                            ? tr('UNSEAL STREAM', 'ABRIR FLUJO')
+                            : tr('UNSEAL IN MEMORY', 'DESCIFRAR EN MEMORIA')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleUnsealPass(pass)}
+                        className="p-1 rounded bg-reb-surface-code/60 border border-reb-border hover:border-reb-mint/50 text-reb-text-muted hover:text-reb-text-light transition-all cursor-pointer"
+                        title={tr('Inspect Node Attestation', 'Inspeccionar Atestación del Nodo')}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+
+      {/* CENTER TACTICAL EXPEDITION CORRIDOR */}
+      <div className="lg:col-span-8 min-h-[540px] flex flex-col justify-between pointer-events-none">
+        {/* Top-Center Floating HUD Compass Pill */}
+        <div className="self-center hidden sm:flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-[#0B100E]/70 backdrop-blur-md border border-reb-mint/20 font-mono text-xs text-reb-mint shadow-lg pointer-events-auto">
+          <Compass className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '12s' }} />
+          <span>
+            {tr(
+              'HUD BEARING 284° WNW • SHINJUKU ENCLAVE LINK 99.8% COHERENT',
+              'RUMBO HUD 284° ONO • ENLACE ENCLAVE SHINJUKU 99.8% COHERENTE'
+            )}
+          </span>
+          <span className="w-1.5 h-1.5 rounded-full bg-reb-mint-bright animate-pulse" />
         </div>
 
-        {/* RIGHT COLUMN (lg:col-span-7) — In-Memory Decryption Stream Viewer */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
+        {/* Center space intentionally open so ENCLAVE NODE [DIANA-9800], GPS VECTOR // 2.4 km, and PATIENT BEACON [#EQ-9042] are 100% unobstructed */}
+        <div className="my-auto" />
+
+        {/* Bottom-Right Floating Glass Decryption Drawer */}
+        <div className="self-end w-full max-w-[500px] pointer-events-auto mt-auto">
           {revokedNoticePass ? (
-            /* High-Contrast Coral Pink Lock Screen when Revoked by Kill-Switch */
-            <div className="w-full reb-glass-pink rounded-xl p-6 lg:p-7 flex flex-col gap-6 shadow-2xl border-2 border-reb-pink">
-              <div className="flex items-center justify-between flex-wrap gap-3 border-b border-reb-pink/30 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-reb-crimson/25 border border-reb-pink flex items-center justify-center text-reb-pink">
-                    <ShieldAlert className="w-6 h-6 animate-pulse" />
+            /* a) Revoked Notice Coral Pink Lock Drawer */
+            <div className="bg-[#131B18]/75 backdrop-blur-md border-2 border-reb-pink rounded-xl p-4 sm:p-5 flex flex-col gap-3 shadow-[0_16px_40px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-reb-pink via-reb-crimson to-reb-pink" />
+
+              <div className="flex items-center justify-between gap-2 border-b border-reb-pink/30 pb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-reb-crimson/25 border border-reb-pink flex items-center justify-center text-reb-pink flex-shrink-0">
+                    <ShieldAlert className="w-4 h-4 animate-pulse" />
                   </div>
-                  <div>
-                    <h2 className="font-display text-base sm:text-lg font-bold text-reb-pink tracking-tight uppercase">
-                      ACCESS REVOKED ON-CHAIN (KILL-SWITCH ACTIVATED — ENCLAVE RAM ZEROIZED)
+                  <div className="flex flex-col min-w-0">
+                    <h2 className="font-mono text-xs font-bold text-reb-pink tracking-tight uppercase truncate">
+                      {tr(
+                        'ACCESS REVOKED ON-CHAIN — ENCLAVE RAM ZEROIZED',
+                        'ACCESO REVOCADO ON-CHAIN — RAM DEL ENCLAVE BORRADA A CERO'
+                      )}
                     </h2>
-                    <p className="font-mono text-xs text-reb-text-muted">
-                      PASS IDENTIFIER: #{revokedNoticePass.id} // {revokedNoticePass.title}
-                    </p>
+                    <span className="font-mono text-[9px] text-reb-text-muted truncate">
+                      {tr('PASS', 'PASE')} #{revokedNoticePass.id} // {revokedNoticePass.title}
+                    </span>
                   </div>
                 </div>
-
-                <span className="px-3 py-1 rounded-full bg-reb-crimson/20 border border-reb-pink text-reb-pink font-mono text-xs font-bold">
-                  DECOUPLED
+                <span className="px-2 py-0.5 rounded-full bg-reb-crimson/20 border border-reb-pink text-reb-pink font-mono text-[9px] font-bold flex-shrink-0">
+                  {tr('DECOUPLED', 'DESACOPLADO')}
                 </span>
               </div>
 
-              <div className="p-5 rounded-xl bg-reb-surface-code/90 border border-reb-pink/50 flex flex-col gap-3">
-                <div className="flex items-center gap-2 text-reb-pink font-mono text-xs font-bold uppercase">
-                  <Lock className="w-4 h-4" />
-                  <span>Cryptographic Session Terminated by Patient Sovereignty Event</span>
+              <div className="p-3 rounded-lg bg-reb-surface-code/90 border border-reb-pink/40 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-reb-pink font-mono text-[10px] font-bold uppercase">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>
+                    {tr(
+                      'Kill-Switch Executed by Patient',
+                      'Kill-Switch Ejecutado por el Paciente'
+                    )}{' '}
+                    ({revokedNoticePass.patientPseudonym})
+                  </span>
                 </div>
-                <p className="font-mono text-xs text-reb-text-light leading-relaxed">
-                  The patient executed <code className="text-reb-pink">revokeAccess(bytes32)</code>{' '}
-                  on QoreChain Diana Testnet. In compliance with SynapseQ Zero-Persistence Enclave
-                  protocol, the unwrapped AES-256-GCM key and ML-KEM-1024 shared secret have been
-                  overwritten with zeros in browser memory.
+                <p className="font-mono text-[10px] text-reb-text-light leading-relaxed">
+                  {tr('On-chain', 'Transacción on-chain')}{' '}
+                  <code className="text-reb-pink">revokeAccess(bytes32)</code>{' '}
+                  {tr(
+                    'confirmed on QoreChain Diana Testnet. Unwrapped AES-256-GCM key and ML-KEM-1024 shared secret have been overwritten with zeros in browser memory.',
+                    'confirmada en QoreChain Diana Testnet. La clave AES-256-GCM desenvuelta y el secreto compartido ML-KEM-1024 han sido sobrescritos con ceros en la memoria del navegador.'
+                  )}
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 font-mono text-[11px]">
-                  <div className="p-2.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink">
-                    RAM Buffer: 0x0000...0000 (WIPED)
+                <div className="grid grid-cols-3 gap-1.5 pt-1 font-mono text-[9px]">
+                  <div className="p-1.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink text-center">
+                    {tr('RAM: 0x00 (WIPED)', 'RAM: 0x00 (BORRADA)')}
                   </div>
-                  <div className="p-2.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink">
-                    ML-KEM Secret: DECOUPLED
+                  <div className="p-1.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink text-center">
+                    {tr('ML-KEM: DECOUPLED', 'ML-KEM: DESACOPLADO')}
                   </div>
-                  <div className="p-2.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink">
-                    Disk Persistence: 0 BYTES
+                  <div className="p-1.5 rounded bg-reb-surface/80 border border-reb-pink/30 text-reb-pink text-center">
+                    {tr('DISK: 0 BYTES', 'DISCO: 0 BYTES')}
                   </div>
                 </div>
               </div>
             </div>
+          ) : decryptionError ? (
+            /* b) Decryption Error Alert Box */
+            <div className="bg-[#131B18]/75 backdrop-blur-md border border-reb-pink/60 rounded-xl p-4 sm:p-5 flex flex-col gap-3 shadow-[0_16px_40px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-reb-pink via-reb-yellow to-reb-pink" />
+              <div className="flex items-center justify-between gap-2 border-b border-reb-pink/30 pb-2">
+                <div className="flex items-center gap-2 text-reb-pink font-mono text-xs font-bold uppercase">
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>
+                    {tr(
+                      'PQC Decapsulation / Verification Failed',
+                      'Falló la Desencapsulación / Verificación PQC'
+                    )}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFlushSessionMemory}
+                  className="px-2 py-0.5 rounded bg-reb-surface-card border border-reb-border text-reb-text-muted hover:text-reb-text-light font-mono text-[9px] cursor-pointer"
+                >
+                  {tr('Dismiss', 'Cerrar')}
+                </button>
+              </div>
+              <p className="font-mono text-xs text-reb-pink leading-relaxed">{decryptionError}</p>
+            </div>
           ) : unsealedSession && selectedPass ? (
-            /* Active Unsealed Decryption Stream HUD */
-            <div className="w-full reb-glass rounded-xl p-6 lg:p-7 flex flex-col gap-6 shadow-2xl relative">
-              {/* Stream Window Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-reb-border/70 pb-4">
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-reb-mint shadow-[0_0_8px_#A8F0C6] animate-pulse" />
-                    <h2 className="font-display text-base sm:text-lg font-bold text-reb-text-light tracking-tight uppercase">
-                      IN-MEMORY DECRYPTION STREAM: {unsealedSession.passTitle}
-                    </h2>
-                  </div>
-                  <span className="font-mono text-xs text-reb-text-muted">
-                    GRANT PASS IDENTIFIER: #{unsealedSession.passId} // REBECCA DIANA TESTNET HUD (
-                    {unsealedSession.decapsulationTimeMs} ms PQC latency)
-                  </span>
-                </div>
+            /* c) Unsealed Session Floating Glass Decryption Drawer */
+            <div className="bg-[#131B18]/65 backdrop-blur-md border border-reb-mint/35 rounded-xl p-4 sm:p-5 flex flex-col gap-3 shadow-[0_16px_40px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              {/* Top Gradient Line */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-reb-blue via-reb-mint-bright to-reb-pink" />
 
-                {/* Isolation Pill */}
-                <div className="px-3 py-1 rounded-full bg-reb-surface-card/90 border border-reb-mint/50 text-reb-mint font-mono text-xs font-semibold flex items-center gap-1.5 shadow-[0_0_10px_rgba(168,240,198,0.1)]">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Enclave RAM: Active (Isolated Zero-Disk)</span>
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between gap-2 border-b border-reb-border/70 pb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-reb-mint animate-pulse shadow-[0_0_8px_#A8F0C6] flex-shrink-0" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-mono text-xs font-bold text-reb-text-light truncate uppercase">
+                      {tr('STREAM', 'FLUJO')}: {unsealedSession.passTitle}
+                    </span>
+                    <span className="font-mono text-[9px] text-reb-text-muted truncate">
+                      {tr('BEACON', 'BALIZA')} #{unsealedSession.passId} //{' '}
+                      {unsealedSession.decapsulationTimeMs} ms PQC •{' '}
+                      {tr('RAM ONLY', 'SOLO RAM')}
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              {/* 4-Step Post-Quantum Attestation Chain */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="font-mono text-xs uppercase tracking-wider text-reb-text-muted">
-                    Post-Quantum Attestation Chain
-                  </span>
-                  <span className="font-mono text-xs text-reb-mint">
-                    Decapsulated &amp; Verified in {unsealedSession.decapsulationTimeMs} ms •{' '}
-                    {unsealedSession.provenance === 'gateway-chain'
-                      ? 'Gateway release + verificación on-chain'
-                      : 'Caché local de demo (sin verificación on-chain)'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {unsealedSession.provenance === 'gateway-chain' ? (
-                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>1. QoreChain ✓</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-yellow/40 text-reb-yellow font-mono text-xs font-semibold">
-                      <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>1. QoreChain — demo</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>2. ML-KEM-1024 ✓</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>3. AES-256-GCM ✓</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-reb-surface-code/80 border border-reb-mint/40 text-reb-mint font-mono text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>4. SHAKE-256 ✓</span>
-                  </div>
+                <div className="px-2 py-0.5 rounded-full bg-reb-surface-card border border-reb-mint/40 text-reb-mint font-mono text-[9px] font-semibold flex items-center gap-1 flex-shrink-0">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>{tr('ISOLATED ENCLAVE', 'ENCLAVE AISLADO')}</span>
                 </div>
               </div>
 
-              {/* 3 Translucent Telemetry Metric Cards (only when the pass carries telemetry) */}
+              {/* 3 Compact Metric Tiles */}
               {selectedPass.metrics && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Metric 1: Neural Latency */}
-                <div className="p-3.5 rounded-lg bg-reb-surface-card/60 border border-reb-mint/30 flex flex-col gap-1">
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted">
-                    NEURAL LATENCY
-                  </span>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="font-display text-2xl font-bold text-reb-mint tracking-tight">
-                      {selectedPass.metrics.neuralLatencyMs.toFixed(2)}
+                <div className="grid grid-cols-3 gap-2">
+                  {/* LATENCY */}
+                  <div className="p-2 rounded-lg bg-reb-surface-code/70 border border-reb-mint/25 flex flex-col gap-0.5">
+                    <span className="font-mono text-[8px] uppercase tracking-wider text-reb-text-muted">
+                      {tr('LATENCY', 'LATENCIA')}
                     </span>
-                    <span className="font-mono text-xs text-reb-mint">ms</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-display font-bold text-base text-reb-mint leading-none">
+                        {selectedPass.metrics.neuralLatencyMs.toFixed(2)}
+                      </span>
+                      <span className="font-mono text-[9px] text-reb-mint">ms</span>
+                    </div>
+                    <span className="font-mono text-[8px] text-reb-mint-bright">
+                      {tr('Nominal', 'Nominal')}
+                    </span>
                   </div>
-                  <span className="font-mono text-[11px] text-reb-text-muted">
-                    Sub-millisecond nominal
-                  </span>
-                </div>
 
-                {/* Metric 2: Impedance */}
-                <div className="p-3.5 rounded-lg bg-reb-surface-card/60 border border-reb-mint/30 flex flex-col gap-1">
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted">
-                    IMPEDANCE
-                  </span>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="font-display text-2xl font-bold text-reb-mint-bright tracking-tight">
-                      {selectedPass.metrics.impedanceKOhm.toFixed(1)}
+                  {/* IMPEDANCE */}
+                  <div className="p-2 rounded-lg bg-reb-surface-code/70 border border-reb-mint-bright/25 flex flex-col gap-0.5">
+                    <span className="font-mono text-[8px] uppercase tracking-wider text-reb-text-muted">
+                      {tr('IMPEDANCE', 'IMPEDANCIA')}
                     </span>
-                    <span className="font-mono text-xs text-reb-mint-bright">kΩ</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-display font-bold text-base text-reb-mint-bright leading-none">
+                        {selectedPass.metrics.impedanceKOhm.toFixed(1)}
+                      </span>
+                      <span className="font-mono text-[9px] text-reb-mint-bright">kΩ</span>
+                    </div>
+                    <span className="font-mono text-[8px] text-reb-text-muted">
+                      {tr('Lattice Matrix', 'Matriz Reticular')}
+                    </span>
                   </div>
-                  <span className="font-mono text-[11px] text-reb-text-muted">
-                    Stable lattice matrix
-                  </span>
-                </div>
 
-                {/* Metric 3: Coherence */}
-                <div className="p-3.5 rounded-lg bg-reb-surface-card/60 border border-reb-mint/30 flex flex-col gap-1">
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-reb-text-muted">
-                    COHERENCE
-                  </span>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="font-display text-2xl font-bold text-reb-mint tracking-tight">
-                      {selectedPass.metrics.coherencePct.toFixed(1)}
+                  {/* COHERENCE */}
+                  <div className="p-2 rounded-lg bg-reb-surface-code/70 border border-reb-mint/25 flex flex-col gap-0.5">
+                    <span className="font-mono text-[8px] uppercase tracking-wider text-reb-text-muted">
+                      {tr('COHERENCE', 'COHERENCIA')}
                     </span>
-                    <span className="font-mono text-xs text-reb-mint">%</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-display font-bold text-base text-reb-mint leading-none">
+                        {selectedPass.metrics.coherencePct.toFixed(1)}
+                      </span>
+                      <span className="font-mono text-[9px] text-reb-mint">%</span>
+                    </div>
+                    <span className="font-mono text-[8px] text-reb-text-muted">
+                      {tr('Zero Drift', 'Sin Deriva')}
+                    </span>
                   </div>
-                  <span className="font-mono text-[11px] text-reb-text-muted">
-                    Zero quantum drift
-                  </span>
                 </div>
-              </div>
               )}
 
-              {/* Ephemeral In-Memory Payload Preview Box */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="font-mono text-xs uppercase tracking-wider text-reb-mint flex items-center gap-1.5 font-semibold">
-                    <Terminal className="w-3.5 h-3.5" />
-                    EPHEMERAL DECRYPTED PAYLOAD (ZERO-PERSISTENCE PREVIEW)
+              {/* 4-Badge Mini Attestation Strip */}
+              <div className="grid grid-cols-4 gap-1 py-0.5 font-mono text-[9px]">
+                {unsealedSession.provenance === 'gateway-chain' ? (
+                  <div className="flex items-center justify-center gap-0.5 px-1 py-0.5 rounded bg-reb-surface-code/60 border border-reb-mint/30 text-reb-mint truncate">
+                    <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0" />
+                    <span>✓ Qore</span>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center justify-center gap-0.5 px-1 py-0.5 rounded bg-reb-surface-code/60 border border-reb-yellow/40 text-reb-yellow truncate"
+                    title={tr(
+                      'Local demo cache (not verified on-chain)',
+                      'Caché local de demo (sin verificación on-chain)'
+                    )}
+                  >
+                    <ShieldAlert className="w-2.5 h-2.5 flex-shrink-0" />
+                    <span>✓ Qore (Demo)</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-center gap-0.5 px-1 py-0.5 rounded bg-reb-surface-code/60 border border-reb-mint/30 text-reb-mint truncate">
+                  <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0" />
+                  <span>✓ ML-KEM</span>
+                </div>
+                <div className="flex items-center justify-center gap-0.5 px-1 py-0.5 rounded bg-reb-surface-code/60 border border-reb-mint/30 text-reb-mint truncate">
+                  <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0" />
+                  <span>✓ AES-GCM</span>
+                </div>
+                <div className="flex items-center justify-center gap-0.5 px-1 py-0.5 rounded bg-reb-surface-code/60 border border-reb-mint/30 text-reb-mint truncate">
+                  <CheckCircle2 className="w-2.5 h-2.5 flex-shrink-0" />
+                  <span>✓ SHAKE</span>
+                </div>
+              </div>
+
+              {/* Compact Scrollable <pre> JSON Payload Preview */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-reb-mint flex items-center gap-1 font-semibold">
+                    <Terminal className="w-3 h-3" />
+                    {tr('EPHEMERAL PAYLOAD PREVIEW', 'VISTA PREVIA DE CARGA EFÍMERA')}
                   </span>
                   <button
                     type="button"
-                    onClick={handleCopyPayloadSnippet}
-                    className="inline-flex items-center gap-1.5 font-mono text-xs text-reb-text-muted hover:text-reb-mint transition-colors cursor-pointer"
+                    onClick={() => void handleCopyPayloadSnippet()}
+                    className="font-mono text-[9px] text-reb-text-muted hover:text-reb-mint transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     {copiedSnippet ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-reb-mint" />
-                        <span className="text-reb-mint font-semibold">COPIED!</span>
+                        <Check className="w-2.5 h-2.5 text-reb-mint" />
+                        <span className="text-reb-mint font-bold">
+                          {tr('COPIED!', '¡COPIADO!')}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>COPY SNIPPET</span>
+                        <Copy className="w-2.5 h-2.5" />
+                        <span>{tr('COPY', 'COPIAR')}</span>
                       </>
                     )}
                   </button>
                 </div>
 
-                <pre className="p-4 rounded-lg bg-reb-surface-code/85 border border-reb-border font-mono text-xs text-reb-text-light overflow-x-auto leading-relaxed selection:bg-reb-mint selection:text-reb-bg max-h-[340px]">
+                <pre className="p-2.5 rounded-lg bg-reb-surface-code/90 border border-reb-border font-mono text-[10px] text-reb-text-light overflow-x-auto max-h-[125px] leading-relaxed selection:bg-reb-mint selection:text-reb-bg">
                   <code>{unsealedSession.decryptedJsonText}</code>
                 </pre>
 
-                <div className="flex items-center justify-between flex-wrap gap-2 font-mono text-[11px] text-reb-text-muted pt-0.5">
-                  <span className="truncate max-w-full">
-                    Verified SHAKE-256:{' '}
+                <div className="flex items-center justify-between gap-2 font-mono text-[9px] text-reb-text-muted">
+                  <span className="truncate">
+                    SHAKE-256:{' '}
                     <span className="text-reb-mint">{unsealedSession.verifiedShake256Hash}</span>
                   </span>
-                  <span>
-                    Envelope: {unsealedSession.envelopeByteSize} B • Ciphertext:{' '}
-                    {unsealedSession.ciphertextByteSize} B
+                  <span className="flex-shrink-0">
+                    {unsealedSession.envelopeByteSize}B / {unsealedSession.ciphertextByteSize}B
                   </span>
                 </div>
               </div>
 
-              {/* Bottom Action Row */}
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-reb-border/70">
-                <div className="flex items-center gap-2 text-reb-text-muted font-mono text-xs">
-                  <ShieldCheck className="w-4 h-4 text-reb-mint" />
+              {/* Footer with Export Proof and Coral Pink FLUSH SESSION RAM button */}
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-reb-border/60">
+                <button
+                  type="button"
+                  onClick={handleExportAttestation}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-reb-surface-card hover:bg-reb-border-subtle border border-reb-border text-reb-text-muted hover:text-reb-mint font-mono text-[10px] transition-all cursor-pointer"
+                >
+                  <Download className="w-3 h-3" />
                   <span>
-                    Descifrado en memoria del navegador. Revocar impide nuevas entregas, pero no
-                    recupera lo que ya se vio.
+                    {exportedAttestation
+                      ? tr('Proof Exported', 'Prueba Exportada')
+                      : tr('Export Proof', 'Exportar Prueba')}
                   </span>
-                </div>
+                </button>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={handleExportAttestation}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-reb-surface-card/70 border border-reb-border hover:border-reb-mint/50 text-reb-text-light hover:text-reb-mint font-mono text-xs font-semibold transition-all cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {exportedAttestation ? 'ATTESTATION EXPORTED' : 'EXPORT ATTESTATION'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleFlushSessionMemory}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-reb-crimson/15 border border-reb-pink text-reb-pink hover:bg-reb-pink hover:text-reb-bg font-mono text-xs font-bold transition-all shadow-[0_0_16px_rgba(244,114,155,0.25)] cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    FLUSH SESSION MEMORY
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleFlushSessionMemory}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-reb-crimson/20 border border-reb-pink text-reb-pink hover:bg-reb-pink hover:text-reb-bg font-mono text-[10px] font-bold transition-all shadow-[0_0_12px_rgba(244,114,155,0.25)] cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>{tr('FLUSH SESSION RAM', 'PURGAR RAM DE SESIÓN')}</span>
+                </button>
               </div>
             </div>
           ) : (
-            /* Standby / Flushed Memory State */
-            <div className="w-full reb-glass rounded-xl p-6 lg:p-7 flex flex-col items-center justify-center text-center gap-4 min-h-[420px] shadow-2xl">
-              <div className="w-12 h-12 rounded-xl bg-reb-surface-card/80 border border-reb-mint/40 flex items-center justify-center text-reb-mint">
-                <Lock className="w-6 h-6" />
-              </div>
-              <div className="max-w-md flex flex-col gap-1.5">
-                <h2 className="font-display text-lg font-bold text-reb-text-light">
-                  ENCLAVE RAM BUFFER ZEROIZED (STANDBY)
-                </h2>
-                <p className="font-mono text-xs text-reb-text-muted leading-relaxed">
-                  Select an active telemetry grant from the left column and click{' '}
-                  <span className="text-reb-mint font-semibold">UNSEAL IN MEMORY</span> to execute
-                  real-time NIST FIPS 203 ML-KEM-1024 decapsulation, AES-256-GCM decryption, and
-                  32-byte SHAKE-256 verification.
-                </p>
-              </div>
-              {decryptionError && (
-                <div className="p-3 rounded-lg bg-reb-crimson/20 border border-reb-pink text-reb-pink font-mono text-xs max-w-md">
-                  {decryptionError}
+            /* d) Compact Idle State Prompting Specialist to Click UNSEAL STREAM */
+            <div className="bg-[#131B18]/65 backdrop-blur-md border border-reb-mint/35 rounded-xl p-4 sm:p-5 flex flex-col gap-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-reb-blue via-reb-mint-bright to-reb-pink" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-reb-surface-card/80 border border-reb-mint/40 flex items-center justify-center text-reb-mint">
+                    <Radio className="w-3.5 h-3.5 animate-pulse" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-mono text-xs font-bold text-reb-text-light uppercase">
+                      {tr(
+                        'ENCLAVE STREAM DRAWER (STANDBY)',
+                        'PANEL DE FLUJO DEL ENCLAVE (EN ESPERA)'
+                      )}
+                    </span>
+                    <span className="font-mono text-[9px] text-reb-text-muted">
+                      {tr(
+                        'ZERO-PERSISTENCE RAM BUFFER • 0 BYTES ALLOCATED',
+                        'BÚFER RAM DE CERO PERSISTENCIA • 0 BYTES ASIGNADOS'
+                      )}
+                    </span>
+                  </div>
                 </div>
-              )}
+                <span className="px-2 py-0.5 rounded-full bg-reb-surface-card border border-reb-border text-reb-text-muted font-mono text-[9px]">
+                  {tr('IDLE', 'INACTIVO')}
+                </span>
+              </div>
+              <p className="font-mono text-[11px] text-reb-text-muted leading-relaxed">
+                {tr(
+                  'Select an active telemetry grant in the left rail and click',
+                  'Selecciona una concesión de telemetría activa en el panel izquierdo y haz clic en'
+                )}{' '}
+                <span className="text-reb-mint font-semibold">
+                  {tr('UNSEAL STREAM', 'ABRIR FLUJO')}
+                </span>{' '}
+                {tr(
+                  'to execute real-time ML-KEM-1024 decapsulation, AES-256-GCM decryption, and SHAKE-256 attestation in isolated browser RAM.',
+                  'para ejecutar en tiempo real la desencapsulación ML-KEM-1024, el descifrado AES-256-GCM y la atestación SHAKE-256 en la RAM aislada del navegador.'
+                )}
+              </p>
             </div>
           )}
         </div>

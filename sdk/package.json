@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "demo": "tsx src/demo.ts",
+    "test:quantum-defense": "tsx src/quantumDefenseSim.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "security": "npm audit --audit-level=moderate",
