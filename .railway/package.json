@@ -1,0 +1,16 @@
+{
+  "name": "@synapseq/railway-iac",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Railway Infrastructure as Code for SynapseQ (isolated from the app packages)",
+  "type": "module",
+  "scripts": {
+    "plan": "railway config plan",
+    "apply": "railway config apply",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "railway": "^3.19.1",
+    "typescript": "^5.7.3"
+  }
+}

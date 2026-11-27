@@ -1,0 +1,17 @@
+# Build context for the Railway Dockerfiles (gateway/Dockerfile, frontend/Dockerfile).
+# Secrets never enter an image: Railway injects variables at build/runtime.
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+.github
+.claude
+.stitch
+.railway
+contracts
+docs
+gateway/data
+*.md

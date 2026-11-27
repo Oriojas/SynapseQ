@@ -19,7 +19,9 @@ function loadDotEnv(file: string): void {
 loadDotEnv(join(process.cwd(), ".env"));
 loadDotEnv(join(process.cwd(), "..", ".env"));
 
-const PORT = Number(process.env.GATEWAY_PORT ?? 4000);
+const PORT = Number(process.env.GATEWAY_PORT ?? process.env.PORT ?? 4000);
+// Loopback by default (local dev). Containers (Railway) set GATEWAY_HOST="0.0.0.0" to accept traffic.
+const HOST = process.env.GATEWAY_HOST ?? "127.0.0.1";
 const RPC_URL = process.env.QORECHAIN_RPC_URL ?? "http://127.0.0.1:8545";
 const CHAIN_ID = Number(process.env.QORECHAIN_CHAIN_ID ?? 9800);
 // EVM authorisation windows only exist on QoreChain itself. A local Anvil (or an Anvil fork) has
@@ -60,9 +62,9 @@ const server = createGatewayServer({
     : undefined,
 });
 
-server.listen(PORT, "127.0.0.1", () => {
+server.listen(PORT, HOST, () => {
   console.log("=========================================================");
-  console.log(`SynapseQ Key-Release Gateway listening on http://127.0.0.1:${PORT}`);
+  console.log(`SynapseQ Key-Release Gateway listening on http://${HOST}:${PORT}`);
   console.log(`QoreChain RPC:  ${RPC_URL} (Chain ID ${CHAIN_ID})`);
   console.log(`Vault Contract: ${CONTRACT_ADDRESS}`);
   console.log(`CORS origins:   ${CORS_ORIGINS.join(", ")}`);
