@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bytesToHex, hexToBytes, type Address } from 'viem';
-import { ShieldAlert, Cpu, KeyRound, Activity, Radio, Wallet, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, Cpu, KeyRound, Activity, Radio, Wallet, CheckCircle2, ArrowLeft, ChevronDown, LogOut, RefreshCw } from 'lucide-react';
 import {
   computeEnvelopeHash,
   computeShake256,
@@ -159,6 +159,19 @@ export function App(): React.JSX.Element {
   const [isKeyPublishedOnChain, setIsKeyPublishedOnChain] = useState<boolean>(false);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
   const [bannerTone, setBannerTone] = useState<BannerTone>('ok');
+  const [walletMenuOpen, setWalletMenuOpen] = useState<boolean>(false);
+  const walletMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!walletMenuOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (walletMenuRef.current && !walletMenuRef.current.contains(e.target as Node)) {
+        setWalletMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', onOutside);
+    return () => window.removeEventListener('mousedown', onOutside);
+  }, [walletMenuOpen]);
 
   const localCacheRef = useRef<Map<string, CachedSealedPayload>>(new Map());
   const [chainSync, setChainSync] = useState<ChainGrantSyncState>({ status: 'off', count: 0, skipped: 0 });
@@ -266,50 +279,70 @@ export function App(): React.JSX.Element {
     void refreshSpecialistGrants();
   }, [refreshSpecialistGrants]);
 
-  const handleConnectWallet = useCallback(async () => {
-    try {
-      const addr = await vault.connectWallet();
-      if (!addr) {
+  const handleConnectWallet = useCallback(
+    async (preferredWalletId?: string) => {
+      setWalletMenuOpen(false);
+      try {
+        const addr = await vault.connectWallet(preferredWalletId);
+        if (!addr) {
+          notify(
+            tr(
+              'No Web3 wallet detected. Running in LOCAL DEMO MODE (nothing is recorded on-chain).',
+              'No se detectó wallet. La app queda en MODO DEMO LOCAL (nada se registra on-chain).'
+            ),
+            'warn'
+          );
+          return;
+        }
+        const chosenName =
+          (preferredWalletId
+            ? vault.availableWallets.find((w) => w.id === preferredWalletId)?.name
+            : vault.activeWallet?.name) ?? 'Web3 Wallet';
+        if (!vault.isChainConfigured) {
+          notify(
+            tr(
+              `${chosenName} (${addr}) connected, but VITE_QORECHAIN_RPC_URL or VITE_SYNAPSE_VAULT_ADDRESS is missing.`,
+              `${chosenName} (${addr}) conectada, pero falta VITE_QORECHAIN_RPC_URL o VITE_SYNAPSE_VAULT_ADDRESS.`
+            ),
+            'warn'
+          );
+        } else if (!env.gatewayUrl) {
+          notify(
+            tr(
+              `${chosenName} (${addr}) connected. Missing VITE_GATEWAY_URL: envelopes cannot be escrowed.`,
+              `${chosenName} (${addr}) conectada. Falta VITE_GATEWAY_URL: los pases no pueden custodiarse.`
+            ),
+            'warn'
+          );
+        } else {
+          notify(
+            tr(
+              `${chosenName} (${addr}) connected to QoreChain (${vault.chainId}). ON-CHAIN mode active.`,
+              `${chosenName} (${addr}) conectada a QoreChain (${vault.chainId}). Modo ON-CHAIN activo.`
+            )
+          );
+        }
+      } catch (err) {
         notify(
-          tr(
-            'No Web3 wallet detected. Running in LOCAL DEMO MODE (nothing is recorded on-chain).',
-            'No se detectó wallet. La app queda en MODO DEMO LOCAL (nada se registra on-chain).'
-          ),
-          'warn'
+          tr(`Failed to connect wallet: ${errorText(err)}`, `Error al conectar wallet: ${errorText(err)}`),
+          'error'
         );
-        return;
       }
-      if (!vault.isChainConfigured) {
-        notify(
-          tr(
-            `Wallet ${addr} connected, but VITE_QORECHAIN_RPC_URL or VITE_SYNAPSE_VAULT_ADDRESS is missing.`,
-            `Wallet ${addr} conectada, pero falta VITE_QORECHAIN_RPC_URL o VITE_SYNAPSE_VAULT_ADDRESS.`
-          ),
-          'warn'
-        );
-      } else if (!env.gatewayUrl) {
-        notify(
-          tr(
-            `Wallet ${addr} connected. Missing VITE_GATEWAY_URL: envelopes cannot be escrowed.`,
-            `Wallet ${addr} conectada. Falta VITE_GATEWAY_URL: los pases no pueden custodiarse.`
-          ),
-          'warn'
-        );
-      } else {
-        notify(
-          tr(
-            `Wallet ${addr} connected to QoreChain (${vault.chainId}). ON-CHAIN mode active.`,
-            `Wallet ${addr} conectada a QoreChain (${vault.chainId}). Modo ON-CHAIN activo.`
-          )
-        );
-      }
-    } catch (err) {
-      notify(
-        tr(`Failed to connect wallet: ${errorText(err)}`, `Error al conectar wallet: ${errorText(err)}`),
-        'error'
-      );
-    }
-  }, [env.gatewayUrl, notify, tr, vault]);
+    },
+    [env.gatewayUrl, notify, tr, vault]
+  );
+
+  const handleDisconnectWallet = useCallback(async () => {
+    setWalletMenuOpen(false);
+    await vault.disconnectWallet();
+    notify(
+      tr(
+        'Wallet disconnected. Switched to LOCAL DEMO MODE.',
+        'Wallet desconectada. Cambiado a MODO DEMO LOCAL.'
+      ),
+      'warn'
+    );
+  }, [notify, tr, vault]);
 
   /** Signs a gateway challenge with the connected wallet. */
   const gatewayAuth = useCallback(
@@ -926,9 +959,15 @@ export function App(): React.JSX.Element {
     [patientPasses]
   );
 
+  const defaultWalletName = useMemo(() => {
+    const qorex = vault.availableWallets.find((w) => w.isQoreX);
+    if (qorex) return qorex.name;
+    return vault.activeWallet?.name ?? 'QoreX';
+  }, [vault.activeWallet, vault.availableWallets]);
+
   const displayAddress = vault.walletAddress
     ? `${vault.walletAddress.slice(0, 6)}...${vault.walletAddress.slice(-4)}`
-    : tr('Connect Wallet', 'Conectar wallet');
+    : tr(`Connect ${defaultWalletName}`, `Conectar ${defaultWalletName}`);
 
   return (
     <div className="min-h-screen flex flex-col justify-between relative bg-reb-bg text-reb-text-light selection:bg-reb-mint selection:text-reb-bg">
@@ -1060,25 +1099,145 @@ export function App(): React.JSX.Element {
               onRefresh={() => void vault.refreshEvmWindow()}
             />
 
-            <button
-              type="button"
-              onClick={() => void handleConnectWallet()}
-              className="flex items-center gap-2 px-3 py-1 rounded-full bg-reb-surface/80 border border-reb-border hover:border-reb-mint/50 font-mono text-xs transition-all cursor-pointer"
-              title={tr(
-                'Connect QoreX Wallet / MetaMask to QoreChain Diana (9800)',
-                'Conectar QoreX Wallet / MetaMask a QoreChain Diana (9800)'
+            <div ref={walletMenuRef} className="relative flex items-center">
+              <div className="flex items-center rounded-full bg-reb-surface/80 border border-reb-border hover:border-reb-mint/50 transition-all">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (vault.isConnected) {
+                      setWalletMenuOpen((prev) => !prev);
+                    } else if (vault.availableWallets.length > 1 && !vault.availableWallets.some((w) => w.isQoreX)) {
+                      setWalletMenuOpen((prev) => !prev);
+                    } else {
+                      void handleConnectWallet();
+                    }
+                  }}
+                  className="flex items-center gap-2 pl-3 pr-2 py-1 font-mono text-xs cursor-pointer"
+                  title={
+                    vault.isConnected
+                      ? tr(
+                          `Connected via ${vault.activeWallet?.name ?? 'Wallet'} • Click to switch or disconnect`,
+                          `Conectado con ${vault.activeWallet?.name ?? 'Wallet'} • Clic para cambiar o desconectar`
+                        )
+                      : tr(
+                          'Connect QoreX Wallet (default) or choose another wallet',
+                          'Conectar QoreX Wallet (por defecto) o elegir otra billetera'
+                        )
+                  }
+                >
+                  {vault.isConnected ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-reb-mint" />
+                  ) : (
+                    <Wallet className="w-3.5 h-3.5 text-reb-yellow" />
+                  )}
+                  <span className="text-reb-text-light">{displayAddress}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-reb-mint/15 text-reb-mint text-[10px] font-semibold">
+                    {vault.isTxPending
+                      ? 'SIGNING...'
+                      : vault.isConnected && vault.activeWallet
+                        ? vault.activeWallet.isQoreX
+                          ? 'QoreX'
+                          : vault.activeWallet.name.split(' ')[0]
+                        : 'ML-KEM'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletMenuOpen((prev) => !prev)}
+                  aria-label={tr('Select or manage wallet', 'Seleccionar o gestionar billetera')}
+                  title={tr('Choose wallet / Disconnect', 'Elegir billetera / Desconectar')}
+                  className="pr-2.5 pl-1 py-1.5 border-l border-reb-border/70 text-reb-text-muted hover:text-reb-mint cursor-pointer transition-colors"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${walletMenuOpen ? 'rotate-180 text-reb-mint' : ''}`} />
+                </button>
+              </div>
+
+              {walletMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 rounded-xl bg-reb-bg/95 backdrop-blur-xl border border-reb-mint/40 shadow-[0_12px_36px_rgba(0,0,0,0.75)] p-3 z-50 font-mono text-xs">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-reb-border">
+                    <span className="text-[10px] uppercase tracking-wider text-reb-text-muted">
+                      {tr('Select EVM Wallet (QoreX Default)', 'Elegir Billetera (QoreX por defecto)')}
+                    </span>
+                    <span className="text-[10px] text-reb-mint">Chain {vault.chainId}</span>
+                  </div>
+
+                  {vault.availableWallets.length === 0 ? (
+                    <div className="py-2.5 px-2 text-[11px] text-reb-yellow bg-reb-surface/70 rounded-lg border border-reb-yellow/30">
+                      {tr(
+                        'No injected wallet detected. Install QoreX Wallet or MetaMask.',
+                        'No se detectó ninguna billetera. Instala QoreX Wallet o MetaMask.'
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {vault.availableWallets.map((w) => {
+                        const isSelected = vault.activeWallet?.id === w.id;
+                        const isActiveConn = vault.isConnected && isSelected;
+                        return (
+                          <button
+                            key={w.id}
+                            type="button"
+                            onClick={() => void handleConnectWallet(w.id)}
+                            className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
+                              isActiveConn
+                                ? 'bg-reb-mint/15 border-reb-mint text-reb-text-light'
+                                : isSelected
+                                  ? 'bg-reb-surface border-reb-mint/40 text-reb-text-light hover:border-reb-mint'
+                                  : 'bg-reb-surface/60 border-reb-border text-reb-text-muted hover:text-reb-text-light hover:border-reb-mint/40'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {w.icon ? (
+                                <img src={w.icon} alt="" className="w-4 h-4 rounded-sm shrink-0" />
+                              ) : (
+                                <Wallet className="w-3.5 h-3.5 text-reb-mint shrink-0" />
+                              )}
+                              <span className="truncate font-semibold">{w.name}</span>
+                              {w.isQoreX && (
+                                <span className="px-1.5 py-0.5 rounded bg-reb-mint/20 text-reb-mint text-[9px] uppercase font-bold">
+                                  {tr('Default', 'Por defecto')}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] shrink-0 text-reb-mint">
+                              {isActiveConn
+                                ? tr('Connected', 'Conectada')
+                                : tr('Connect', 'Conectar')}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {vault.isConnected && vault.walletAddress && (
+                    <div className="mt-2.5 pt-2.5 border-t border-reb-border space-y-1.5">
+                      <div className="px-2 py-1 rounded bg-reb-surface-code border border-reb-border-subtle text-[10px] text-reb-text-muted break-all">
+                        {vault.walletAddress}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void handleConnectWallet(vault.activeWallet?.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-reb-surface border border-reb-border hover:border-reb-mint/50 text-reb-text-light text-[11px] cursor-pointer transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3 text-reb-mint" />
+                          <span>{tr('Reconnect', 'Reconectar')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDisconnectWallet()}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-reb-pink/15 border border-reb-pink/50 hover:bg-reb-pink hover:text-reb-bg text-reb-pink text-[11px] font-semibold cursor-pointer transition-colors"
+                        >
+                          <LogOut className="w-3 h-3" />
+                          <span>{tr('Disconnect', 'Desconectar')}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
-            >
-              {vault.isConnected ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-reb-mint" />
-              ) : (
-                <Wallet className="w-3.5 h-3.5 text-reb-yellow" />
-              )}
-              <span className="text-reb-text-light">{displayAddress}</span>
-              <span className="px-1.5 py-0.5 rounded bg-reb-mint/15 text-reb-mint text-[10px] font-semibold">
-                {vault.isTxPending ? 'SIGNING...' : 'ML-KEM'}
-              </span>
-            </button>
+            </div>
 
             <button
               type="button"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BaseError,
   ContractFunctionRevertedError,
@@ -19,17 +19,128 @@ import {
   type EvmWindowStatus,
 } from '@sdk/evmWindow';
 import { getFrontendEnvConfig } from '@/config/env';
+import { detectDappLocale } from '@/i18n/context';
 
-interface EthereumProvider {
+export interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   on?: (event: string, handler: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+  isQoreX?: boolean;
+  isQore?: boolean;
+  isQoreChain?: boolean;
+  isMetaMask?: boolean;
+  isRabby?: boolean;
+  isBraveWallet?: boolean;
+  isCoinbaseWallet?: boolean;
+  providers?: EthereumProvider[];
+}
+
+export interface Eip6963ProviderInfo {
+  readonly uuid: string;
+  readonly name: string;
+  readonly icon: string;
+  readonly rdns: string;
+}
+
+export interface DiscoveredWalletProvider {
+  readonly id: string;
+  readonly name: string;
+  readonly rdns: string;
+  readonly icon?: string;
+  readonly isQoreX: boolean;
+  readonly provider: EthereumProvider;
 }
 
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
+    qorex?: EthereumProvider & { ethereum?: EthereumProvider };
+    qore?: EthereumProvider & { ethereum?: EthereumProvider };
+    qorechain?: EthereumProvider & { ethereum?: EthereumProvider };
   }
+}
+
+const DISCONNECT_STORAGE_KEY = 'synapseq.wallet.disconnected';
+const SELECTED_WALLET_STORAGE_KEY = 'synapseq.wallet.selectedId';
+
+function isQoreXDescriptor(name?: string, rdns?: string, p?: EthereumProvider): boolean {
+  const n = (name ?? '').toLowerCase();
+  const r = (rdns ?? '').toLowerCase();
+  return Boolean(
+    p?.isQoreX ||
+      p?.isQore ||
+      p?.isQoreChain ||
+      n.includes('qorex') ||
+      n.includes('qore') ||
+      r.includes('qorex') ||
+      r.includes('qorechain') ||
+      r.includes('qore')
+  );
+}
+
+function inferLegacyProviderName(p: EthereumProvider): { id: string; name: string; rdns: string; isQoreX: boolean } {
+  if (isQoreXDescriptor(undefined, undefined, p)) {
+    return { id: 'io.qorechain.qorex', name: 'QoreX Wallet', rdns: 'io.qorechain.qorex', isQoreX: true };
+  }
+  if (p.isRabby) {
+    return { id: 'io.rabby', name: 'Rabby Wallet', rdns: 'io.rabby', isQoreX: false };
+  }
+  if (p.isBraveWallet) {
+    return { id: 'com.brave.wallet', name: 'Brave Wallet', rdns: 'com.brave.wallet', isQoreX: false };
+  }
+  if (p.isCoinbaseWallet) {
+    return { id: 'com.coinbase.wallet', name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet', isQoreX: false };
+  }
+  if (p.isMetaMask) {
+    return { id: 'io.metamask', name: 'MetaMask', rdns: 'io.metamask', isQoreX: false };
+  }
+  return { id: 'injected.evm', name: 'Injected EVM Wallet', rdns: 'injected.evm', isQoreX: false };
+}
+
+function sortWalletsQoreXFirst(list: readonly DiscoveredWalletProvider[]): DiscoveredWalletProvider[] {
+  return [...list].sort((a, b) => {
+    if (a.isQoreX !== b.isQoreX) return a.isQoreX ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function collectLegacyProviders(): DiscoveredWalletProvider[] {
+  if (typeof window === 'undefined') return [];
+  const results: DiscoveredWalletProvider[] = [];
+  const seenProviders = new Set<EthereumProvider>();
+
+  const pushProvider = (raw: EthereumProvider | undefined, explicitQoreX = false) => {
+    if (!raw || typeof raw.request !== 'function' || seenProviders.has(raw)) return;
+    seenProviders.add(raw);
+    const meta = explicitQoreX
+      ? { id: 'io.qorechain.qorex', name: 'QoreX Wallet', rdns: 'io.qorechain.qorex', isQoreX: true }
+      : inferLegacyProviderName(raw);
+    results.push({
+      id: meta.id,
+      name: meta.name,
+      rdns: meta.rdns,
+      isQoreX: meta.isQoreX,
+      provider: raw,
+    });
+  };
+
+  // 1. Check dedicated QoreX global objects first
+  const qorexCand = window.qorex?.ethereum ?? window.qorex ?? window.qore?.ethereum ?? window.qore ?? window.qorechain?.ethereum ?? window.qorechain;
+  if (qorexCand) pushProvider(qorexCand, true);
+
+  // 2. Check window.ethereum.providers array (when multiple extensions are installed)
+  if (Array.isArray(window.ethereum?.providers)) {
+    for (const sub of window.ethereum.providers) {
+      pushProvider(sub, false);
+    }
+  }
+
+  // 3. Fallback to window.ethereum
+  if (window.ethereum) {
+    pushProvider(window.ethereum, false);
+  }
+
+  return sortWalletsQoreXFirst(results);
 }
 
 export interface OnChainTxReceiptInfo {
@@ -79,8 +190,6 @@ type WritableFunction =
   | 'logFirmwareUpdate'
   | 'updatePartStatus';
 
-import { detectDappLocale } from '@/i18n/context';
-
 function bi(en: string, es: string): string {
   return detectDappLocale() === 'es' ? es : en;
 }
@@ -106,12 +215,87 @@ export function useSynapseVault() {
   const targetChainId = env.qorechainChainId || 9800;
   const contractAddress = env.synapseVaultAddress;
 
+  const [availableWallets, setAvailableWallets] = useState<readonly DiscoveredWalletProvider[]>(() =>
+    collectLegacyProviders()
+  );
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(SELECTED_WALLET_STORAGE_KEY);
+  });
   const [walletAddress, setWalletAddress] = useState<Address | null>(null);
   const [isTxPending, setIsTxPending] = useState<boolean>(false);
   const [txHistory, setTxHistory] = useState<readonly OnChainTxReceiptInfo[]>([]);
   /** QoreChain EVM authorisation window of the connected wallet (null = unknown / not enforced). */
   const [evmWindow, setEvmWindow] = useState<EvmWindowStatus | null>(null);
   const [evmWindowEnforced, setEvmWindowEnforced] = useState<boolean>(false);
+
+  const eip6963MapRef = useRef<Map<string, DiscoveredWalletProvider>>(new Map());
+
+  // Discover wallets via EIP-6963 + legacy providers, always sorting QoreX first
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const rebuildWalletList = () => {
+      const eip6963List = [...eip6963MapRef.current.values()];
+      const legacyList = collectLegacyProviders();
+      const merged: DiscoveredWalletProvider[] = [...eip6963List];
+      const seenProviders = new Set(eip6963List.map((w) => w.provider));
+      const seenRdns = new Set(eip6963List.map((w) => w.rdns.toLowerCase()));
+
+      for (const leg of legacyList) {
+        if (seenProviders.has(leg.provider)) continue;
+        if (leg.isQoreX && [...eip6963List].some((w) => w.isQoreX)) continue;
+        if (seenRdns.has(leg.rdns.toLowerCase())) continue;
+        merged.push(leg);
+      }
+
+      const sorted = sortWalletsQoreXFirst(merged);
+      setAvailableWallets(sorted);
+    };
+
+    const onAnnounce = (ev: Event) => {
+      const customEv = ev as CustomEvent<{ info?: Eip6963ProviderInfo; provider?: EthereumProvider }>;
+      const info = customEv.detail?.info;
+      const provider = customEv.detail?.provider;
+      if (!info || !provider || typeof provider.request !== 'function') return;
+      const isQoreX = isQoreXDescriptor(info.name, info.rdns, provider);
+      const id = info.rdns || info.uuid;
+      eip6963MapRef.current.set(id, {
+        id,
+        name: info.name || (isQoreX ? 'QoreX Wallet' : 'EVM Wallet'),
+        rdns: info.rdns || id,
+        icon: info.icon,
+        isQoreX,
+        provider,
+      });
+      rebuildWalletList();
+    };
+
+    window.addEventListener('eip6963:announceProvider', onAnnounce);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    rebuildWalletList();
+
+    return () => {
+      window.removeEventListener('eip6963:announceProvider', onAnnounce);
+    };
+  }, []);
+
+  /**
+   * Resolves the active wallet entry:
+   * 1. Explicit user choice (if present in availableWallets)
+   * 2. QoreX Wallet (default priority!)
+   * 3. First available injected wallet
+   */
+  const activeWalletEntry = useMemo<DiscoveredWalletProvider | null>(() => {
+    if (availableWallets.length === 0) return null;
+    if (selectedWalletId) {
+      const explicit = availableWallets.find((w) => w.id === selectedWalletId || w.rdns === selectedWalletId);
+      if (explicit) return explicit;
+    }
+    const qorex = availableWallets.find((w) => w.isQoreX);
+    if (qorex) return qorex;
+    return availableWallets[0];
+  }, [availableWallets, selectedWalletId]);
 
   const chain = useMemo(
     () =>
@@ -128,44 +312,109 @@ export function useSynapseVault() {
     if (env.qorechainRpcUrl) {
       return createPublicClient({ chain, transport: http(env.qorechainRpcUrl) });
     }
+    if (activeWalletEntry?.provider) {
+      return createPublicClient({ chain, transport: custom(activeWalletEntry.provider) });
+    }
     if (typeof window !== 'undefined' && window.ethereum) {
       return createPublicClient({ chain, transport: custom(window.ethereum) });
     }
     return null;
-  }, [env.qorechainRpcUrl, chain]);
+  }, [activeWalletEntry, env.qorechainRpcUrl, chain]);
 
-  // Track the wallet's active account (account switches in the wallet update the UI)
+  // Track the active provider's account unless the user explicitly disconnected
   useEffect(() => {
-    const eth = typeof window !== 'undefined' ? window.ethereum : undefined;
-    if (!eth) return;
-    eth
-      .request({ method: 'eth_accounts' })
-      .then((accounts) => {
-        if (Array.isArray(accounts) && typeof accounts[0] === 'string') {
-          setWalletAddress(accounts[0] as Address);
-        }
-      })
-      .catch(() => undefined);
+    const provider = activeWalletEntry?.provider;
+    if (!provider || typeof window === 'undefined') return;
+
+    const isDisconnected = window.localStorage.getItem(DISCONNECT_STORAGE_KEY) === 'true';
+    if (!isDisconnected) {
+      provider
+        .request({ method: 'eth_accounts' })
+        .then((accounts) => {
+          if (Array.isArray(accounts) && typeof accounts[0] === 'string') {
+            setWalletAddress(accounts[0] as Address);
+          }
+        })
+        .catch(() => undefined);
+    }
+
     const onAccounts = (...args: unknown[]) => {
+      if (window.localStorage.getItem(DISCONNECT_STORAGE_KEY) === 'true') return;
       const accounts = args[0];
       setWalletAddress(
         Array.isArray(accounts) && typeof accounts[0] === 'string' ? (accounts[0] as Address) : null
       );
     };
-    eth.on?.('accountsChanged', onAccounts);
-    return () => eth.removeListener?.('accountsChanged', onAccounts);
+    provider.on?.('accountsChanged', onAccounts);
+    return () => provider.removeListener?.('accountsChanged', onAccounts);
+  }, [activeWalletEntry]);
+
+  const selectWallet = useCallback((walletId: string) => {
+    setSelectedWalletId(walletId);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SELECTED_WALLET_STORAGE_KEY, walletId);
+    }
   }, []);
 
-  const connectWallet = useCallback(async (): Promise<Address | null> => {
-    if (typeof window === 'undefined' || !window.ethereum) return null;
-    const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) as string[];
-    const primary = (accounts?.[0] as Address | undefined) ?? null;
-    setWalletAddress(primary);
-    return primary;
-  }, []);
+  const connectWallet = useCallback(
+    async (preferredWalletId?: string): Promise<Address | null> => {
+      if (typeof window === 'undefined') return null;
+
+      let entry: DiscoveredWalletProvider | null = null;
+      if (preferredWalletId) {
+        entry =
+          availableWallets.find((w) => w.id === preferredWalletId || w.rdns === preferredWalletId) ?? null;
+        if (entry) {
+          setSelectedWalletId(entry.id);
+          window.localStorage.setItem(SELECTED_WALLET_STORAGE_KEY, entry.id);
+        }
+      }
+      if (!entry) {
+        // Default priority: QoreX first, then user's previous selection, then first available
+        const qorex = availableWallets.find((w) => w.isQoreX);
+        entry = qorex ?? activeWalletEntry;
+        if (entry) {
+          setSelectedWalletId(entry.id);
+          window.localStorage.setItem(SELECTED_WALLET_STORAGE_KEY, entry.id);
+        }
+      }
+
+      const provider = entry?.provider ?? window.ethereum;
+      if (!provider) return null;
+
+      window.localStorage.removeItem(DISCONNECT_STORAGE_KEY);
+      const accounts = (await provider.request({ method: 'eth_requestAccounts' })) as string[];
+      const primary = (accounts?.[0] as Address | undefined) ?? null;
+      setWalletAddress(primary);
+      return primary;
+    },
+    [activeWalletEntry, availableWallets]
+  );
+
+  const disconnectWallet = useCallback(async (): Promise<void> => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(DISCONNECT_STORAGE_KEY, 'true');
+    }
+    const provider = activeWalletEntry?.provider;
+    if (provider) {
+      // Best-effort EIP-2255 permission revocation (supported by modern wallets; ignored if unsupported)
+      try {
+        await provider.request({
+          method: 'wallet_revokePermissions',
+          params: [{ eth_accounts: {} }],
+        });
+      } catch {
+        // Wallets like QoreX or older extensions that don't implement wallet_revokePermissions simply clear local session
+      }
+    }
+    setWalletAddress(null);
+    setEvmWindow(null);
+    setEvmWindowEnforced(false);
+  }, [activeWalletEntry]);
 
   const getWalletClient = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.ethereum) {
+    const provider = activeWalletEntry?.provider ?? (typeof window !== 'undefined' ? window.ethereum : undefined);
+    if (!provider) {
       throw new Error(
         bi(
           'No Web3 wallet detected (install QoreX Wallet or MetaMask).',
@@ -173,13 +422,13 @@ export function useSynapseVault() {
         )
       );
     }
-    const account = walletAddress ?? (await connectWallet());
+    const account = walletAddress ?? (await connectWallet(activeWalletEntry?.id));
     if (!account) throw new Error(bi('Wallet not connected.', 'Wallet no conectada.'));
     return {
       account,
-      client: createWalletClient({ account, chain, transport: custom(window.ethereum) }),
+      client: createWalletClient({ account, chain, transport: custom(provider) }),
     };
-  }, [chain, connectWallet, walletAddress]);
+  }, [activeWalletEntry, chain, connectWallet, walletAddress]);
 
   /** Reads the window through the gateway (QoreChain REST has no CORS). Local chains: not enforced. */
   const refreshEvmWindow = useCallback(async (): Promise<EvmWindowStatus | null> => {
@@ -374,6 +623,9 @@ export function useSynapseVault() {
   return {
     isConnected: Boolean(walletAddress),
     isChainConfigured: Boolean(contractAddress && publicClient),
+    availableWallets,
+    activeWallet: activeWalletEntry,
+    selectWallet,
     evmWindow,
     evmWindowEnforced,
     refreshEvmWindow,
@@ -383,6 +635,7 @@ export function useSynapseVault() {
     isTxPending,
     txHistory,
     connectWallet,
+    disconnectWallet,
     signMessage,
     queryKemPublicKeyOnChain,
     getGrantMetadata,
