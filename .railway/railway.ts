@@ -4,8 +4,10 @@
  * This folder is an isolated package (its own package.json / node_modules): the SDK used here
  * never touches the app packages (sdk/, gateway/, frontend/).
  *
+ * Full step-by-step guide (login, link, secrets, domains, verify): .railway/README.md
+ *
  *   cd .railway && npm install
- *   railway link                 # pick the project + environment
+ *   railway login && railway link
  *   npm run plan                 # railway config plan
  *   npm run apply                # railway config apply
  *
