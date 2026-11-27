@@ -1,5 +1,6 @@
 # 🧬⚙️ SynapseQ: Post-Quantum Ephemeral Health & Cyber-Human Augmentation Vault
 
+[![Built on QoreChain](https://build.qorechain.io/badge/synapseq.svg)](https://build.qorechain.io/p/synapseq)
 [![Hackathon](https://img.shields.io/badge/QoreChain-Build%20Before%20Q--Day-6E56CF?style=for-the-badge)](https://build.qorechain.io/es/projects)
 [![Network](https://img.shields.io/badge/Network-QoreChain%20Diana%20(Chain%20ID%209800)-00D1B2?style=for-the-badge)](https://dashboard.qorechain.io/faucet)
 [![PQC](https://img.shields.io/badge/PQC-ML--KEM--1024%20%2B%20ML--DSA--87-FF3860?style=for-the-badge)](https://build.qorechain.io/es/kits)
@@ -413,6 +414,7 @@ QoreChain solo admite transacciones EVM de cuentas con clave ML-DSA-87 registrad
 
 ## 🔗 Enlaces del Ecosistema QoreChain
 
+* **Página Oficial del Proyecto SynapseQ en QoreChain:** https://build.qorechain.io/p/synapseq
 * **Hackathon Build Before Q-Day:** https://build.qorechain.io/es/projects
 * **Documentación Oficial QoreChain:** https://docs.qorechain.io/es/introduction
 * **RPC Oficial Diana Testnet (Chain ID 9800):** `https://evm-testnet.qore.host`

@@ -1,5 +1,6 @@
 # 🤖🧬 `AI_USAGE.md` — Ingeniería AI-Native Multi-Agente en SynapseQ
 
+[![Built on QoreChain](https://build.qorechain.io/badge/synapseq.svg)](https://build.qorechain.io/p/synapseq)
 [![AI-Native Track](https://img.shields.io/badge/QoreChain%20Track-AI--Native%20Engineering-A855F7?style=for-the-badge)](https://build.qorechain.io/es/projects)
 [![Orchestration](https://img.shields.io/badge/Orchestration-Multi--Agent%20Swarm%20%2B%20MCP-00D1B2?style=for-the-badge)](./README.md)
 [![Red-Team Audit](https://img.shields.io/badge/AI%20Red--Team-13%2F13%20PoCs%20Mitigated-A8F0C6?style=for-the-badge)](./docs/informe-revision-key-release-gateway.md)
